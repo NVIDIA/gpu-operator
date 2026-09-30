@@ -690,24 +690,15 @@ spec:
                     description: 'Optional: ServiceAccount configuration for NVIDIA
                       DCGM Exporter'
                     properties:
-                      create:
-                        description: |-
-                          Create indicates whether the operator manages the lifecycle of the DCGM
-                          Exporter ServiceAccount. Defaults to true. When set to false, a
-                          ServiceAccount with the configured name has to already exist in the
-                          operator namespace; the operator then only references it and never
-                          creates, adopts, mutates or deletes it.
-                        type: boolean
                       name:
                         description: |-
-                          Name of the ServiceAccount used by the NVIDIA DCGM Exporter DaemonSet.
-                          Defaults to the operator-managed ServiceAccount when left empty.
+                          Name of an existing ServiceAccount in the operator namespace. When empty,
+                          the operator creates and manages its default account. The default name
+                          (nvidia-dcgm-exporter for ClusterPolicy, nvidia-dcgm-exporter-dra for
+                          GPUCluster) is reserved and must not be explicitly configured.
+                          The operator does not create, modify, adopt or delete a named account.
                         type: string
                     type: object
-                    x-kubernetes-validations:
-                    - message: name is required when create is false
-                      rule: '!has(self.create) || self.create || (has(self.name) &&
-                        size(self.name) > 0)'
                   serviceMonitor:
                     description: 'Optional: ServiceMonitor configuration for NVIDIA
                       DCGM Exporter'

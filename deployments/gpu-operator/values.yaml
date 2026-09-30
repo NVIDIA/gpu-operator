@@ -324,14 +324,15 @@ dcgmExporter:
   # podLabelAllowlistRegex:
   #   - "^app$"
   #   - "^kueue\\.x-k8s\\.io/.*$"
-  # ServiceAccount used by the DCGM Exporter DaemonSet. Leave unset to keep the
-  # operator-managed "nvidia-dcgm-exporter" ServiceAccount.
+  # Reference an existing ServiceAccount in the release namespace. The operator
+  # only validates and uses this account; manage it separately or via extraObjects.
+  # Leave empty to use the operator-managed default. Its name is reserved:
+  # nvidia-dcgm-exporter (ClusterPolicy), nvidia-dcgm-exporter-dra (GPUCluster).
+  # Switching to an external account retains the managed default until the exporter
+  # is disabled or its CR is deleted. Account changes trigger a DaemonSet rollout.
+  serviceAccount: {}
   # serviceAccount:
-  #   # name of the ServiceAccount to reference
-  #   name: nvidia-dcgm-exporter
-  #   # set to false to bind to a ServiceAccount that already exists in the operator
-  #   # namespace; the operator then never creates, mutates or deletes it
-  #   create: true
+  #   name: metrics-identity
   service:
     internalTrafficPolicy: Cluster
   serviceMonitor:

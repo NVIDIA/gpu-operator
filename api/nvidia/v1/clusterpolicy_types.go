@@ -1153,28 +1153,18 @@ type DCGMExporterServiceConfig struct {
 	InternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
 }
 
-// DCGMExporterServiceAccountConfig defines the ServiceAccount used by the NVIDIA
-// DCGM Exporter DaemonSet.
-// +kubebuilder:validation:XValidation:rule="!has(self.create) || self.create || (has(self.name) && size(self.name) > 0)",message="name is required when create is false"
+// DCGMExporterServiceAccountConfig selects an externally managed ServiceAccount.
 type DCGMExporterServiceAccountConfig struct {
-	// Name of the ServiceAccount used by the NVIDIA DCGM Exporter DaemonSet.
-	// Defaults to the operator-managed ServiceAccount when left empty.
+	// Name of an existing ServiceAccount in the operator namespace. When empty,
+	// the operator creates and manages its default account. The default name
+	// (nvidia-dcgm-exporter for ClusterPolicy, nvidia-dcgm-exporter-dra for
+	// GPUCluster) is reserved and must not be explicitly configured.
+	// The operator does not create, modify, adopt or delete a named account.
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ServiceAccount name for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Existing ServiceAccount name for NVIDIA DCGM Exporter"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
-
-	// Create indicates whether the operator manages the lifecycle of the DCGM
-	// Exporter ServiceAccount. Defaults to true. When set to false, a
-	// ServiceAccount with the configured name has to already exist in the
-	// operator namespace; the operator then only references it and never
-	// creates, adopts, mutates or deletes it.
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Create the ServiceAccount for NVIDIA DCGM Exporter"
-	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
-	Create *bool `json:"create,omitempty"`
 }
 
 // DCGMSpec defines the properties for NVIDIA DCGM deployment
@@ -2339,15 +2329,9 @@ func (e *DCGMExporterSpec) GetServiceAccountName(defaultName string) string {
 	return e.ServiceAccount.Name
 }
 
-// IsServiceAccountCreateEnabled returns true if the operator owns the lifecycle of
-// the DCGM Exporter ServiceAccount. When false the ServiceAccount is supplied by
-// the user and is never created, adopted, mutated or deleted by the operator.
-func (e *DCGMExporterSpec) IsServiceAccountCreateEnabled() bool {
-	if e.ServiceAccount == nil || e.ServiceAccount.Create == nil {
-		// default is true if not specified by user
-		return true
-	}
-	return *e.ServiceAccount.Create
+// HasServiceAccountName reports whether the exporter references an external account.
+func (e *DCGMExporterSpec) HasServiceAccountName() bool {
+	return e.ServiceAccount != nil && e.ServiceAccount.Name != ""
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator

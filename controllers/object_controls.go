@@ -28,7 +28,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -337,145 +336,30 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
-// dcgmExporterDaemonSetName is the DCGM Exporter DaemonSet, read to confirm which
-// ServiceAccount the deployed operand actually references.
-const dcgmExporterDaemonSetName = "nvidia-dcgm-exporter"
-
-// dcgmExporterServiceAccountMarker identifies the ServiceAccounts the operator created
-// for the DCGM Exporter. It reuses the app label the asset has always carried, so
-// accounts created by an earlier release are still recognized after an upgrade;
-// ServiceAccount() stamps it on each one it creates rather than trusting the asset.
+// The existing exporter label and controller reference identify its default account.
 var dcgmExporterServiceAccountMarker = ownership.Marker{
 	Key:   "app",
 	Value: "nvidia-dcgm-exporter",
 }
 
-// ensureDCGMExporterServiceAccount creates a missing account or validates the exact
-// version whose ownership we observed. Re-reading the cache after AlreadyExists is
-// insufficient: it can still contain the managed account a user has replaced.
-func (n ClusterPolicyController) ensureDCGMExporterServiceAccount(ctx context.Context, obj *corev1.ServiceAccount) error {
-	found := &corev1.ServiceAccount{}
-	if err := n.client.Get(ctx, client.ObjectKeyFromObject(obj), found); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		// AlreadyExists must also retry, so the next reconcile validates the account
-		// through the existing-object path rather than trusting the cached absence.
-		return n.client.Create(ctx, obj)
+// deleteDefaultDCGMExporterServiceAccount leaves external accounts alone, including
+// a same-name replacement of the default. The default is retained during identity
+// changes so running pods can keep using it until the exporter is disabled.
+func (n ClusterPolicyController) deleteDefaultDCGMExporterServiceAccount() (gpuv1.State, error) {
+	sa := &corev1.ServiceAccount{}
+	err := n.client.Get(n.ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: DCGMExporterDefaultServiceAccountName}, sa)
+	if apierrors.IsNotFound(err) {
+		return gpuv1.Disabled, nil
 	}
-	if !ownership.IsManaged(found, n.singleton, dcgmExporterServiceAccountMarker) {
-		return ownership.ConflictError("ClusterPolicy", obj.Name, obj.Namespace)
+	if err != nil {
+		return gpuv1.NotReady, err
 	}
-	base := found.DeepCopy()
-	return n.client.Patch(ctx, found, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{}))
-}
-
-// dcgmExporterServiceAccountRenamed reports whether the exporter is configured to use a
-// ServiceAccount other than the operator default.
-func dcgmExporterServiceAccountRenamed(config *gpuv1.ClusterPolicySpec) bool {
-	return dcgmExporterServiceAccountName(config) != DCGMExporterDefaultServiceAccountName
-}
-
-// releaseDCGMExporterServiceAccount drops this ClusterPolicy's controller reference from a
-// ServiceAccount the user has taken over with create=false. Without it the object stays
-// garbage-collected together with the ClusterPolicy even though the operator no longer
-// manages it. Only a ServiceAccount the exporter created is handed back: pointing
-// create=false at another operand's ServiceAccount must leave that operand's ownership alone.
-func (n ClusterPolicyController) releaseDCGMExporterServiceAccount(ctx context.Context, sa *corev1.ServiceAccount, logger logr.Logger) error {
-	if !ownership.IsManaged(sa, n.singleton, dcgmExporterServiceAccountMarker) {
-		return nil
-	}
-	ownership.ReleaseOwner(sa, n.singleton.GetUID())
-	logger.V(1).Info("Releasing ownership of a user-provided ServiceAccount", "Name", sa.Name)
-	return n.client.Update(ctx, sa)
-}
-
-// cleanupSupersededDCGMExporterServiceAccount removes the ServiceAccounts the exporter
-// created under a previous configuration once a different one has taken over. It runs only
-// after every control of the state converged, so a failure part-way through reconciliation
-// never leaves the DaemonSet referencing a ServiceAccount that has already been deleted.
-func (n ClusterPolicyController) cleanupSupersededDCGMExporterServiceAccount(ctx context.Context) error {
-	if n.stateNames[n.idx] != "state-dcgm-exporter" || !n.isStateEnabled(n.stateNames[n.idx]) {
-		// A disabled exporter sweeps its ServiceAccounts in ServiceAccount() itself,
-		// where nothing references them any more.
-		return nil
-	}
-	logger := n.logger.WithValues("Namespace", n.operatorNamespace)
-	configured := dcgmExporterServiceAccountName(&n.singleton.Spec)
-
-	// Convergence is not proof that the operands moved to the configured account:
-	// DaemonSet() reports Ready without touching the live object when no GPU node is
-	// detected, so a rename would delete an account the deployed DaemonSet still uses.
-	ds := &appsv1.DaemonSet{}
-	err := n.client.Get(ctx,
-		types.NamespacedName{Namespace: n.operatorNamespace, Name: dcgmExporterDaemonSetName}, ds)
-	switch {
-	case apierrors.IsNotFound(err):
-		// Nothing is deployed, so nothing references a ServiceAccount.
-	case err != nil:
-		return err
-	case ds.Spec.Template.Spec.ServiceAccountName != configured || !isDaemonSetRollingUpdateComplete(ds):
-		logger.V(1).Info("DCGM Exporter DaemonSet has not finished switching ServiceAccounts, deferring cleanup",
-			"Deployed", ds.Spec.Template.Spec.ServiceAccountName, "Configured", configured)
-		return nil
-	}
-	return n.deleteOwnedDCGMExporterServiceAccounts(ctx, configured, logger)
-}
-
-// disableDCGMExporterServiceAccount cleans up when the exporter is turned off. It sweeps
-// every ServiceAccount the exporter created and this ClusterPolicy still owns -- not just
-// the one currently configured -- so an update that disables the exporter and renames the
-// ServiceAccount at once leaves nothing behind. A user-provided ServiceAccount (create=false)
-// is handed back instead: it may have been operator-managed before, and returning Disabled
-// with the owner reference in place would garbage-collect it with the ClusterPolicy.
-func (n ClusterPolicyController) disableDCGMExporterServiceAccount(ctx context.Context, configured *corev1.ServiceAccount, unmanaged bool, logger logr.Logger) (gpuv1.State, error) {
-	keep := ""
-	if unmanaged {
-		keep = configured.Name
-		found := &corev1.ServiceAccount{}
-		err := n.client.Get(ctx, types.NamespacedName{Namespace: configured.Namespace, Name: configured.Name}, found)
-		switch {
-		case err == nil:
-			// Release before the sweep: once the controller reference is gone the sweep
-			// skips the object, whereas the other way round it would be deleted.
-			if err := n.releaseDCGMExporterServiceAccount(ctx, found, logger); err != nil {
-				return gpuv1.NotReady, err
-			}
-		case !apierrors.IsNotFound(err):
+	if ownership.IsManaged(sa, n.singleton, dcgmExporterServiceAccountMarker) {
+		if err := ownership.DeleteObserved(n.ctx, n.client, sa); err != nil {
 			return gpuv1.NotReady, err
 		}
 	}
-	if err := n.deleteOwnedDCGMExporterServiceAccounts(ctx, keep, logger); err != nil {
-		logger.Info("Couldn't delete", "Error", err)
-		return gpuv1.NotReady, err
-	}
 	return gpuv1.Disabled, nil
-}
-
-// deleteOwnedDCGMExporterServiceAccounts removes every ServiceAccount the exporter created
-// that this ClusterPolicy still controls, except the one named keep. Finding them by label
-// rather than by name is what covers a rename from one custom name to another, or back to
-// the default: no record of the previous configuration exists, but every ServiceAccount the
-// operator created for the exporter carries the label. A ServiceAccount the user provisioned
-// under one of those names carries no controller reference and is left alone.
-func (n ClusterPolicyController) deleteOwnedDCGMExporterServiceAccounts(ctx context.Context, keep string, logger logr.Logger) error {
-	list := &corev1.ServiceAccountList{}
-	if err := n.client.List(ctx, list,
-		client.InNamespace(n.operatorNamespace),
-		dcgmExporterServiceAccountMarker.Selector()); err != nil {
-		return err
-	}
-	for i := range list.Items {
-		sa := &list.Items[i]
-		if sa.Name == keep || !ownership.IsManaged(sa, n.singleton, dcgmExporterServiceAccountMarker) {
-			continue
-		}
-		logger.V(1).Info("Removing a dcgm-exporter ServiceAccount the operator no longer uses", "Name", sa.Name)
-		if err := ownership.DeleteObserved(ctx, n.client, sa); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ServiceAccount creates ServiceAccount resource
@@ -484,74 +368,48 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
-
-	// The DCGM Exporter ServiceAccount name is user-configurable. The label is how the
-	// operator later finds the ServiceAccounts it created for the exporter, whatever they
-	// were named at the time.
 	isDCGMExporter := n.stateNames[state] == "state-dcgm-exporter"
-	if isDCGMExporter {
-		obj.Name = dcgmExporterServiceAccountName(&n.singleton.Spec)
-		dcgmExporterServiceAccountMarker.Apply(obj)
-	}
-	// A ServiceAccount the user brings is only referenced, never managed: the
-	// operator must not create, adopt, mutate or delete it.
-	unmanaged := isDCGMExporter && !n.singleton.Spec.DCGMExporter.IsServiceAccountCreateEnabled()
-
 	logger := n.logger.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
+	if !n.isStateEnabled(n.stateNames[state]) {
 		if isDCGMExporter {
-			return n.disableDCGMExporterServiceAccount(ctx, obj, unmanaged, logger)
+			return n.deleteDefaultDCGMExporterServiceAccount()
 		}
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
+		if err := n.client.Delete(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
 	}
 
-	if unmanaged {
-		// Surface the misconfiguration here rather than leaving the DaemonSet
-		// pending on a ServiceAccount that does not exist.
-		found := &corev1.ServiceAccount{}
-		if err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found); err != nil {
-			if apierrors.IsNotFound(err) {
-				logger.Error(err, "ServiceAccount configured with create=false does not exist")
+	if isDCGMExporter {
+		if n.singleton.Spec.DCGMExporter.HasServiceAccountName() {
+			name := dcgmExporterServiceAccountName(&n.singleton.Spec)
+			if name == DCGMExporterDefaultServiceAccountName {
+				return gpuv1.NotReady, fmt.Errorf("ServiceAccount name %q is reserved for operator management; omit dcgmExporter.serviceAccount.name to use it", name)
 			}
-			return gpuv1.NotReady, err
+			found := &corev1.ServiceAccount{}
+			if err := n.client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, found); err != nil {
+				return gpuv1.NotReady, fmt.Errorf("cannot use DCGM Exporter ServiceAccount %q in namespace %q: %w", name, n.operatorNamespace, err)
+			}
+			if !found.DeletionTimestamp.IsZero() {
+				return gpuv1.NotReady, fmt.Errorf("DCGM Exporter ServiceAccount %q in namespace %q is being deleted", name, n.operatorNamespace)
+			}
+			return gpuv1.Ready, nil
 		}
-		// The same ServiceAccount may have been operator-managed before the user set
-		// create=false. Leaving the controller reference in place would garbage-collect
-		// their object together with the ClusterPolicy.
-		if err := n.releaseDCGMExporterServiceAccount(ctx, found, logger); err != nil {
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
+		dcgmExporterServiceAccountMarker.Apply(obj)
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
-
-	// The operator default keeps its historical upgrade behavior. A configured
-	// name must be validated against the server before later controls bind to it.
-	if isDCGMExporter && dcgmExporterServiceAccountRenamed(&n.singleton.Spec) {
-		if err := n.ensureDCGMExporterServiceAccount(ctx, obj); err != nil {
-			return gpuv1.NotReady, err
-		}
-	} else if err := n.client.Create(ctx, obj); err != nil {
+	if err := n.client.Create(ctx, obj); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			logger.Info("Couldn't create", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		logger.Info("Found Resource, skipping update")
 	}
-
-	// Reclaiming the ServiceAccounts a previous configuration left behind is deferred to
-	// cleanupSupersededDCGMExporterServiceAccount, which runs once every control of this
-	// state has converged.
 	return gpuv1.Ready, nil
 }
 

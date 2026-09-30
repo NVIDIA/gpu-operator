@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -32,91 +33,177 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
-func TestDCGMExporterManagedAccountValidation(t *testing.T) {
-	for name, tc := range map[string]struct{ replacement, changed, patchDenied bool }{
-		"current managed account is validated without replacing metadata": {},
-		"stale managed cache must not authorize a replacement":            {replacement: true},
-		"same UID with changed ownership is rejected":                     {changed: true},
-		"validation write failure stops later controls":                   {patchDenied: true},
+func newExporterAccountController(t *testing.T) ClusterPolicyController {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	return ClusterPolicyController{
+		client: fake.NewClientBuilder().WithScheme(scheme).Build(), ctx: t.Context(),
+		singleton: &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "policy", UID: "policy-uid"}},
+		scheme:    scheme, operatorNamespace: "operator", logger: logr.Discard(),
+		stateNames: []string{"state-dcgm-exporter"},
+		resources:  []Resources{{ServiceAccount: corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: DCGMExporterDefaultServiceAccountName}}}},
+		controls:   []controlFunc{{ServiceAccount}},
+	}
+}
+
+func TestDCGMExporterServiceAccountReference(t *testing.T) {
+	for name, tc := range map[string]struct {
+		configured, namespace            string
+		missing, terminating, emptyBlock bool
+		err                              string
+	}{
+		"unset creates default":                     {},
+		"empty block creates default":               {emptyBlock: true},
+		"external account is read only":             {configured: "metrics", namespace: "operator"},
+		"missing account blocks consumers":          {configured: "metrics", missing: true, err: "cannot use"},
+		"account in another namespace is missing":   {configured: "metrics", namespace: "another", err: "cannot use"},
+		"reserved name is rejected even if present": {configured: DCGMExporterDefaultServiceAccountName, namespace: "operator", err: "reserved"},
+		"reserved name is never created explicitly": {configured: DCGMExporterDefaultServiceAccountName, missing: true, err: "reserved"},
+		"terminating account is not ready":          {configured: "metrics", namespace: "operator", terminating: true, err: "being deleted"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			ctx := t.Context()
-			scheme := runtime.NewScheme()
-			require.NoError(t, corev1.AddToScheme(scheme))
-			require.NoError(t, appsv1.AddToScheme(scheme))
-			require.NoError(t, gpuv1.AddToScheme(scheme))
-			cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "policy", UID: "policy-uid"}}
-			cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics"}
-			cached := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "metrics", Namespace: "operator", UID: "old-uid", ResourceVersion: "10", Annotations: map[string]string{"example.com/identity": "keep"}}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: "pull-secret"}}}
-			dcgmExporterServiceAccountMarker.Apply(cached)
-			require.NoError(t, controllerutil.SetControllerReference(cp, cached, scheme))
-			live := cached.DeepCopy()
-			if tc.replacement || tc.changed {
-				live.ResourceVersion = "20"
-				live.OwnerReferences = nil
-				if tc.replacement {
-					live.UID = "replacement-uid"
-				}
+			n := newExporterAccountController(t)
+			if tc.configured != "" || tc.emptyBlock {
+				n.singleton.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: tc.configured}
 			}
-			base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(live).Build()
-			creates := 0
-			c := interceptor.NewClient(base, interceptor.Funcs{
-				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if sa, ok := obj.(*corev1.ServiceAccount); ok && key == client.ObjectKeyFromObject(cached) {
-						*sa = *cached.DeepCopy()
-						return nil
-					}
-					return c.Get(ctx, key, obj, opts...)
-				},
-				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-					creates++
-					return c.Create(ctx, obj, opts...)
-				},
-				Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					if tc.patchDenied {
-						return apierrors.NewForbidden(corev1.Resource("serviceaccounts"), obj.GetName(), nil)
-					}
-					return c.Patch(ctx, obj, patch, opts...)
-				},
-			})
+			var before *corev1.ServiceAccount
+			if tc.configured != "" && !tc.missing {
+				sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+					Name: tc.configured, Namespace: tc.namespace,
+					Labels:          map[string]string{"app": "nvidia-dcgm-exporter"},
+					Annotations:     map[string]string{"example.com/identity": "keep"},
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: "external-owner", UID: "external-owner"}},
+				}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: "pull-secret"}}}
+				require.NoError(t, n.client.Create(t.Context(), sa))
+				if tc.terminating {
+					sa.Finalizers = []string{"example.com/keep"}
+					require.NoError(t, n.client.Update(t.Context(), sa))
+					require.NoError(t, n.client.Delete(t.Context(), sa))
+				}
+				before = &corev1.ServiceAccount{}
+				require.NoError(t, n.client.Get(t.Context(), client.ObjectKeyFromObject(sa), before))
+			}
 			consumers := 0
-			n := ClusterPolicyController{client: c, ctx: ctx, singleton: cp, scheme: scheme, operatorNamespace: "operator", logger: logr.Discard(),
-				stateNames: []string{"state-dcgm-exporter"}, resources: []Resources{{ServiceAccount: corev1.ServiceAccount{}}},
-				controls: []controlFunc{{ServiceAccount, func(ClusterPolicyController) (gpuv1.State, error) { consumers++; return gpuv1.Ready, nil }}},
-			}
+			n.controls[0] = append(n.controls[0], func(ClusterPolicyController) (gpuv1.State, error) { consumers++; return gpuv1.Ready, nil })
 			state, err := n.step()
-			if tc.replacement || tc.changed || tc.patchDenied {
-				require.Error(t, err)
+			if tc.err != "" {
+				require.ErrorContains(t, err, tc.err)
 				require.Equal(t, gpuv1.NotReady, state)
-				require.Zero(t, consumers, "unvalidated identities must not reach RBAC or DaemonSet controls")
-				if !tc.patchDenied {
-					require.True(t, apierrors.IsConflict(err))
-				}
+				require.Zero(t, consumers)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, gpuv1.Ready, state)
 				require.Equal(t, 1, consumers)
 			}
-			require.Zero(t, creates, "an existing account must be validated with its resource version")
+			if before != nil {
+				after := &corev1.ServiceAccount{}
+				require.NoError(t, n.client.Get(t.Context(), client.ObjectKeyFromObject(before), after))
+				require.Equal(t, before, after)
+			}
+			accounts := &corev1.ServiceAccountList{}
+			require.NoError(t, n.client.List(t.Context(), accounts))
+			switch {
+			case tc.configured == "":
+				require.Len(t, accounts.Items, 1)
+				require.Equal(t, DCGMExporterDefaultServiceAccountName, accounts.Items[0].Name)
+				require.True(t, metav1.IsControlledBy(&accounts.Items[0], n.singleton))
+			case tc.missing:
+				require.Empty(t, accounts.Items)
+			default:
+				require.Len(t, accounts.Items, 1, "a custom reference must not create an account")
+			}
+		})
+	}
+}
+
+func TestDCGMExporterServiceAccountTransitions(t *testing.T) {
+	n := newExporterAccountController(t)
+	ctx := t.Context()
+	for _, name := range []string{"metrics-a", "metrics-b"} {
+		require.NoError(t, n.client.Create(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "operator", Labels: map[string]string{"app": "nvidia-dcgm-exporter"}}}))
+	}
+	for _, name := range []string{"", "metrics-a", "metrics-b", ""} {
+		n.idx = 0
+		n.singleton.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: name}
+		_, err := n.step()
+		require.NoError(t, err)
+		accounts := &corev1.ServiceAccountList{}
+		require.NoError(t, n.client.List(ctx, accounts))
+		require.Len(t, accounts.Items, 3, "switching identity must retain the default and both external accounts")
+	}
+	// A missing new identity must not destroy the account still used by running pods.
+	n.singleton.Spec.DCGMExporter.ServiceAccount.Name = "missing"
+	n.idx = 0
+	_, err := n.step()
+	require.True(t, apierrors.IsNotFound(err))
+	n.singleton.Spec.DCGMExporter.Enabled = new(false)
+	state, err := n.step()
+	require.NoError(t, err, "missing external accounts must not prevent teardown")
+	require.Equal(t, gpuv1.Disabled, state)
+	accounts := &corev1.ServiceAccountList{}
+	require.NoError(t, n.client.List(ctx, accounts))
+	require.Len(t, accounts.Items, 2)
+	for _, sa := range accounts.Items {
+		require.Empty(t, sa.OwnerReferences)
+	}
+}
+
+func TestDCGMExporterDefaultAccountDeletionConflict(t *testing.T) {
+	for _, replacement := range []bool{false, true} {
+		t.Run(fmt.Sprintf("replacement=%t", replacement), func(t *testing.T) {
+			n := newExporterAccountController(t)
+			_, err := ServiceAccount(n)
+			require.NoError(t, err)
+			n.singleton.Spec.DCGMExporter.Enabled = new(false)
+			base := n.client
+			deletes := 0
+			n.client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+				deletes++
+				if deletes == 1 {
+					current := &corev1.ServiceAccount{}
+					require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(obj), current))
+					if replacement {
+						require.NoError(t, c.Delete(ctx, current))
+						current = &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: obj.GetName(), Namespace: obj.GetNamespace(), UID: "replacement", Labels: map[string]string{"app": "nvidia-dcgm-exporter"}}}
+						require.NoError(t, c.Create(ctx, current))
+						options := (&client.DeleteOptions{}).ApplyOptions(opts)
+						require.NotNil(t, options.Preconditions)
+						require.NotNil(t, options.Preconditions.UID)
+						return apierrors.NewConflict(corev1.Resource("serviceaccounts"), obj.GetName(), fmt.Errorf("UID changed"))
+					}
+					current.Annotations = map[string]string{"audit": "updated"}
+					require.NoError(t, c.Update(ctx, current))
+				}
+				return c.Delete(ctx, obj, opts...)
+			}})
+			_, err = ServiceAccount(n)
+			require.True(t, apierrors.IsConflict(err))
+			_, err = ServiceAccount(n)
+			require.NoError(t, err)
 			found := &corev1.ServiceAccount{}
-			require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(live), found))
-			require.Equal(t, live.UID, found.UID)
-			require.Equal(t, live.OwnerReferences, found.OwnerReferences)
-			require.Equal(t, live.Labels, found.Labels)
-			require.Equal(t, live.Annotations, found.Annotations)
-			require.Equal(t, live.ImagePullSecrets, found.ImagePullSecrets)
+			err = base.Get(t.Context(), client.ObjectKey{Namespace: "operator", Name: DCGMExporterDefaultServiceAccountName}, found)
+			if replacement {
+				require.NoError(t, err)
+				require.Empty(t, found.OwnerReferences)
+				require.Equal(t, 1, deletes)
+			} else {
+				require.True(t, apierrors.IsNotFound(err))
+				require.Equal(t, 2, deletes)
+			}
 		})
 	}
 }
 
 func TestClusterPolicyRechecksReadyExporterServiceAccount(t *testing.T) {
 	cp := clusterPolicyForUpgradeTest(false)
-	cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "byo", Create: new(false)}
+	cp.Spec.DCGMExporter.ServiceAccount = &gpuv1.DCGMExporterServiceAccountConfig{Name: "byo"}
 	node := nodeWithLabels("nfd-node", map[string]string{"feature.node.kubernetes.io/test": "true"})
 	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp, node)
 	require.NoError(t, appsv1.AddToScheme(r.Scheme))
@@ -145,39 +232,15 @@ func TestClusterPolicyRechecksReadyExporterServiceAccount(t *testing.T) {
 	require.Empty(t, restored.OwnerReferences)
 }
 
-// A benign metadata conflict must retry cleanup rather than leave an obsolete
-// managed identity behind after the state reports Ready.
-func TestDCGMExporterCleanupRetriesMetadataConflict(t *testing.T) {
-	ctx := t.Context()
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	require.NoError(t, gpuv1.AddToScheme(scheme))
-	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "policy", UID: "policy-uid"}}
-	old := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "previous", Namespace: "operator", UID: "old-uid"}}
-	dcgmExporterServiceAccountMarker.Apply(old)
-	require.NoError(t, controllerutil.SetControllerReference(cp, old, scheme))
-	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(old).Build()
-	deletes := 0
-	c := interceptor.NewClient(base, interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
-		deletes++
-		if deletes == 1 {
-			current := &corev1.ServiceAccount{}
-			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(old), current))
-			current.Annotations = map[string]string{"example.com/last-audit": "updated"}
-			require.NoError(t, c.Update(ctx, current))
-		}
-		return c.Delete(ctx, obj, opts...)
-	}})
-	n := ClusterPolicyController{client: c, ctx: ctx, singleton: cp, scheme: scheme, operatorNamespace: "operator", logger: logr.Discard(), stateNames: []string{"state-dcgm-exporter"}, controls: []controlFunc{{func(ClusterPolicyController) (gpuv1.State, error) { return gpuv1.Ready, nil }}}}
-	state, err := n.step()
-	require.True(t, apierrors.IsConflict(err))
-	require.Equal(t, gpuv1.NotReady, state)
-	require.Zero(t, n.idx, "a failed cleanup must not advance the state")
-	require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(old), &corev1.ServiceAccount{}))
-	state, err = n.step()
+func TestNonExporterServiceAccountDeletionIsUnchanged(t *testing.T) {
+	n := newExporterAccountController(t)
+	n.stateNames[0] = "state-driver"
+	n.singleton.Spec.Driver.Enabled = new(false)
+	sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "driver", Namespace: "operator"}}
+	n.resources[0].ServiceAccount = *sa.DeepCopy()
+	require.NoError(t, n.client.Create(t.Context(), sa))
+	state, err := ServiceAccount(n)
 	require.NoError(t, err)
-	require.Equal(t, gpuv1.Ready, state)
-	require.Equal(t, 2, deletes)
-	require.True(t, apierrors.IsNotFound(base.Get(ctx, client.ObjectKeyFromObject(old), &corev1.ServiceAccount{})))
+	require.Equal(t, gpuv1.Disabled, state)
+	require.True(t, apierrors.IsNotFound(n.client.Get(t.Context(), client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{})))
 }

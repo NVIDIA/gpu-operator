@@ -18,7 +18,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -152,6 +150,146 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 
 	require.Len(t, ctr.Resources.Claims, 1)
 	assert.Equal(t, "admin-gpus", ctr.Resources.Claims[0].Name)
+}
+
+func TestDCGMExporterExternalServiceAccountValidation(t *testing.T) {
+	for name, tc := range map[string]struct {
+		configured, namespace, err string
+		missing, terminating       bool
+	}{
+		"existing external account": {configured: "metrics", namespace: "test-operator"},
+		"missing external account":  {configured: "metrics", missing: true, err: "cannot use"},
+		"different namespace":       {configured: "metrics", namespace: "other", err: "cannot use"},
+		"reserved name exists":      {configured: dcgmExporterDefaultServiceAccountName, namespace: "test-operator", err: "reserved"},
+		"reserved name missing":     {configured: dcgmExporterDefaultServiceAccountName, missing: true, err: "reserved"},
+		"terminating account":       {configured: "metrics", namespace: "test-operator", terminating: true, err: "being deleted"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: tc.configured}})
+			s := newTestDCGMExporterStateWithObjects(t)
+			var before *corev1.ServiceAccount
+			if !tc.missing {
+				sa := selfLabelledServiceAccount(tc.configured)
+				sa.Namespace = tc.namespace
+				sa.Annotations = map[string]string{"example.com/identity": "keep"}
+				sa.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "pull-secret"}}
+				sa.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: "external-owner", UID: "external-owner"}}
+				require.NoError(t, s.client.Create(ctx, sa))
+				if tc.terminating {
+					sa.Finalizers = []string{"example.com/keep"}
+					require.NoError(t, s.client.Update(ctx, sa))
+					require.NoError(t, s.client.Delete(ctx, sa))
+				}
+				before = &corev1.ServiceAccount{}
+				require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(sa), before))
+			}
+			state, err := s.Sync(ctx, cr, draSupportedCatalog())
+			if tc.err != "" {
+				require.ErrorContains(t, err, tc.err)
+				require.Equal(t, SyncState(SyncStateNotReady), state)
+				daemonsets := &appsv1.DaemonSetList{}
+				require.NoError(t, s.client.List(ctx, daemonsets))
+				require.Empty(t, daemonsets.Items, "invalid identities must not reach operand creation")
+			} else {
+				require.NoError(t, err)
+			}
+			if before != nil {
+				after := &corev1.ServiceAccount{}
+				require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(before), after))
+				require.Equal(t, before, after)
+			}
+			accounts := &corev1.ServiceAccountList{}
+			require.NoError(t, s.client.List(ctx, accounts))
+			if tc.missing {
+				require.Empty(t, accounts.Items)
+			} else {
+				require.Len(t, accounts.Items, 1, "external mode never creates a ServiceAccount")
+			}
+		})
+	}
+}
+
+func TestDCGMExporterServiceAccountTransitions(t *testing.T) {
+	ctx := t.Context()
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
+	cr.UID = "cluster-uid"
+	s := newTestDCGMExporterStateWithObjects(t, selfLabelledServiceAccount("metrics-a"), selfLabelledServiceAccount("metrics-b"))
+	for _, name := range []string{"", "metrics-a", "metrics-b", ""} {
+		cr.Spec.DCGMExporter.ServiceAccount = &nvidiav1.DCGMExporterServiceAccountConfig{Name: name}
+		_, err := s.Sync(ctx, cr, draSupportedCatalog())
+		require.NoError(t, err)
+		ds := &appsv1.DaemonSet{}
+		require.NoError(t, s.client.Get(ctx, client.ObjectKey{Namespace: "test-operator", Name: "nvidia-dcgm-exporter-dra"}, ds))
+		require.Equal(t, cr.Spec.DCGMExporter.GetServiceAccountName(dcgmExporterDefaultServiceAccountName), ds.Spec.Template.Spec.ServiceAccountName)
+		// Completing rollout must no longer reclaim the managed default.
+		ds.Status = appsv1.DaemonSetStatus{ObservedGeneration: ds.Generation, DesiredNumberScheduled: 1, CurrentNumberScheduled: 1, UpdatedNumberScheduled: 1, NumberReady: 1, NumberAvailable: 1}
+		require.NoError(t, s.client.Status().Update(ctx, ds))
+		state, err := s.Sync(ctx, cr, draSupportedCatalog())
+		require.NoError(t, err)
+		require.Equal(t, SyncState(SyncStateReady), state)
+		accounts := &corev1.ServiceAccountList{}
+		require.NoError(t, s.client.List(ctx, accounts))
+		require.Len(t, accounts.Items, 3)
+		for _, sa := range accounts.Items {
+			if sa.Name == dcgmExporterDefaultServiceAccountName {
+				require.True(t, metav1.IsControlledBy(&sa, cr))
+			} else {
+				require.Empty(t, sa.OwnerReferences)
+			}
+		}
+	}
+	cr.Spec.DCGMExporter.ServiceAccount.Name = "metrics-a"
+	_, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	sa := &corev1.ServiceAccount{}
+	key := client.ObjectKey{Namespace: "test-operator", Name: "metrics-a"}
+	require.NoError(t, s.client.Get(ctx, key, sa))
+	require.NoError(t, s.client.Delete(ctx, sa))
+	state, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.True(t, apierrors.IsNotFound(err))
+	require.Equal(t, SyncState(SyncStateNotReady), state)
+	require.NoError(t, s.client.Create(ctx, selfLabelledServiceAccount("metrics-a")))
+	state, err = s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateReady), state)
+}
+
+func TestDCGMExporterDisabledSyncPreservesExternalAccounts(t *testing.T) {
+	for name, spec := range map[string]*nvidiav1.DCGMExporterSpec{
+		"spec removed":                nil,
+		"default disabled":            {Enabled: new(false)},
+		"external reference disabled": {Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics"}},
+		"missing reference disabled":  {Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "missing"}},
+		"reserved reference disabled": {Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: dcgmExporterDefaultServiceAccountName}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			cr := exporterCR(spec)
+			cr.UID = "cluster-uid"
+			managed := ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)
+			external := selfLabelledServiceAccount("metrics")
+			external.Annotations = map[string]string{"example.com/identity": "keep"}
+			other := selfLabelledServiceAccount("previous-external")
+			sibling := otherStateServiceAccount(cr, "nvidia-dcgm-dra")
+			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "exporter-config", Namespace: "test-operator", Labels: map[string]string{consts.StateLabel: dcgmExporterStateName}}}
+			s := newTestDCGMExporterStateWithObjects(t, managed, external, other, sibling, cm)
+			before := &corev1.ServiceAccount{}
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(external), before))
+			_, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.True(t, apierrors.IsNotFound(s.client.Get(ctx, client.ObjectKeyFromObject(managed), &corev1.ServiceAccount{})))
+			require.True(t, apierrors.IsNotFound(s.client.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{})))
+			after := &corev1.ServiceAccount{}
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(external), after))
+			require.Equal(t, before, after)
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(other), &corev1.ServiceAccount{}))
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(sibling), &corev1.ServiceAccount{}))
+			state, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.Equal(t, SyncState(SyncStateIgnore), state)
+		})
+	}
 }
 
 func TestDCGMExporterDisabled(t *testing.T) {
@@ -331,23 +469,20 @@ func TestDCGMExporterServiceAccountRendering(t *testing.T) {
 			created:    dcgmExporterDefaultServiceAccountName,
 			referenced: dcgmExporterDefaultServiceAccountName,
 		},
-		"a configured name is created and referenced under that name": {
+		"a configured name is referenced without creation": {
 			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customName},
-			created:        customName,
 			referenced:     customName,
 		},
 		"a numeric-looking name remains a string": {
 			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "123"},
-			created:        "123",
 			referenced:     "123",
 		},
 		"a boolean-looking name remains a string": {
 			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "true"},
-			created:        "true",
 			referenced:     "true",
 		},
-		"create=false references the ServiceAccount without rendering it": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
+		"external accounts are not rendered": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName},
 			created:        "",
 			referenced:     byoName,
 		},
@@ -358,7 +493,7 @@ func TestDCGMExporterServiceAccountRendering(t *testing.T) {
 			s := newTestDCGMExporterState(t, false)
 			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: tc.serviceAccount})
 
-			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedOpenshiftCatalog())
 			require.NoError(t, err)
 
 			if tc.created == "" {
@@ -373,6 +508,12 @@ func TestDCGMExporterServiceAccountRendering(t *testing.T) {
 				subjectNames(t, objs, "RoleBinding", "nvidia-dcgm-exporter-dra"))
 			assert.Equal(t, []string{tc.referenced},
 				subjectNames(t, objs, "ClusterRoleBinding", "nvidia-dcgm-exporter-dra-read-pods"))
+			scc := findByKind(objs, "SecurityContextConstraints")
+			require.NotNil(t, scc)
+			users, found, err := unstructured.NestedStringSlice(scc.Object, "users")
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Equal(t, []string{"system:serviceaccount:test-operator:" + tc.referenced}, users)
 			// Only the subjects follow the ServiceAccount; the binding objects keep their names.
 			assert.Equal(t, []string{"nvidia-dcgm-exporter-dra"}, kindNames(objs, "RoleBinding"))
 		})
@@ -423,705 +564,10 @@ func otherStateServiceAccount(cr *nvidiav1alpha1.GPUCluster, name string) *corev
 	return sa
 }
 
-// requireReleased asserts the ServiceAccount survived with neither this CR's controller
-// reference nor the state label -- the two things that would otherwise hand a user-owned
-// object to garbage collection or to the state cleanup.
-func requireReleased(t *testing.T, ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, name string) {
-	t.Helper()
-	sa, err := s.getServiceAccount(ctx, name)
-	require.NoError(t, err, "a user-provided ServiceAccount must never be deleted")
-	assert.False(t, metav1.IsControlledBy(sa, cr),
-		"the owner reference has to go, otherwise the user's ServiceAccount is garbage-collected with the GPUCluster")
-	assert.NotContains(t, sa.Labels, consts.StateLabel,
-		"the state label has to go, otherwise the state cleanup sweeps the user's ServiceAccount")
-}
-
-// requireStillManaged asserts the ServiceAccount kept its controller reference and its
-// state label, whichever state's that is.
-func requireStillManaged(t *testing.T, ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, name string) {
-	t.Helper()
-	sa, err := s.getServiceAccount(ctx, name)
-	require.NoError(t, err)
-	assert.True(t, metav1.IsControlledBy(sa, cr), "%q must keep its controller reference", name)
-	assert.Contains(t, sa.Labels, consts.StateLabel, "%q must keep its state label", name)
-}
-
-// TestDCGMExporterServiceAccountPreSync covers the preSync hook. It rejects a configuration
-// the manifests cannot express, and hands a ServiceAccount the user took over with
-// create=false back to them right away -- before the operands sync, so the hand-off never
-// waits on a DaemonSet becoming Ready. It deletes nothing: reclaiming what a previous
-// configuration left behind happens in postSync, once the operands stopped referencing it.
-func TestDCGMExporterServiceAccountPreSync(t *testing.T) {
-	ctx := context.Background()
-	const (
-		customName = "metrics-identity"
-		byoName    = "byo-sa"
-		driverName = "nvidia-driver"
-	)
-
-	testCases := map[string]struct {
-		serviceAccount *nvidiav1.DCGMExporterServiceAccountConfig
-		existing       func(cr *nvidiav1alpha1.GPUCluster) []client.Object
-		// expectedError is a substring of the error the hook must return; empty accepts.
-		expectedError string
-		// released must survive without this CR's controller reference or the state
-		// label; stillManaged must keep both.
-		released     []string
-		stillManaged []string
-	}{
-		"the default configuration needs nothing to exist": {},
-		"create=false requires the ServiceAccount to exist": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			expectedError:  byoName,
-		},
-		"create=false accepts an existing ServiceAccount": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{unownedServiceAccount(byoName)}
-			},
-		},
-		"create=false releases the ServiceAccount the operator used to own": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, byoName)}
-			},
-			released: []string{byoName},
-		},
-		"create=false releases the operator default the user took over": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{
-				Name: dcgmExporterDefaultServiceAccountName, Create: new(false),
-			},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)}
-			},
-			released: []string{dcgmExporterDefaultServiceAccountName},
-		},
-		"create=false leaves another state's ServiceAccount to that state": {
-			// The GPUCluster controls the driver's ServiceAccount too. Referencing it is
-			// the user's call, but stripping its owner reference and label is not ours.
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: driverName, Create: new(false)},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{otherStateServiceAccount(cr, driverName)}
-			},
-			stillManaged: []string{driverName},
-		},
-		"a configured name refuses to take over an unowned ServiceAccount": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customName},
-			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{unownedServiceAccount(customName)}
-			},
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-		},
-		"a configured name refuses a sibling operand's ServiceAccount": {
-			// The GPUCluster controls nvidia-dcgm-dra as well, so the owner reference
-			// alone would pass and the sync would relabel it into this state.
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "nvidia-dcgm-dra"},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{otherStateServiceAccount(cr, "nvidia-dcgm-dra")}
-			},
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-			stillManaged:  []string{"nvidia-dcgm-dra"},
-		},
-		"a configured name accepts the ServiceAccount it already owns": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customName},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, customName)}
-			},
-			stillManaged: []string{customName},
-		},
-		"renaming leaves the superseded default for the postSync reclaim": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customName},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)}
-			},
-			stillManaged: []string{dcgmExporterDefaultServiceAccountName},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: tc.serviceAccount})
-			var objs []client.Object
-			if tc.existing != nil {
-				objs = tc.existing(cr)
-			}
-			s := newTestDCGMExporterStateWithObjects(t, objs...)
-
-			err := checkDCGMExporterServiceAccount(ctx, s, cr)
-			if tc.expectedError != "" {
-				require.ErrorContains(t, err, tc.expectedError)
-				// A refusal must leave the object it refused exactly as it was.
-				for _, saName := range tc.stillManaged {
-					requireStillManaged(t, ctx, s, cr, saName)
-				}
-				return
-			}
-			require.NoError(t, err)
-
-			// Nothing is deleted on this path, whatever the outcome.
-			for _, obj := range objs {
-				_, getErr := s.getServiceAccount(ctx, obj.GetName())
-				require.NoError(t, getErr, "the preSync hook must not remove %q", obj.GetName())
-			}
-			for _, saName := range tc.released {
-				requireReleased(t, ctx, s, cr, saName)
-			}
-			for _, saName := range tc.stillManaged {
-				requireStillManaged(t, ctx, s, cr, saName)
-			}
-		})
-	}
-}
-
-// TestDCGMExporterSupersededServiceAccountReclaim covers the postSync hook. It runs after
-// the manifests converged, so the operands already reference the configured ServiceAccount
-// and whatever this state created under a previous configuration can go. The candidates
-// are found by the state label rather than by name -- that is what covers a rename from one
-// custom name to another, or back to the default.
-func TestDCGMExporterSupersededServiceAccountReclaim(t *testing.T) {
-	ctx := context.Background()
-	const (
-		customA    = "metrics-a"
-		customB    = "metrics-b"
-		byoName    = "byo-sa"
-		driverName = "nvidia-driver"
-	)
-
-	testCases := map[string]struct {
-		serviceAccount *nvidiav1.DCGMExporterServiceAccountConfig
-		existing       func(cr *nvidiav1alpha1.GPUCluster) []client.Object
-		// deleted names the ServiceAccounts that must be gone afterwards, kept those
-		// that must survive.
-		deleted []string
-		kept    []string
-	}{
-		"the default configuration reclaims nothing": {
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)}
-			},
-			kept: []string{dcgmExporterDefaultServiceAccountName},
-		},
-		"renaming reclaims the superseded operator-owned default": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customA},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{
-					ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName),
-					ownedServiceAccount(cr, customA),
-				}
-			},
-			deleted: []string{dcgmExporterDefaultServiceAccountName},
-			kept:    []string{customA},
-		},
-		"renaming keeps a previous ServiceAccount the operator does not own": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customA},
-			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{unownedServiceAccount(dcgmExporterDefaultServiceAccountName)}
-			},
-			kept: []string{dcgmExporterDefaultServiceAccountName},
-		},
-		"renaming from one custom name to another reclaims the previous one": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customB},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, customA), ownedServiceAccount(cr, customB)}
-			},
-			deleted: []string{customA},
-			kept:    []string{customB},
-		},
-		"switching back to the default reclaims every custom ServiceAccount left behind": {
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{
-					ownedServiceAccount(cr, customA),
-					ownedServiceAccount(cr, customB),
-					ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName),
-				}
-			},
-			deleted: []string{customA, customB},
-			kept:    []string{dcgmExporterDefaultServiceAccountName},
-		},
-		"create=false reclaims the operator-owned default": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{
-					ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName),
-					unownedServiceAccount(byoName),
-				}
-			},
-			deleted: []string{dcgmExporterDefaultServiceAccountName},
-			kept:    []string{byoName},
-		},
-		"the configured ServiceAccount is never a candidate, whatever it carries": {
-			// preSync hands it back before this hook runs; this pins the safety net for
-			// the case where it did not get to.
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, byoName)}
-			},
-			kept: []string{byoName},
-		},
-		"another state's ServiceAccount is not this state's to reclaim": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customA},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{otherStateServiceAccount(cr, driverName), ownedServiceAccount(cr, customA)}
-			},
-			kept: []string{driverName, customA},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: tc.serviceAccount})
-			s := newTestDCGMExporterStateWithObjects(t, tc.existing(cr)...)
-
-			require.NoError(t, reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr))
-
-			for _, saName := range tc.deleted {
-				_, err := s.getServiceAccount(ctx, saName)
-				require.True(t, apierrors.IsNotFound(err), "%q must be reclaimed", saName)
-			}
-			for _, saName := range tc.kept {
-				_, err := s.getServiceAccount(ctx, saName)
-				require.NoError(t, err, "%q must not be reclaimed", saName)
-			}
-		})
-	}
-}
-
-// TestDCGMExporterServiceAccountAdoptionGuard covers the veto the sync applies when the
-// create call reports AlreadyExists: between the preSync check and that call somebody else
-// may have created the ServiceAccount, and stamping our controller reference onto it would
-// hand it to garbage collection.
-func TestDCGMExporterServiceAccountAdoptionGuard(t *testing.T) {
-	cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
-
-	// current builds the object the sync found already present. state is the value of
-	// the state label it carries, empty for none.
-	current := func(kind, name string, refs []metav1.OwnerReference, state string) *unstructured.Unstructured {
-		obj := &unstructured.Unstructured{}
-		obj.SetKind(kind)
-		obj.SetName(name)
-		obj.SetNamespace("test-operator")
-		obj.SetOwnerReferences(refs)
-		if state != "" {
-			obj.SetLabels(map[string]string{consts.StateLabel: state})
-		}
-		return obj
-	}
-	ourRef := []metav1.OwnerReference{{
-		APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
-		Kind:       "GPUCluster",
-		Name:       cr.Name,
-		UID:        cr.UID,
-		Controller: new(true),
-	}}
-	foreignRef := []metav1.OwnerReference{{
-		APIVersion: "apps/v1",
-		Kind:       "Deployment",
-		Name:       "somebody-else",
-		UID:        "other-uid",
-		Controller: new(true),
-	}}
-
-	testCases := map[string]struct {
-		current       *unstructured.Unstructured
-		expectedError string
-	}{
-		"another kind is not this guard's business": {
-			current: current("ConfigMap", "metrics-identity", foreignRef, ""),
-		},
-		"a ServiceAccount this state already manages is ours to update": {
-			current: current("ServiceAccount", "metrics-identity", ourRef, "state-dcgm-exporter"),
-		},
-		"a sibling operand's ServiceAccount is refused": {
-			// The GPUCluster controls it too, so the owner reference alone would pass
-			// and the sync would relabel it into this state.
-			current:       current("ServiceAccount", "nvidia-dcgm-dra", ourRef, "state-dcgm"),
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-		},
-		"a ServiceAccount this CR controls but no state claims is refused": {
-			current:       current("ServiceAccount", "metrics-identity", ourRef, ""),
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-		},
-		"a ServiceAccount somebody else controls is refused": {
-			current:       current("ServiceAccount", "metrics-identity", foreignRef, ""),
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-		},
-		"an unowned ServiceAccount under a configured name is refused": {
-			current:       current("ServiceAccount", "metrics-identity", nil, ""),
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-		},
-		"the operator default without owner references stays adoptable": {
-			// It predates owner references, i.e. an upgrade from an older release. An
-			// account with no owner reference cannot be a sibling operand's.
-			current: current("ServiceAccount", dcgmExporterDefaultServiceAccountName, nil, ""),
-		},
-		"the operator default somebody else controls is refused": {
-			current:       current("ServiceAccount", dcgmExporterDefaultServiceAccountName, foreignRef, ""),
-			expectedError: "not managed by the DCGM Exporter of this GPUCluster",
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			err := guardDCGMExporterServiceAccountAdoption(cr, tc.current)
-			if tc.expectedError != "" {
-				require.ErrorContains(t, err, tc.expectedError)
-				return
-			}
-			require.NoError(t, err)
-		})
-	}
-}
-
-// TestDCGMExporterServiceAccountAdoptionGuardWiring covers the guard where it matters: the
-// AlreadyExists path of the sync, which is the only place the operator would ever write an
-// owner reference onto an object it did not create.
-func TestDCGMExporterServiceAccountAdoptionGuardWiring(t *testing.T) {
-	ctx := context.Background()
-	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
-		ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
-	})
-
-	testScheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(testScheme))
-	require.NoError(t, nvidiav1alpha1.AddToScheme(testScheme))
-
-	// The ServiceAccount appeared after the preSync check accepted the configuration.
-	existing := unownedServiceAccount("metrics-identity")
-	k8sClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(existing).Build()
-
-	skel := &stateSkel{
-		name:          "state-dcgm-exporter",
-		namespace:     "test-operator",
-		client:        k8sClient,
-		scheme:        testScheme,
-		adoptionGuard: guardDCGMExporterServiceAccountAdoption,
-	}
-
-	desired := &unstructured.Unstructured{}
-	desired.SetAPIVersion("v1")
-	desired.SetKind("ServiceAccount")
-	desired.SetName("metrics-identity")
-	desired.SetNamespace("test-operator")
-
-	err := skel.createOrUpdateObjs(ctx, cr, func(*unstructured.Unstructured) error { return nil },
-		[]*unstructured.Unstructured{desired})
-	require.ErrorContains(t, err, "not managed by the DCGM Exporter of this GPUCluster")
-
-	// The object the guard refused must be left exactly as it was found.
-	found, err := (&configurableState{stateSkel: *skel}).getServiceAccount(ctx, "metrics-identity")
-	require.NoError(t, err)
-	assert.Empty(t, found.OwnerReferences)
-	assert.NotContains(t, found.Labels, consts.StateLabel)
-}
-
-// TestDCGMExporterServiceAccountReleasedOnDelete covers the combined transition: one
-// update both hands the ServiceAccount to the user with create=false and disables the
-// exporter. The generic state cleanup deletes every object carrying the state label, and
-// the ServiceAccount still carries it from when the operator managed it, so ownership has
-// to be released before that cleanup rather than in preSync -- which the disabled path
-// never reaches.
-func TestDCGMExporterServiceAccountReleasedOnDelete(t *testing.T) {
-	ctx := context.Background()
-	const (
-		byoName    = "byo-sa"
-		driverName = "nvidia-driver"
-	)
-
-	testCases := map[string]struct {
-		serviceAccount *nvidiav1.DCGMExporterServiceAccountConfig
-		existing       func(cr *nvidiav1alpha1.GPUCluster) []client.Object
-		// released must survive with neither this CR's owner reference nor the state
-		// label; stillManaged must keep whatever the operator put on it;
-		// untouchedLabel must keep the label the user put on it themselves.
-		released       []string
-		stillManaged   []string
-		untouchedLabel []string
-	}{
-		"create=false releases the ServiceAccount the operator used to own": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, byoName)}
-			},
-			released: []string{byoName},
-		},
-		"create=false on a ServiceAccount the operator never owned changes nothing": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{unownedServiceAccount(byoName)}
-			},
-			released: []string{byoName},
-		},
-		"create=false leaves another state's ServiceAccount to that state": {
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: driverName, Create: new(false)},
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{otherStateServiceAccount(cr, driverName)}
-			},
-			stillManaged: []string{driverName},
-		},
-		"create=false leaves an account the user labelled themselves alone": {
-			// The label says "an exporter account", not "an account this CR owns".
-			// Stripping it off an account the operator never created would edit the
-			// user's object, which the unmanaged contract forbids.
-			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-			existing: func(*nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{selfLabelledServiceAccount(byoName)}
-			},
-			untouchedLabel: []string{byoName},
-		},
-		"a managed ServiceAccount is left for the state cleanup to remove": {
-			existing: func(cr *nvidiav1alpha1.GPUCluster) []client.Object {
-				return []client.Object{ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)}
-			},
-			stillManaged: []string{dcgmExporterDefaultServiceAccountName},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: tc.serviceAccount})
-			s := newTestDCGMExporterStateWithObjects(t, tc.existing(cr)...)
-
-			require.NoError(t, releaseDCGMExporterServiceAccountOnDelete(ctx, s, cr))
-
-			for _, saName := range tc.released {
-				requireReleased(t, ctx, s, cr, saName)
-			}
-			for _, saName := range tc.stillManaged {
-				requireStillManaged(t, ctx, s, cr, saName)
-			}
-			for _, saName := range tc.untouchedLabel {
-				sa, err := s.getServiceAccount(ctx, saName)
-				require.NoError(t, err)
-				assert.Contains(t, sa.Labels, consts.StateLabel,
-					"a label the user set on their own ServiceAccount must not be removed")
-			}
-		})
-	}
-}
-
-// TestDCGMExporterSyncReleasesBeforeDeletion drives Sync() on a disabled exporter and
-// checks the hook actually runs on that path.
-func TestDCGMExporterSyncReleasesBeforeDeletion(t *testing.T) {
-	ctx := context.Background()
-	const byoName = "byo-sa"
-
-	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
-		Enabled:        new(false),
-		ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-	})
-	s := newTestDCGMExporterStateWithObjects(t, ownedServiceAccount(cr, byoName))
-
-	_, err := s.Sync(ctx, cr, draSupportedCatalog())
-	require.NoError(t, err)
-
-	requireReleased(t, ctx, s, cr, byoName)
-}
-
-// TestDCGMExporterSyncReleasesBeforeOperandsConverge drives Sync() with the exporter enabled
-// and its DaemonSet stuck short of Ready -- the situation in which a hand-off deferred to
-// postSync would never happen. The user's ServiceAccount has to come back regardless, while
-// the reclaim of the superseded default still waits for the operands to converge.
-func TestDCGMExporterSyncReleasesBeforeOperandsConverge(t *testing.T) {
-	ctx := context.Background()
-	const byoName = "byo-sa"
-
-	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
-		ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName, Create: new(false)},
-	})
-	cr.UID = "gpucluster-uid"
-
-	// The DaemonSet controller has processed the object, but none of its pods is available.
-	stuck := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "nvidia-dcgm-exporter-dra", Namespace: "test-operator", Generation: 1},
-		Status: appsv1.DaemonSetStatus{
-			ObservedGeneration:     1,
-			DesiredNumberScheduled: 1,
-			CurrentNumberScheduled: 1,
-			NumberAvailable:        0,
-		},
-	}
-	s := newTestDCGMExporterStateWithObjects(t,
-		ownedServiceAccount(cr, byoName),
-		ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName),
-		stuck)
-
-	syncState, err := s.Sync(ctx, cr, draSupportedCatalog())
-	require.NoError(t, err)
-	require.Equal(t, SyncState(SyncStateNotReady), syncState, "the DaemonSet is short of Ready, so the state must not converge")
-
-	requireReleased(t, ctx, s, cr, byoName)
-	_, err = s.getServiceAccount(ctx, dcgmExporterDefaultServiceAccountName)
-	require.NoError(t, err, "the superseded default is reclaimed only once the operands converged")
-}
-
-// Exercise the whole disabled-state cleanup, not just the ownership-release hook.
-func TestDCGMExporterDisabledSyncPreservesUnmanagedAccounts(t *testing.T) {
-	for name, released := range map[string]bool{"self-labelled user account": false, "managed account handed back": true} {
-		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-			cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)}})
-			sa := selfLabelledServiceAccount("byo-sa")
-			if released {
-				sa = ownedServiceAccount(cr, sa.Name)
-			}
-			sa.Annotations = map[string]string{"example.com/identity": "keep-me"}
-			// A different user account with the same label is not ours to delete either.
-			other := selfLabelledServiceAccount("another-user-sa")
-			old := ownedServiceAccount(cr, "previous-managed-sa")
-			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "exporter-config", Namespace: "test-operator", Labels: map[string]string{consts.StateLabel: dcgmExporterStateName}}}
-			s := newTestDCGMExporterStateWithObjects(t, sa, other, old, cm)
-			_, err := s.Sync(ctx, cr, draSupportedCatalog())
-			require.NoError(t, err)
-			found, err := s.getServiceAccount(ctx, sa.Name)
-			require.NoError(t, err)
-			require.Equal(t, sa.Annotations, found.Annotations)
-			if released {
-				requireReleased(t, ctx, s, cr, sa.Name)
-			} else {
-				require.Equal(t, sa.Labels, found.Labels)
-				require.Empty(t, found.OwnerReferences)
-			}
-			_, err = s.getServiceAccount(ctx, other.Name)
-			require.NoError(t, err)
-			_, err = s.getServiceAccount(ctx, old.Name)
-			require.True(t, apierrors.IsNotFound(err))
-			require.True(t, apierrors.IsNotFound(s.client.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{})))
-			state, err := s.Sync(ctx, cr, draSupportedCatalog())
-			require.NoError(t, err)
-			require.Equal(t, SyncState(SyncStateIgnore), state, "preserved accounts must not keep cleanup pending")
-		})
-	}
-}
-
-func TestDCGMExporterServiceAccountDeletionRace(t *testing.T) {
-	for _, disabled := range []bool{false, true} {
-		t.Run(fmt.Sprintf("disabled=%t", disabled), func(t *testing.T) {
-			ctx := context.Background()
-			cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(!disabled)})
-			old := ownedServiceAccount(cr, "previous-sa")
-			old.UID = "old-uid"
-			s := newTestDCGMExporterStateWithObjects(t, old)
-			var deletes int
-			s.client = interceptor.NewClient(s.client.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
-				if obj.GetName() != old.Name {
-					return c.Delete(ctx, obj, opts...)
-				}
-				deletes++
-				require.NoError(t, c.Delete(ctx, old))
-				replacement := selfLabelledServiceAccount(old.Name)
-				replacement.UID = "replacement-uid"
-				require.NoError(t, c.Create(ctx, replacement))
-				options := (&client.DeleteOptions{}).ApplyOptions(opts)
-				// The fake client does not implement UID preconditions; emulate the API server.
-				if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != replacement.UID {
-					return apierrors.NewConflict(corev1.Resource("serviceaccounts"), obj.GetName(), fmt.Errorf("UID changed"))
-				}
-				return c.Delete(ctx, obj, opts...)
-			}})
-			if disabled {
-				status, err := s.Sync(ctx, cr, draSupportedCatalog())
-				require.True(t, apierrors.IsConflict(err))
-				require.Equal(t, SyncState(SyncStateError), status)
-			} else {
-				require.True(t, apierrors.IsConflict(reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr)))
-			}
-			require.Equal(t, 1, deletes)
-			found, err := s.getServiceAccount(ctx, old.Name)
-			require.NoError(t, err)
-			require.Equal(t, types.UID("replacement-uid"), found.UID)
-			require.Empty(t, found.OwnerReferences)
-			if disabled {
-				status, err := s.Sync(ctx, cr, draSupportedCatalog())
-				require.NoError(t, err)
-				require.Equal(t, SyncState(SyncStateIgnore), status)
-			} else {
-				require.NoError(t, reclaimSupersededDCGMExporterServiceAccounts(ctx, s, cr))
-			}
-			require.Equal(t, 1, deletes)
-		})
-	}
-}
-
-func TestDCGMExporterDeletionFilterScope(t *testing.T) {
-	for name, test := range map[string]struct {
-		spec    *nvidiav1.DCGMExporterSpec
-		generic bool
-		deleted bool
-	}{
-		"omitted exporter still deletes managed accounts":        {deleted: true},
-		"disabled managed exporter deletes managed accounts":     {spec: &nvidiav1.DCGMExporterSpec{Enabled: new(false)}, deleted: true},
-		"BYO account is excluded even with stale owner metadata": {spec: &nvidiav1.DCGMExporterSpec{Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics", Create: new(false)}}},
-		"operands without a filter retain label-based cleanup":   {generic: true, deleted: true},
-	} {
-		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-			cr := exporterCR(test.spec)
-			sa := ownedServiceAccount(cr, "metrics")
-			if test.generic {
-				sa.OwnerReferences = nil
-			}
-			s := newTestDCGMExporterStateWithObjects(t, sa)
-			if test.generic {
-				s.deletionFilter = nil
-			}
-			// Simulate a stale list following ownership release by calling the sweep directly.
-			found, err := s.deleteStateRelatedObjects(ctx, cr)
-			require.NoError(t, err)
-			require.Equal(t, test.deleted, found)
-			_, err = s.getServiceAccount(ctx, sa.Name)
-			if test.deleted {
-				require.True(t, apierrors.IsNotFound(err))
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestDCGMExporterAdoptionRejectsStaleManagedAccount(t *testing.T) {
-	ctx := t.Context()
-	cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics"}})
-	cached := ownedServiceAccount(cr, "metrics")
-	cached.UID, cached.ResourceVersion = "old-uid", "10"
-	replacement := selfLabelledServiceAccount("metrics")
-	replacement.UID, replacement.ResourceVersion = "new-uid", "20"
-	s := newTestDCGMExporterStateWithObjects(t, replacement)
-	base := s.client
-	s.client = interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-		if key == client.ObjectKeyFromObject(cached) {
-			switch obj := obj.(type) {
-			case *corev1.ServiceAccount:
-				*obj = *cached.DeepCopy()
-				return nil
-			case *unstructured.Unstructured:
-				data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cached)
-				require.NoError(t, err)
-				obj.Object = data
-				obj.SetAPIVersion("v1")
-				obj.SetKind("ServiceAccount")
-				return nil
-			}
-		}
-		return c.Get(ctx, key, obj, opts...)
-	}})
-	desired := &unstructured.Unstructured{}
-	desired.SetAPIVersion("v1")
-	desired.SetKind("ServiceAccount")
-	desired.SetName(cached.Name)
-	desired.SetNamespace(cached.Namespace)
-	err := s.createOrUpdateObjs(ctx, cr, func(*unstructured.Unstructured) error { return nil }, []*unstructured.Unstructured{desired})
-	require.True(t, apierrors.IsConflict(err), "GPUCluster updates must also validate the observed resource version")
-	found := &corev1.ServiceAccount{}
-	require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(replacement), found))
-	require.Equal(t, replacement.UID, found.UID)
-	require.Empty(t, found.OwnerReferences)
-	require.Equal(t, replacement.Labels, found.Labels)
-}
-
 func TestDCGMExporterDisabledSyncRetriesMetadataConflict(t *testing.T) {
 	ctx := t.Context()
 	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
-	old := ownedServiceAccount(cr, "previous")
+	old := ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)
 	s := newTestDCGMExporterStateWithObjects(t, old)
 	deletes := 0
 	s.client = interceptor.NewClient(s.client.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
@@ -1146,63 +592,14 @@ func TestDCGMExporterDisabledSyncRetriesMetadataConflict(t *testing.T) {
 	require.Equal(t, 2, deletes)
 }
 
-// A successful update can still be followed by the old ready DaemonSet in the cache,
-// or by the new template with readiness counters from the previous generation.
-func TestDCGMExporterSyncWaitsForServiceAccountRollout(t *testing.T) {
-	for _, staleTemplate := range []bool{true, false} {
-		t.Run(fmt.Sprintf("stale template=%t", staleTemplate), func(t *testing.T) {
-			ctx := t.Context()
-			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "new-metrics"}})
-			cr.UID = "cluster-uid"
-			old := ownedServiceAccount(cr, "old-metrics")
-			s := newTestDCGMExporterStateWithObjects(t, old)
-			objs, err := s.getManifestObjects(ctx, cr, draSupportedCatalog())
-			require.NoError(t, err)
-			ds := findDaemonSet(t, objs)
-			ds.Spec.Template.Spec.ServiceAccountName = old.Name
-			ds.Generation = 1
-			ds.Status = appsv1.DaemonSetStatus{ObservedGeneration: 1, DesiredNumberScheduled: 1, CurrentNumberScheduled: 1, UpdatedNumberScheduled: 1, NumberAvailable: 1, NumberReady: 1}
-			require.NoError(t, s.client.Create(ctx, ds))
-			server := s.client
-			cached := ds.DeepCopy()
-			s.client = interceptor.NewClient(server.(client.WithWatch), interceptor.Funcs{
-				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if staleTemplate && key == client.ObjectKeyFromObject(cached) {
-						switch out := obj.(type) {
-						case *appsv1.DaemonSet:
-							*out = *cached.DeepCopy()
-							return nil
-						case *unstructured.Unstructured:
-							if out.GetKind() == "DaemonSet" {
-								data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cached)
-								out.Object = data
-								return err
-							}
-						}
-					}
-					return c.Get(ctx, key, obj, opts...)
-				},
-				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
-					if obj.GetObjectKind().GroupVersionKind().Kind == "DaemonSet" {
-						obj.SetGeneration(2) // The fake client does not advance generations.
-					}
-					return c.Update(ctx, obj, opts...)
-				},
-			})
-			_, err = s.Sync(ctx, cr, draSupportedCatalog())
-			require.NoError(t, err)
-			require.NoError(t, server.Get(ctx, client.ObjectKeyFromObject(old), &corev1.ServiceAccount{}), "keep the old identity until the new template has rolled out")
-
-			// Once the cache and DaemonSet controller catch up, cleanup must finish.
-			s.client = server
-			require.NoError(t, server.Get(ctx, client.ObjectKeyFromObject(ds), ds))
-			require.Equal(t, "new-metrics", ds.Spec.Template.Spec.ServiceAccountName)
-			ds.Status.ObservedGeneration = ds.Generation
-			require.NoError(t, server.Status().Update(ctx, ds))
-			state, err := s.Sync(ctx, cr, draSupportedCatalog())
-			require.NoError(t, err)
-			require.Equal(t, SyncState(SyncStateReady), state)
-			require.True(t, apierrors.IsNotFound(server.Get(ctx, client.ObjectKeyFromObject(old), &corev1.ServiceAccount{})))
-		})
-	}
+func TestDCGMExporterDisabledSyncPreservesDefaultReplacement(t *testing.T) {
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
+	replacement := selfLabelledServiceAccount(dcgmExporterDefaultServiceAccountName)
+	s := newTestDCGMExporterStateWithObjects(t, replacement)
+	state, err := s.Sync(t.Context(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateIgnore), state)
+	found := &corev1.ServiceAccount{}
+	require.NoError(t, s.client.Get(t.Context(), client.ObjectKeyFromObject(replacement), found))
+	require.Empty(t, found.OwnerReferences)
 }

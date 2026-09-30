@@ -14,25 +14,14 @@
 # limitations under the License.
 **/
 
-// Package ownership holds the rules deciding whether an object belongs to one
-// operand of the CR being reconciled.
-//
-// Both the ClusterPolicy and the GPUCluster controller set their own controller
-// reference on every operand object they create, so ownership alone answers "does this
-// CR own it", never "which operand created it". Where an object's name is
-// user-configurable -- the DCGM Exporter ServiceAccount -- that distinction decides
-// whether a configured name is a fresh account to create, an account to adopt, or a
-// sibling operand's account that must be left alone. A Marker supplies the missing
-// half.
+// Package ownership protects operator-managed objects during cleanup.
 package ownership
 
 import (
 	"context"
-	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -60,47 +49,12 @@ func (m Marker) Apply(obj metav1.Object) {
 	obj.SetLabels(labels)
 }
 
-// Selector returns the marker as a list option, for finding every object the operand
-// created regardless of the name a previous configuration gave it.
-func (m Marker) Selector() client.MatchingLabels {
-	return client.MatchingLabels{m.Key: m.Value}
-}
-
 // IsManaged reports whether obj is an object this operand created for owner: it carries
 // the operand's marker and owner is its controller. Both halves are required -- the
 // marker alone would match an object another CR created for the same operand, and the
 // controller reference alone would match every other operand of this CR.
 func IsManaged(obj metav1.Object, owner metav1.Object, m Marker) bool {
 	return m.Matches(obj.GetLabels()) && metav1.IsControlledBy(obj, owner)
-}
-
-// ReleaseOwner drops owner's reference from obj, handing the object to whoever is meant
-// to own it now. Returns whether anything changed.
-func ReleaseOwner(obj metav1.Object, ownerUID types.UID) bool {
-	refs := obj.GetOwnerReferences()
-	kept := make([]metav1.OwnerReference, 0, len(refs))
-	for _, ref := range refs {
-		if ref.UID == ownerUID {
-			continue
-		}
-		kept = append(kept, ref)
-	}
-	if len(kept) == len(refs) {
-		return false
-	}
-	obj.SetOwnerReferences(kept)
-	return true
-}
-
-// ConflictError reports a configured ServiceAccount name that names an object this
-// operand does not manage -- an unrelated account, or one belonging to a sibling
-// operand. Creating it is refused rather than silently adopting an identity the
-// operand did not provision.
-func ConflictError(ownerKind, name, namespace string) error {
-	return fmt.Errorf(
-		"ServiceAccount %q already exists in namespace %q and is not managed by the DCGM Exporter of this %s; "+
-			"set dcgmExporter.serviceAccount.create to false to reference it",
-		name, namespace, ownerKind)
 }
 
 // DeleteObserved deletes only the object version whose ownership was checked. UID

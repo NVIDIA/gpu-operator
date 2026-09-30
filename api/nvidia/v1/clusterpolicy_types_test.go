@@ -91,80 +91,36 @@ func TestImagePath(t *testing.T) {
 }
 
 func TestDCGMExporterServiceAccount(t *testing.T) {
-	const defaultName = "nvidia-dcgm-exporter"
-
-	testCases := map[string]struct {
-		serviceAccount *DCGMExporterServiceAccountConfig
-		expectedName   string
-		expectedCreate bool
+	for name, tc := range map[string]struct {
+		config   *DCGMExporterServiceAccountConfig
+		expected string
+		external bool
 	}{
-		"unset falls back to the default and is operator-managed": {
-			serviceAccount: nil,
-			expectedName:   defaultName,
-			expectedCreate: true,
-		},
-		"empty name falls back to the default": {
-			serviceAccount: &DCGMExporterServiceAccountConfig{},
-			expectedName:   defaultName,
-			expectedCreate: true,
-		},
-		"name only stays operator-managed": {
-			serviceAccount: &DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
-			expectedName:   "metrics-identity",
-			expectedCreate: true,
-		},
-		"create=false marks the ServiceAccount as user-provided": {
-			serviceAccount: &DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
-			expectedName:   "byo-sa",
-			expectedCreate: false,
-		},
-		"create=true is explicit operator management": {
-			serviceAccount: &DCGMExporterServiceAccountConfig{Name: "managed-sa", Create: new(true)},
-			expectedName:   "managed-sa",
-			expectedCreate: true,
-		},
-	}
-
-	for name, tc := range testCases {
+		"unset":                     {expected: "default"},
+		"empty block":               {config: &DCGMExporterServiceAccountConfig{}, expected: "default"},
+		"named account is external": {config: &DCGMExporterServiceAccountConfig{Name: "metrics"}, expected: "metrics", external: true},
+	} {
 		t.Run(name, func(t *testing.T) {
-			spec := &DCGMExporterSpec{ServiceAccount: tc.serviceAccount}
-			require.Equal(t, tc.expectedName, spec.GetServiceAccountName(defaultName))
-			require.Equal(t, tc.expectedCreate, spec.IsServiceAccountCreateEnabled())
+			spec := &DCGMExporterSpec{ServiceAccount: tc.config}
+			require.Equal(t, tc.expected, spec.GetServiceAccountName("default"))
+			require.Equal(t, tc.external, spec.HasServiceAccountName())
 		})
 	}
 }
 
-// TestDCGMExporterServiceAccountCRDValidation pins the CEL rule that guards
-// `serviceAccount: {create: false}` without a name. The helpers cannot catch that
-// combination -- GetServiceAccountName falls back to the default and the operator
-// would then treat the default ServiceAccount as user-provided -- so the generated
-// CRD is the only safeguard before reconciliation.
-func TestDCGMExporterServiceAccountCRDValidation(t *testing.T) {
-	crds := map[string]string{
-		"ClusterPolicy": "../../../config/crd/bases/nvidia.com_clusterpolicies.yaml",
-		"GPUCluster":    "../../../config/crd/bases/nvidia.com_gpuclusters.yaml",
-	}
-
-	for kind, path := range crds {
+func TestDCGMExporterServiceAccountCRDSchema(t *testing.T) {
+	for _, kind := range []string{"clusterpolicies", "gpuclusters"} {
 		t.Run(kind, func(t *testing.T) {
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile("../../../config/crd/bases/nvidia.com_" + kind + ".yaml")
 			require.NoError(t, err)
-
 			crd := &apiextensionsv1.CustomResourceDefinition{}
 			require.NoError(t, yaml.Unmarshal(data, crd))
-			require.NotEmpty(t, crd.Spec.Versions)
-
-			props := crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].
-				Properties["dcgmExporter"].Properties["serviceAccount"]
-			require.Contains(t, props.Properties, "name")
-			require.Contains(t, props.Properties, "create")
-
-			require.Len(t, props.XValidations, 1,
-				"the create/name consistency rule must survive CRD regeneration")
-			rule := props.XValidations[0]
-			require.Equal(t, "name is required when create is false", rule.Message)
-			require.Contains(t, rule.Rule, "self.create")
-			require.Contains(t, rule.Rule, "self.name")
+			for _, version := range crd.Spec.Versions {
+				props := version.Schema.OpenAPIV3Schema.Properties["spec"].Properties["dcgmExporter"].Properties["serviceAccount"]
+				require.Equal(t, "string", props.Properties["name"].Type)
+				require.NotContains(t, props.Properties, "create")
+				require.Empty(t, props.XValidations, "no obsolete create/name rule may remain")
+			}
 		})
 	}
 }

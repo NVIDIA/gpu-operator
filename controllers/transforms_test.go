@@ -5096,16 +5096,16 @@ func TestTransformDCGMExporterServiceAccount(t *testing.T) {
 			serviceAccount:     nil,
 			expectedNameChange: "",
 		},
-		"explicit default keeps the asset value": {
-			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: DCGMExporterDefaultServiceAccountName},
+		"empty block keeps the asset value": {
+			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{},
 			expectedNameChange: "",
 		},
 		"custom name is applied": {
 			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: "metrics-identity"},
 			expectedNameChange: "metrics-identity",
 		},
-		"custom name with create=false is applied": {
-			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: "byo-sa", Create: new(false)},
+		"another external name is applied": {
+			serviceAccount:     &gpuv1.DCGMExporterServiceAccountConfig{Name: "byo-sa"},
 			expectedNameChange: "byo-sa",
 		},
 	}
