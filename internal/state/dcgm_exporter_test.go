@@ -30,6 +30,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
@@ -214,6 +216,48 @@ func TestDCGMExporterServiceMonitorRendered(t *testing.T) {
 	sm := findByKind(objs, "ServiceMonitor")
 	require.NotNil(t, sm, "ServiceMonitor must render when the CRD is served and it is enabled")
 	assert.Equal(t, "nvidia-dcgm-exporter-dra", sm.GetName())
+}
+
+func TestDCGMExporterServiceMonitorRelabelings(t *testing.T) {
+	s := newTestDCGMExporterState(t, true)
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{
+		ServiceMonitor: &nvidiav1.ServiceMonitorConfig{
+			Enabled: new(true),
+			Relabelings: []*promv1.RelabelConfig{{
+				Action:       "replace",
+				Regex:        "(.*)",
+				SourceLabels: []promv1.LabelName{"__meta_kubernetes_pod_node_name"},
+				TargetLabel:  "instance",
+			}},
+			MetricRelabelings: []*promv1.RelabelConfig{{
+				Action:       "replace",
+				Regex:        "(.+)",
+				SourceLabels: []promv1.LabelName{"exported_namespace"},
+				TargetLabel:  "namespace",
+			}},
+		},
+	})
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+
+	sm := findByKind(objs, "ServiceMonitor")
+	require.NotNil(t, sm)
+
+	endpoints, _, err := unstructured.NestedSlice(sm.Object, "spec", "endpoints")
+	require.NoError(t, err)
+	require.Len(t, endpoints, 1)
+	endpoint := endpoints[0].(map[string]any)
+
+	relabelings, ok := endpoint["relabelings"].([]any)
+	require.True(t, ok, "relabelings must be rendered")
+	require.Len(t, relabelings, 1)
+	assert.Equal(t, "instance", relabelings[0].(map[string]any)["targetLabel"])
+
+	metricRelabelings, ok := endpoint["metricRelabelings"].([]any)
+	require.True(t, ok, "metricRelabelings must be rendered")
+	require.Len(t, metricRelabelings, 1)
+	assert.Equal(t, "namespace", metricRelabelings[0].(map[string]any)["targetLabel"])
 }
 
 func TestDCGMExporterServiceType(t *testing.T) {
