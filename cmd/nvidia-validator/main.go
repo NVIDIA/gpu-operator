@@ -126,6 +126,7 @@ var (
 	namespaceFlag                   string
 	withWaitFlag                    bool
 	withWorkloadFlag                bool
+	debugFlag                       bool
 	componentFlag                   string
 	cleanupAllFlag                  bool
 	outputDirFlag                   string
@@ -285,6 +286,14 @@ func main() {
 			Usage:       "indicates to wait for validation to complete successfully",
 			Destination: &withWaitFlag,
 			Sources:     cli.EnvVars("WITH_WAIT"),
+		},
+		&cli.BoolFlag{
+			Name:        "debug",
+			Aliases:     []string{"d"},
+			Value:       false,
+			Usage:       "Enable debug-level logging",
+			Destination: &debugFlag,
+			Sources:     cli.EnvVars("DEBUG"),
 		},
 		&cli.BoolFlag{
 			Name:        "with-workload",
@@ -529,6 +538,12 @@ func start(ctx context.Context, cli *cli.Command) error {
 			}
 		}
 	}
+
+	logLevel := log.DebugLevel
+	if debugFlag {
+		logLevel = log.DebugLevel
+	}
+	log.SetLevel(logLevel)
 
 	// create status directory
 	err := os.Mkdir(outputDirFlag, 0755)
