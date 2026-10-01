@@ -30,11 +30,6 @@ spec:
         app.kubernetes.io/name: nvidia-dra-driver
         app.kubernetes.io/component: nvidia-dra-driver-kubelet-plugin
         app: nvidia-dra-driver-kubelet-plugin
-        {{- range $k, $v := .Daemonsets.Labels }}
-        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
-        {{ $k }}: {{ $v | quote }}
-        {{- end }}
-        {{- end }}
       {{- if .Daemonsets.Annotations }}
       annotations:
         {{- range $k, $v := .Daemonsets.Annotations }}
