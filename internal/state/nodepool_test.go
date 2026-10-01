@@ -190,6 +190,44 @@ func TestGetNodePoolsGroupsNodesByOSTag(t *testing.T) {
 	require.Equal(t, "", poolsByName["ubuntu22.04"].nodeSelector[nfdOSVersionIDMajorLabelKey])
 }
 
+func TestGetNodePoolsReturnsStableOrder(t *testing.T) {
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+
+	labels := func(osID, osVersion string) map[string]string {
+		return map[string]string{
+			consts.GPUPresentLabel:        "true",
+			consts.NVIDIADriverOwnerLabel: "driver-a",
+			nfdOSReleaseIDLabelKey:        osID,
+			nfdOSVersionIDLabelKey:        osVersion,
+			nfdOSVersionIDMajorLabelKey:   osVersion[:2],
+		}
+	}
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "ubuntu", Labels: labels("ubuntu", "22.04")}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "rhel", Labels: labels("rhel", "9.4")}},
+		).
+		Build()
+	driver := &nvidiav1alpha1.NVIDIADriver{ObjectMeta: metav1.ObjectMeta{Name: "driver-a"}}
+
+	nodePools, err := getNodePools(context.Background(), k8sClient, driver, false)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"rhel9", "ubuntu22.04"}, []string{nodePools[0].name, nodePools[1].name})
+}
+
+func TestSortedNodePoolsSortsMapEntriesByName(t *testing.T) {
+	nodePools := map[string]nodePool{
+		"ubuntu22.04": {name: "ubuntu22.04"},
+		"rhel9":       {name: "rhel9"},
+	}
+
+	sorted := sortedNodePools(nodePools)
+
+	require.Equal(t, []string{"rhel9", "ubuntu22.04"}, []string{sorted[0].name, sorted[1].name})
+}
+
 func TestGetNodePoolsSkipsNodesMissingNFDOSLabels(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 
