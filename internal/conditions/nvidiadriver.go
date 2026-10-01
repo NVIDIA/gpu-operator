@@ -69,6 +69,11 @@ func (u *nvDriverUpdater) updateConditions(ctx context.Context, cr *nvidiav1alph
 	if err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance); err != nil {
 		return fmt.Errorf("failed to get NVIDIADriver instance for status update: %w", err)
 	}
+	// The fetched object can be newer than the object this reconcile processed.
+	// Do not publish a stale result as current for an unreconciled generation.
+	if instance.Generation != cr.Generation {
+		return nil
+	}
 
 	switch statusType {
 	case Ready:
@@ -77,21 +82,21 @@ func (u *nvDriverUpdater) updateConditions(ctx context.Context, cr *nvidiav1alph
 			Status:             metav1.ConditionTrue,
 			Reason:             reason,
 			Message:            message,
-			ObservedGeneration: instance.Generation,
+			ObservedGeneration: cr.Generation,
 		})
 
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 			Type:               Error,
 			Status:             metav1.ConditionFalse,
 			Reason:             Ready,
-			ObservedGeneration: instance.Generation,
+			ObservedGeneration: cr.Generation,
 		})
 	case Error:
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
 			Type:               Ready,
 			Status:             metav1.ConditionFalse,
 			Reason:             Error,
-			ObservedGeneration: instance.Generation,
+			ObservedGeneration: cr.Generation,
 		})
 
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
@@ -99,7 +104,7 @@ func (u *nvDriverUpdater) updateConditions(ctx context.Context, cr *nvidiav1alph
 			Status:             metav1.ConditionTrue,
 			Reason:             reason,
 			Message:            message,
-			ObservedGeneration: instance.Generation,
+			ObservedGeneration: cr.Generation,
 		})
 
 		// Ensure status.state is not empty when updating the CR status.

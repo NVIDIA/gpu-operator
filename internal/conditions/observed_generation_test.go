@@ -18,11 +18,17 @@ package conditions
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -100,4 +106,150 @@ func assertObservedGenerations(t *testing.T, conditions []metav1.Condition, gene
 	for _, condition := range conditions {
 		require.Equal(t, generation, condition.ObservedGeneration)
 	}
+}
+
+func TestConditionWritersSkipUnreconciledGeneration(t *testing.T) {
+	const reconciledGeneration int64 = 7
+	const currentGeneration int64 = 8
+
+	t.Run("ClusterPolicy", func(t *testing.T) {
+		reconciled := newClusterPolicy("cluster-policy-generation-mismatch")
+		reconciled.Generation = reconciledGeneration
+		stored := reconciled.DeepCopy()
+		stored.Generation = currentGeneration
+		c := newClusterPolicyClient(t, stored)
+
+		require.NoError(t, NewClusterPolicyUpdater(c).SetConditionsReady(context.Background(), reconciled, Reconciled, "ready"))
+
+		got := &nvidiav1.ClusterPolicy{}
+		require.NoError(t, c.Get(context.Background(), objectKey(reconciled.Name), got))
+		require.Equal(t, currentGeneration, got.Generation)
+		require.Empty(t, got.Status.Conditions)
+	})
+
+	t.Run("NVIDIADriver", func(t *testing.T) {
+		reconciled := newNvDriver("gpu-driver-generation-mismatch")
+		reconciled.Generation = reconciledGeneration
+		stored := reconciled.DeepCopy()
+		stored.Generation = currentGeneration
+		c := newNvDriverClient(t, stored)
+
+		require.NoError(t, NewNvDriverUpdater(c).SetConditionsReady(context.Background(), reconciled, Reconciled, "ready"))
+
+		got := &nvidiav1alpha1.NVIDIADriver{}
+		require.NoError(t, c.Get(context.Background(), objectKey(reconciled.Name), got))
+		require.Equal(t, currentGeneration, got.Generation)
+		require.Empty(t, got.Status.Conditions)
+	})
+
+	t.Run("GPUCluster", func(t *testing.T) {
+		reconciled := newGPUCluster("gpu-cluster-generation-mismatch", "")
+		reconciled.Generation = reconciledGeneration
+		stored := reconciled.DeepCopy()
+		stored.Generation = currentGeneration
+		c := newGPUClusterClient(t, stored)
+
+		require.NoError(t, NewGPUClusterUpdater(c).SetConditionsReady(context.Background(), reconciled, Reconciled, "ready"))
+
+		got := getGPUCluster(t, c, reconciled.Name)
+		require.Equal(t, currentGeneration, got.Generation)
+		require.Empty(t, got.Status.Conditions)
+	})
+}
+
+func TestConditionWritersConflictRetryDoesNotAcknowledgeNewGeneration(t *testing.T) {
+	const reconciledGeneration int64 = 7
+	const currentGeneration int64 = 8
+
+	t.Run("ClusterPolicy", func(t *testing.T) {
+		reconciled := newClusterPolicy("cluster-policy-conflict-generation")
+		reconciled.Generation = reconciledGeneration
+		stored := reconciled.DeepCopy()
+		var updateCalls int
+		c := fake.NewClientBuilder().
+			WithScheme(clusterPolicyScheme(t)).
+			WithObjects(stored).
+			WithStatusSubresource(stored).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					updateCalls++
+					if updateCalls == 1 {
+						latest := &nvidiav1.ClusterPolicy{}
+						require.NoError(t, cl.Get(ctx, objectKey(obj.GetName()), latest))
+						latest.Generation = currentGeneration
+						require.NoError(t, cl.Update(ctx, latest))
+						return apierrors.NewConflict(schema.GroupResource{Group: "nvidia.com", Resource: "clusterpolicies"}, obj.GetName(), errors.New("the object has been modified"))
+					}
+					return cl.SubResource(subResourceName).Update(ctx, obj, opts...)
+				},
+			}).Build()
+
+		require.NoError(t, NewClusterPolicyUpdater(c).SetConditionsReady(context.Background(), reconciled, Reconciled, "ready"))
+		require.Equal(t, 1, updateCalls, "retry must stop before writing status for the newer generation")
+		got := &nvidiav1.ClusterPolicy{}
+		require.NoError(t, c.Get(context.Background(), objectKey(reconciled.Name), got))
+		require.Equal(t, currentGeneration, got.Generation)
+		require.Empty(t, got.Status.Conditions)
+	})
+
+	t.Run("NVIDIADriver", func(t *testing.T) {
+		reconciled := newNvDriver("gpu-driver-conflict-generation")
+		reconciled.Generation = reconciledGeneration
+		stored := reconciled.DeepCopy()
+		var updateCalls int
+		c := fake.NewClientBuilder().
+			WithScheme(nvDriverScheme(t)).
+			WithObjects(stored).
+			WithStatusSubresource(stored).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					updateCalls++
+					if updateCalls == 1 {
+						latest := &nvidiav1alpha1.NVIDIADriver{}
+						require.NoError(t, cl.Get(ctx, objectKey(obj.GetName()), latest))
+						latest.Generation = currentGeneration
+						require.NoError(t, cl.Update(ctx, latest))
+						return apierrors.NewConflict(schema.GroupResource{Group: "nvidia.com", Resource: "nvidiadrivers"}, obj.GetName(), errors.New("the object has been modified"))
+					}
+					return cl.SubResource(subResourceName).Update(ctx, obj, opts...)
+				},
+			}).Build()
+
+		require.NoError(t, NewNvDriverUpdater(c).SetConditionsReady(context.Background(), reconciled, Reconciled, "ready"))
+		require.Equal(t, 1, updateCalls, "retry must stop before writing status for the newer generation")
+		got := &nvidiav1alpha1.NVIDIADriver{}
+		require.NoError(t, c.Get(context.Background(), objectKey(reconciled.Name), got))
+		require.Equal(t, currentGeneration, got.Generation)
+		require.Empty(t, got.Status.Conditions)
+	})
+
+	t.Run("GPUCluster", func(t *testing.T) {
+		reconciled := newGPUCluster("gpu-cluster-conflict-generation", "")
+		reconciled.Generation = reconciledGeneration
+		stored := reconciled.DeepCopy()
+		var updateCalls int
+		c := fake.NewClientBuilder().
+			WithScheme(gpuClusterScheme(t)).
+			WithObjects(stored).
+			WithStatusSubresource(stored).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					updateCalls++
+					if updateCalls == 1 {
+						latest := &nvidiav1alpha1.GPUCluster{}
+						require.NoError(t, cl.Get(ctx, objectKey(obj.GetName()), latest))
+						latest.Generation = currentGeneration
+						require.NoError(t, cl.Update(ctx, latest))
+						return apierrors.NewConflict(schema.GroupResource{Group: "nvidia.com", Resource: "gpuclusters"}, obj.GetName(), errors.New("the object has been modified"))
+					}
+					return cl.SubResource(subResourceName).Update(ctx, obj, opts...)
+				},
+			}).Build()
+
+		require.NoError(t, NewGPUClusterUpdater(c).SetConditionsReady(context.Background(), reconciled, Reconciled, "ready"))
+		require.Equal(t, 1, updateCalls, "retry must stop before writing status for the newer generation")
+		got := getGPUCluster(t, c, reconciled.Name)
+		require.Equal(t, currentGeneration, got.Generation)
+		require.Empty(t, got.Status.Conditions)
+	})
 }
