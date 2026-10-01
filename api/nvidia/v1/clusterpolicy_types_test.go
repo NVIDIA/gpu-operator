@@ -17,10 +17,13 @@
 package v1
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"sigs.k8s.io/yaml"
 )
 
 func TestImagePath(t *testing.T) {
@@ -85,4 +88,39 @@ func TestImagePath(t *testing.T) {
 		assert.Empty(t, path)
 		assert.ErrorContains(t, err, "invalid nil spec")
 	})
+}
+
+func TestDCGMExporterServiceAccount(t *testing.T) {
+	for name, tc := range map[string]struct {
+		config   *DCGMExporterServiceAccountConfig
+		expected string
+		external bool
+	}{
+		"unset":                     {expected: "default"},
+		"empty block":               {config: &DCGMExporterServiceAccountConfig{}, expected: "default"},
+		"named account is external": {config: &DCGMExporterServiceAccountConfig{Name: "metrics"}, expected: "metrics", external: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			spec := &DCGMExporterSpec{ServiceAccount: tc.config}
+			require.Equal(t, tc.expected, spec.GetServiceAccountName("default"))
+			require.Equal(t, tc.external, spec.HasServiceAccountName())
+		})
+	}
+}
+
+func TestDCGMExporterServiceAccountCRDSchema(t *testing.T) {
+	for _, kind := range []string{"clusterpolicies", "gpuclusters"} {
+		t.Run(kind, func(t *testing.T) {
+			data, err := os.ReadFile("../../../config/crd/bases/nvidia.com_" + kind + ".yaml")
+			require.NoError(t, err)
+			crd := &apiextensionsv1.CustomResourceDefinition{}
+			require.NoError(t, yaml.Unmarshal(data, crd))
+			for _, version := range crd.Spec.Versions {
+				props := version.Schema.OpenAPIV3Schema.Properties["spec"].Properties["dcgmExporter"].Properties["serviceAccount"]
+				require.Equal(t, "string", props.Properties["name"].Type)
+				require.NotContains(t, props.Properties, "create")
+				require.Empty(t, props.XValidations, "no obsolete create/name rule may remain")
+			}
+		})
+	}
 }

@@ -1059,6 +1059,11 @@ type DCGMExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Service configuration for NVIDIA DCGM Exporter"
 	ServiceSpec *DCGMExporterServiceConfig `json:"service,omitempty"`
 
+	// Optional: ServiceAccount configuration for NVIDIA DCGM Exporter
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ServiceAccount configuration for NVIDIA DCGM Exporter"
+	ServiceAccount *DCGMExporterServiceAccountConfig `json:"serviceAccount,omitempty"`
+
 	// HostPID allows the DCGM-Exporter daemon set to access the host's PID namespace
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
@@ -1146,6 +1151,20 @@ type DCGMExporterServiceConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Internal Traffic Policy for the DCGM Exporter K8s Service"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	InternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
+}
+
+// DCGMExporterServiceAccountConfig selects an externally managed ServiceAccount.
+type DCGMExporterServiceAccountConfig struct {
+	// Name of an existing ServiceAccount in the operator namespace. When empty,
+	// the operator creates and manages its default account. The default name
+	// (nvidia-dcgm-exporter for ClusterPolicy, nvidia-dcgm-exporter-dra for
+	// GPUCluster) is reserved and must not be explicitly configured.
+	// The operator does not create, modify, adopt or delete a named account.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Existing ServiceAccount name for NVIDIA DCGM Exporter"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	Name string `json:"name,omitempty"`
 }
 
 // DCGMSpec defines the properties for NVIDIA DCGM deployment
@@ -2300,6 +2319,20 @@ func (e *DCGMExporterSpec) IsPodUIDEnabled() bool {
 // enrichment is enabled for DCGM Exporter.
 func (e *DCGMExporterSpec) IsKubernetesPodMetadataEnabled() bool {
 	return e.IsPodLabelsEnabled() || e.IsPodUIDEnabled()
+}
+
+// GetServiceAccountName returns the name of the ServiceAccount referenced by the
+// DCGM Exporter operands, falling back to defaultName when it is not configured.
+func (e *DCGMExporterSpec) GetServiceAccountName(defaultName string) string {
+	if e.ServiceAccount == nil || e.ServiceAccount.Name == "" {
+		return defaultName
+	}
+	return e.ServiceAccount.Name
+}
+
+// HasServiceAccountName reports whether the exporter references an external account.
+func (e *DCGMExporterSpec) HasServiceAccountName() bool {
+	return e.ServiceAccount != nil && e.ServiceAccount.Name != ""
 }
 
 // IsEnabled returns true if gpu-feature-discovery is enabled(default) through gpu-operator

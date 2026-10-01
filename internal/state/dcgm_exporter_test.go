@@ -22,16 +22,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const dcgmExporterManifestDir = "../../manifests/state-dcgm-exporter"
@@ -54,6 +61,40 @@ func newTestDCGMExporterState(t *testing.T, serviceMonitorCRD bool) *configurabl
 		WithRESTMapper(restMapperWithServiceMonitor(serviceMonitorCRD)).
 		Build()
 	s, err := NewStateDCGMExporter(client, "test-operator", runtime.NewScheme(), dcgmExporterManifestDir)
+	require.NoError(t, err)
+	return s.(*configurableState)
+}
+
+// newTestDCGMExporterStateWithObjects builds the state with a client that already holds
+// the given objects, for the ServiceAccount checks that read cluster state. The DaemonSet
+// status is a subresource so a pre-seeded status survives the sync's update -- that is how
+// a test keeps the operand short of Ready.
+func newTestDCGMExporterStateWithObjects(t *testing.T, objs ...client.Object) *configurableState {
+	t.Helper()
+	t.Setenv("DCGM_EXPORTER_IMAGE", "nvcr.io/nvidia/k8s/dcgm-exporter:test")
+
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, appsv1.AddToScheme(testScheme))
+	require.NoError(t, rbacv1.AddToScheme(testScheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(testScheme))
+
+	// Disabled Sync must exercise real cleanup, rather than skip every kind as unserved.
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion})
+	for _, gvk := range []schema.GroupVersionKind{
+		corev1.SchemeGroupVersion.WithKind("ServiceAccount"),
+		corev1.SchemeGroupVersion.WithKind("ConfigMap"),
+		appsv1.SchemeGroupVersion.WithKind("DaemonSet"),
+	} {
+		mapper.Add(gvk, meta.RESTScopeNamespace)
+	}
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(testScheme).
+		WithRESTMapper(mapper).
+		WithObjects(objs...).
+		WithStatusSubresource(&appsv1.DaemonSet{}).
+		Build()
+	s, err := NewStateDCGMExporter(k8sClient, "test-operator", testScheme, dcgmExporterManifestDir)
 	require.NoError(t, err)
 	return s.(*configurableState)
 }
@@ -109,6 +150,146 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 
 	require.Len(t, ctr.Resources.Claims, 1)
 	assert.Equal(t, "admin-gpus", ctr.Resources.Claims[0].Name)
+}
+
+func TestDCGMExporterExternalServiceAccountValidation(t *testing.T) {
+	for name, tc := range map[string]struct {
+		configured, namespace, err string
+		missing, terminating       bool
+	}{
+		"existing external account": {configured: "metrics", namespace: "test-operator"},
+		"missing external account":  {configured: "metrics", missing: true, err: "cannot use"},
+		"different namespace":       {configured: "metrics", namespace: "other", err: "cannot use"},
+		"reserved name exists":      {configured: dcgmExporterDefaultServiceAccountName, namespace: "test-operator", err: "reserved"},
+		"reserved name missing":     {configured: dcgmExporterDefaultServiceAccountName, missing: true, err: "reserved"},
+		"terminating account":       {configured: "metrics", namespace: "test-operator", terminating: true, err: "being deleted"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: tc.configured}})
+			s := newTestDCGMExporterStateWithObjects(t)
+			var before *corev1.ServiceAccount
+			if !tc.missing {
+				sa := selfLabelledServiceAccount(tc.configured)
+				sa.Namespace = tc.namespace
+				sa.Annotations = map[string]string{"example.com/identity": "keep"}
+				sa.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "pull-secret"}}
+				sa.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: "external-owner", UID: "external-owner"}}
+				require.NoError(t, s.client.Create(ctx, sa))
+				if tc.terminating {
+					sa.Finalizers = []string{"example.com/keep"}
+					require.NoError(t, s.client.Update(ctx, sa))
+					require.NoError(t, s.client.Delete(ctx, sa))
+				}
+				before = &corev1.ServiceAccount{}
+				require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(sa), before))
+			}
+			state, err := s.Sync(ctx, cr, draSupportedCatalog())
+			if tc.err != "" {
+				require.ErrorContains(t, err, tc.err)
+				require.Equal(t, SyncState(SyncStateNotReady), state)
+				daemonsets := &appsv1.DaemonSetList{}
+				require.NoError(t, s.client.List(ctx, daemonsets))
+				require.Empty(t, daemonsets.Items, "invalid identities must not reach operand creation")
+			} else {
+				require.NoError(t, err)
+			}
+			if before != nil {
+				after := &corev1.ServiceAccount{}
+				require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(before), after))
+				require.Equal(t, before, after)
+			}
+			accounts := &corev1.ServiceAccountList{}
+			require.NoError(t, s.client.List(ctx, accounts))
+			if tc.missing {
+				require.Empty(t, accounts.Items)
+			} else {
+				require.Len(t, accounts.Items, 1, "external mode never creates a ServiceAccount")
+			}
+		})
+	}
+}
+
+func TestDCGMExporterServiceAccountTransitions(t *testing.T) {
+	ctx := t.Context()
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
+	cr.UID = "cluster-uid"
+	s := newTestDCGMExporterStateWithObjects(t, selfLabelledServiceAccount("metrics-a"), selfLabelledServiceAccount("metrics-b"))
+	for _, name := range []string{"", "metrics-a", "metrics-b", ""} {
+		cr.Spec.DCGMExporter.ServiceAccount = &nvidiav1.DCGMExporterServiceAccountConfig{Name: name}
+		_, err := s.Sync(ctx, cr, draSupportedCatalog())
+		require.NoError(t, err)
+		ds := &appsv1.DaemonSet{}
+		require.NoError(t, s.client.Get(ctx, client.ObjectKey{Namespace: "test-operator", Name: "nvidia-dcgm-exporter-dra"}, ds))
+		require.Equal(t, cr.Spec.DCGMExporter.GetServiceAccountName(dcgmExporterDefaultServiceAccountName), ds.Spec.Template.Spec.ServiceAccountName)
+		// Completing rollout must no longer reclaim the managed default.
+		ds.Status = appsv1.DaemonSetStatus{ObservedGeneration: ds.Generation, DesiredNumberScheduled: 1, CurrentNumberScheduled: 1, UpdatedNumberScheduled: 1, NumberReady: 1, NumberAvailable: 1}
+		require.NoError(t, s.client.Status().Update(ctx, ds))
+		state, err := s.Sync(ctx, cr, draSupportedCatalog())
+		require.NoError(t, err)
+		require.Equal(t, SyncState(SyncStateReady), state)
+		accounts := &corev1.ServiceAccountList{}
+		require.NoError(t, s.client.List(ctx, accounts))
+		require.Len(t, accounts.Items, 3)
+		for _, sa := range accounts.Items {
+			if sa.Name == dcgmExporterDefaultServiceAccountName {
+				require.True(t, metav1.IsControlledBy(&sa, cr))
+			} else {
+				require.Empty(t, sa.OwnerReferences)
+			}
+		}
+	}
+	cr.Spec.DCGMExporter.ServiceAccount.Name = "metrics-a"
+	_, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	sa := &corev1.ServiceAccount{}
+	key := client.ObjectKey{Namespace: "test-operator", Name: "metrics-a"}
+	require.NoError(t, s.client.Get(ctx, key, sa))
+	require.NoError(t, s.client.Delete(ctx, sa))
+	state, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.True(t, apierrors.IsNotFound(err))
+	require.Equal(t, SyncState(SyncStateNotReady), state)
+	require.NoError(t, s.client.Create(ctx, selfLabelledServiceAccount("metrics-a")))
+	state, err = s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateReady), state)
+}
+
+func TestDCGMExporterDisabledSyncPreservesExternalAccounts(t *testing.T) {
+	for name, spec := range map[string]*nvidiav1.DCGMExporterSpec{
+		"spec removed":                nil,
+		"default disabled":            {Enabled: new(false)},
+		"external reference disabled": {Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "metrics"}},
+		"missing reference disabled":  {Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "missing"}},
+		"reserved reference disabled": {Enabled: new(false), ServiceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: dcgmExporterDefaultServiceAccountName}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			cr := exporterCR(spec)
+			cr.UID = "cluster-uid"
+			managed := ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)
+			external := selfLabelledServiceAccount("metrics")
+			external.Annotations = map[string]string{"example.com/identity": "keep"}
+			other := selfLabelledServiceAccount("previous-external")
+			sibling := otherStateServiceAccount(cr, "nvidia-dcgm-dra")
+			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "exporter-config", Namespace: "test-operator", Labels: map[string]string{consts.StateLabel: dcgmExporterStateName}}}
+			s := newTestDCGMExporterStateWithObjects(t, managed, external, other, sibling, cm)
+			before := &corev1.ServiceAccount{}
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(external), before))
+			_, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.True(t, apierrors.IsNotFound(s.client.Get(ctx, client.ObjectKeyFromObject(managed), &corev1.ServiceAccount{})))
+			require.True(t, apierrors.IsNotFound(s.client.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{})))
+			after := &corev1.ServiceAccount{}
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(external), after))
+			require.Equal(t, before, after)
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(other), &corev1.ServiceAccount{}))
+			require.NoError(t, s.client.Get(ctx, client.ObjectKeyFromObject(sibling), &corev1.ServiceAccount{}))
+			state, err := s.Sync(ctx, cr, draSupportedCatalog())
+			require.NoError(t, err)
+			require.Equal(t, SyncState(SyncStateIgnore), state)
+		})
+	}
 }
 
 func TestDCGMExporterDisabled(t *testing.T) {
@@ -234,4 +415,222 @@ func TestDCGMExporterServiceType(t *testing.T) {
 	assert.Equal(t, "NodePort", svcType)
 	itpValue, _, _ := unstructured.NestedString(svc.Object, "spec", "internalTrafficPolicy")
 	assert.Equal(t, "Local", itpValue)
+}
+
+// kindNames collects the names of every rendered object of the given kind.
+func kindNames(objs []*unstructured.Unstructured, kind string) []string {
+	var names []string
+	for _, o := range objs {
+		if o.GetKind() == kind {
+			names = append(names, o.GetName())
+		}
+	}
+	return names
+}
+
+// subjectNames collects the ServiceAccount subject names of a rendered RBAC binding.
+func subjectNames(t *testing.T, objs []*unstructured.Unstructured, kind, name string) []string {
+	t.Helper()
+	for _, o := range objs {
+		if o.GetKind() != kind || o.GetName() != name {
+			continue
+		}
+		subjects, found, err := unstructured.NestedSlice(o.Object, "subjects")
+		require.NoError(t, err)
+		require.True(t, found)
+		var names []string
+		for _, raw := range subjects {
+			subject, ok := raw.(map[string]any)
+			require.True(t, ok)
+			names = append(names, subject["name"].(string))
+		}
+		return names
+	}
+	t.Fatalf("%s %q not found in rendered objects", kind, name)
+	return nil
+}
+
+// TestDCGMExporterServiceAccountRendering covers what the configured ServiceAccount does to
+// the rendered manifests: which object is created, and which operands reference it.
+func TestDCGMExporterServiceAccountRendering(t *testing.T) {
+	const (
+		customName = "metrics-identity"
+		byoName    = "byo-sa"
+	)
+
+	testCases := map[string]struct {
+		serviceAccount *nvidiav1.DCGMExporterServiceAccountConfig
+		// created is the ServiceAccount the operator renders, empty when it renders none.
+		created string
+		// referenced is the name every operand has to point at.
+		referenced string
+	}{
+		"the default configuration creates and references the operator default": {
+			created:    dcgmExporterDefaultServiceAccountName,
+			referenced: dcgmExporterDefaultServiceAccountName,
+		},
+		"a configured name is referenced without creation": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: customName},
+			referenced:     customName,
+		},
+		"a numeric-looking name remains a string": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "123"},
+			referenced:     "123",
+		},
+		"a boolean-looking name remains a string": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: "true"},
+			referenced:     "true",
+		},
+		"external accounts are not rendered": {
+			serviceAccount: &nvidiav1.DCGMExporterServiceAccountConfig{Name: byoName},
+			created:        "",
+			referenced:     byoName,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDCGMExporterState(t, false)
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{ServiceAccount: tc.serviceAccount})
+
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedOpenshiftCatalog())
+			require.NoError(t, err)
+
+			if tc.created == "" {
+				assert.Empty(t, kindNames(objs, "ServiceAccount"),
+					"the operator must not render a ServiceAccount it does not own")
+			} else {
+				assert.Equal(t, []string{tc.created}, kindNames(objs, "ServiceAccount"))
+			}
+
+			assert.Equal(t, tc.referenced, findDaemonSet(t, objs).Spec.Template.Spec.ServiceAccountName)
+			assert.Equal(t, []string{tc.referenced},
+				subjectNames(t, objs, "RoleBinding", "nvidia-dcgm-exporter-dra"))
+			assert.Equal(t, []string{tc.referenced},
+				subjectNames(t, objs, "ClusterRoleBinding", "nvidia-dcgm-exporter-dra-read-pods"))
+			scc := findByKind(objs, "SecurityContextConstraints")
+			require.NotNil(t, scc)
+			users, found, err := unstructured.NestedStringSlice(scc.Object, "users")
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Equal(t, []string{"system:serviceaccount:test-operator:" + tc.referenced}, users)
+			// Only the subjects follow the ServiceAccount; the binding objects keep their names.
+			assert.Equal(t, []string{"nvidia-dcgm-exporter-dra"}, kindNames(objs, "RoleBinding"))
+		})
+	}
+}
+
+// ownedServiceAccount returns a ServiceAccount in the operand namespace, controlled by cr
+// and labelled as belonging to this state, the way the sync would have left it.
+func ownedServiceAccount(cr *nvidiav1alpha1.GPUCluster, name string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "test-operator",
+			Labels:    map[string]string{consts.StateLabel: "state-dcgm-exporter"},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
+				Kind:       "GPUCluster",
+				Name:       cr.Name,
+				UID:        cr.UID,
+				Controller: new(true),
+			}},
+		},
+	}
+}
+
+// unownedServiceAccount returns a ServiceAccount in the operand namespace that the
+// operator did not create.
+func unownedServiceAccount(name string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-operator"},
+	}
+}
+
+// selfLabelledServiceAccount returns a ServiceAccount the user created and labelled with
+// this state's label themselves. The operator never owned it, so it is not ours to mutate.
+func selfLabelledServiceAccount(name string) *corev1.ServiceAccount {
+	sa := unownedServiceAccount(name)
+	sa.Labels = map[string]string{consts.StateLabel: "state-dcgm-exporter"}
+	return sa
+}
+
+// otherStateServiceAccount returns a ServiceAccount another state of the same GPUCluster
+// manages: it carries the CR's controller reference like every operand object does, but
+// not this state's label.
+func otherStateServiceAccount(cr *nvidiav1alpha1.GPUCluster, name string) *corev1.ServiceAccount {
+	sa := ownedServiceAccount(cr, name)
+	sa.Labels[consts.StateLabel] = "state-driver"
+	return sa
+}
+
+func TestDCGMExporterDisabledSyncRetriesMetadataConflict(t *testing.T) {
+	ctx := t.Context()
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
+	old := ownedServiceAccount(cr, dcgmExporterDefaultServiceAccountName)
+	s := newTestDCGMExporterStateWithObjects(t, old)
+	deletes := 0
+	s.client = interceptor.NewClient(s.client.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+		deletes++
+		if deletes == 1 {
+			current := &corev1.ServiceAccount{}
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(old), current))
+			current.Annotations = map[string]string{"example.com/last-audit": "updated"}
+			require.NoError(t, c.Update(ctx, current))
+		}
+		return c.Delete(ctx, obj, opts...)
+	}})
+	status, err := s.Sync(ctx, cr, draSupportedCatalog())
+	require.True(t, apierrors.IsConflict(err))
+	require.Equal(t, SyncState(SyncStateError), status)
+	status, err = s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateNotReady), status)
+	status, err = s.Sync(ctx, cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateIgnore), status)
+	require.Equal(t, 2, deletes)
+}
+
+func TestDCGMExporterDisabledSyncPreservesDefaultReplacement(t *testing.T) {
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
+	replacement := selfLabelledServiceAccount(dcgmExporterDefaultServiceAccountName)
+	s := newTestDCGMExporterStateWithObjects(t, replacement)
+	state, err := s.Sync(t.Context(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+	require.Equal(t, SyncState(SyncStateIgnore), state)
+	found := &corev1.ServiceAccount{}
+	require.NoError(t, s.client.Get(t.Context(), client.ObjectKeyFromObject(replacement), found))
+	require.Empty(t, found.OwnerReferences)
+}
+
+func TestDCGMExporterDeletionFilterUsesNameAndOwner(t *testing.T) {
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
+	cr.UID = "cluster-uid"
+	for name, tc := range map[string]struct {
+		name       string
+		owned      bool
+		wantDelete bool
+	}{
+		"controlled default without a marker": {name: dcgmExporterDefaultServiceAccountName, owned: true, wantDelete: true},
+		"unowned default":                     {name: dcgmExporterDefaultServiceAccountName},
+		"another operand's account":           {name: "nvidia-dcgm-dra", owned: true},
+		"external account":                    {name: "metrics"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			sa := unownedServiceAccount(tc.name)
+			if tc.owned {
+				sa = ownedServiceAccount(cr, tc.name)
+			}
+			// The generic state sweep already selects by state label. The account
+			// filter itself only needs the reserved name and controller reference.
+			sa.Labels = nil
+			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sa)
+			require.NoError(t, err)
+			u := &unstructured.Unstructured{Object: obj}
+			u.SetAPIVersion("v1")
+			u.SetKind("ServiceAccount")
+			require.Equal(t, tc.wantDelete, canDeleteDCGMExporterObject(cr, u))
+		})
+	}
 }

@@ -18,11 +18,16 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -43,6 +48,14 @@ const (
 	dcgmExporterCustomCollectors      = "/etc/dcgm-exporter/dcgm-metrics.csv"
 	dcgmExporterDefaultKubeletRootDir = "/var/lib/kubelet"
 	dcgmExporterDefaultJobMappingDir  = "/var/lib/dcgm-exporter/job-mapping"
+
+	// dcgmExporterDefaultServiceAccountName is the ServiceAccount the DRA operands
+	// reference unless the user configures a different one.
+	dcgmExporterDefaultServiceAccountName = "nvidia-dcgm-exporter-dra"
+
+	// dcgmExporterStateName is this state's name, and the value syncObjects writes into
+	// the state label of every object it applies.
+	dcgmExporterStateName = "state-dcgm-exporter"
 )
 
 func NewStateDCGMExporter(
@@ -56,6 +69,7 @@ func NewStateDCGMExporter(
 	if err != nil {
 		return nil, err
 	}
+	skel.deletionFilter = canDeleteDCGMExporterObject
 	return &configurableState{
 		stateSkel: skel,
 		isEnabled: func(cr *nvidiav1alpha1.GPUCluster) bool {
@@ -67,6 +81,7 @@ func NewStateDCGMExporter(
 		},
 		imageEnvName:    dcgmExporterImageEnvName,
 		buildRenderData: buildDCGMExporterRenderData,
+		preSync:         checkDCGMExporterServiceAccount,
 	}, nil
 }
 
@@ -140,7 +155,41 @@ func buildDCGMExporterRenderData(ctx context.Context, s *configurableState, cr *
 		PodResourcesDir:              filepath.Join(kubeletRootDir, "pod-resources"),
 		ServiceType:                  serviceType,
 		ServiceInternalTrafficPolicy: serviceInternalTrafficPolicy,
+		ServiceAccountName:           spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName),
+		CreateServiceAccount:         !spec.HasServiceAccountName(),
 	}, nil
+}
+
+// checkDCGMExporterServiceAccount only reads external accounts. Their metadata and
+// lifecycle remain with the provider, even when the exporter is reconfigured.
+func checkDCGMExporterServiceAccount(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error {
+	spec := cr.Spec.DCGMExporter
+	if !spec.HasServiceAccountName() {
+		return nil
+	}
+	name := spec.GetServiceAccountName(dcgmExporterDefaultServiceAccountName)
+	if name == dcgmExporterDefaultServiceAccountName {
+		return fmt.Errorf("ServiceAccount name %q is reserved for operator management; omit dcgmExporter.serviceAccount.name to use it", name)
+	}
+	sa := &corev1.ServiceAccount{}
+	if err := s.client.Get(ctx, types.NamespacedName{Namespace: s.namespace, Name: name}, sa); err != nil {
+		return fmt.Errorf("cannot use DCGM Exporter ServiceAccount %q in namespace %q: %w", name, s.namespace, err)
+	}
+	if !sa.DeletionTimestamp.IsZero() {
+		return fmt.Errorf("DCGM Exporter ServiceAccount %q in namespace %q is being deleted", name, s.namespace)
+	}
+	return nil
+}
+
+// Only the operator-owned default belongs to this state's ServiceAccount cleanup.
+// External accounts may carry the state label too, including after a name change
+// or removal of the exporter spec, so label selection alone is not sufficient.
+func canDeleteDCGMExporterObject(owner metav1.Object, obj *unstructured.Unstructured) bool {
+	if obj.GetAPIVersion() != "v1" || obj.GetKind() != "ServiceAccount" {
+		return true
+	}
+	return obj.GetName() == dcgmExporterDefaultServiceAccountName &&
+		metav1.IsControlledBy(obj, owner)
 }
 
 // serviceMonitorCRDServed reports whether the cluster serves the monitoring.coreos.com
