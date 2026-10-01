@@ -118,18 +118,25 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		return nil, fmt.Errorf("failed to get OpenShift version: %w", err)
 	}
 
+	gpusHealthcheckPort := resolveHealthcheckPort(
+		cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck, defaultGPUsHealthcheckPort)
+	computeDomainsHealthcheckPort := resolveHealthcheckPort(
+		cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort)
+	if cr.Spec.DRADriver.IsComputeDomainsEnabled() &&
+		gpusHealthcheckPort > 0 && gpusHealthcheckPort == computeDomainsHealthcheckPort {
+		return nil, fmt.Errorf("GPU and computeDomains healthcheck ports must differ: %d", gpusHealthcheckPort)
+	}
+
 	renderData := &draDriverRenderData{
-		DRADriver:             draDriverSpec,
-		HostPaths:             &hostPaths,
-		Daemonsets:            &daemonsets,
-		Namespace:             s.namespace,
-		OpenshiftVersion:      openshiftVersion,
-		DeviceClassAPIVersion: apiVersion,
-		FeatureGates:          cr.Spec.DRADriver.FeatureGates,
-		GPUsHealthcheckPort: resolveHealthcheckPort(
-			cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck, defaultGPUsHealthcheckPort),
-		ComputeDomainsHealthcheckPort: resolveHealthcheckPort(
-			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort),
+		DRADriver:                     draDriverSpec,
+		HostPaths:                     &hostPaths,
+		Daemonsets:                    &daemonsets,
+		Namespace:                     s.namespace,
+		OpenshiftVersion:              openshiftVersion,
+		DeviceClassAPIVersion:         apiVersion,
+		FeatureGates:                  cr.Spec.DRADriver.FeatureGates,
+		GPUsHealthcheckPort:           gpusHealthcheckPort,
+		ComputeDomainsHealthcheckPort: computeDomainsHealthcheckPort,
 	}
 
 	return s.renderObjects(ctx, renderData)
