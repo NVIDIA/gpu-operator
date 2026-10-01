@@ -510,6 +510,12 @@ type NVIDIADriverStatus struct {
 	State State `json:"state"`
 	// Namespace indicates a namespace in which the operator and driver are installed
 	Namespace string `json:"namespace,omitempty"`
+	// AssignedNodeCount is the number of GPU-present nodes that match nodeSelector
+	// and are assigned to this NVIDIADriver, regardless of driver pod readiness.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	AssignedNodeCount int32 `json:"assignedNodeCount"`
 	// Conditions is a list of conditions representing the NVIDIADriver's current state.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -521,6 +527,7 @@ type NVIDIADriverStatus struct {
 //+kubebuilder:resource:scope=Cluster,shortName={"nvd","nvdriver","nvdrivers"}
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 //+kubebuilder:printcolumn:name="Default",type=boolean,JSONPath=`.spec.default`,priority=0
+//+kubebuilder:printcolumn:name="Nodes",type=integer,JSONPath=`.status.assignedNodeCount`,priority=0
 //+kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
 
 // NVIDIADriver is the Schema for the nvidiadrivers API
