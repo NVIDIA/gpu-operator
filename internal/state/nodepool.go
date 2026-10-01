@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -144,12 +145,18 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 		}
 	}
 
+	return sortedNodePools(nodePoolMap), nil
+}
+
+func sortedNodePools(nodePoolMap map[string]nodePool) []nodePool {
 	var nodePools []nodePool
 	for _, nodePool := range nodePoolMap {
 		nodePools = append(nodePools, nodePool)
 	}
-
-	return nodePools, nil
+	sort.Slice(nodePools, func(i, j int) bool {
+		return nodePools[i].name < nodePools[j].name
+	})
+	return nodePools
 }
 
 func getOSTag(osRelease, osVersion string) (string, error) {
