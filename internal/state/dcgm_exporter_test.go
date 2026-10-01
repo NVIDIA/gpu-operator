@@ -603,3 +603,34 @@ func TestDCGMExporterDisabledSyncPreservesDefaultReplacement(t *testing.T) {
 	require.NoError(t, s.client.Get(t.Context(), client.ObjectKeyFromObject(replacement), found))
 	require.Empty(t, found.OwnerReferences)
 }
+
+func TestDCGMExporterDeletionFilterUsesNameAndOwner(t *testing.T) {
+	cr := exporterCR(&nvidiav1.DCGMExporterSpec{Enabled: new(false)})
+	cr.UID = "cluster-uid"
+	for name, tc := range map[string]struct {
+		name       string
+		owned      bool
+		wantDelete bool
+	}{
+		"controlled default without a marker": {name: dcgmExporterDefaultServiceAccountName, owned: true, wantDelete: true},
+		"unowned default":                     {name: dcgmExporterDefaultServiceAccountName},
+		"another operand's account":           {name: "nvidia-dcgm-dra", owned: true},
+		"external account":                    {name: "metrics"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			sa := unownedServiceAccount(tc.name)
+			if tc.owned {
+				sa = ownedServiceAccount(cr, tc.name)
+			}
+			// The generic state sweep already selects by state label. The account
+			// filter itself only needs the reserved name and controller reference.
+			sa.Labels = nil
+			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sa)
+			require.NoError(t, err)
+			u := &unstructured.Unstructured{Object: obj}
+			u.SetAPIVersion("v1")
+			u.SetKind("ServiceAccount")
+			require.Equal(t, tc.wantDelete, canDeleteDCGMExporterObject(cr, u))
+		})
+	}
+}

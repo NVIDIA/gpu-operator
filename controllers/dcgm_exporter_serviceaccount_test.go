@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -230,6 +231,45 @@ func TestClusterPolicyRechecksReadyExporterServiceAccount(t *testing.T) {
 	require.Equal(t, time.Minute, result.RequeueAfter)
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(restored), restored))
 	require.Empty(t, restored.OwnerReferences)
+}
+
+func TestDCGMExporterDefaultAccountDeletionUsesOwner(t *testing.T) {
+	for name, tc := range map[string]struct {
+		labels     map[string]string
+		ownerUID   string
+		wantDelete bool
+	}{
+		"controlled account without labels": {ownerUID: "policy-uid", wantDelete: true},
+		"controlled account with changed app label": {
+			labels: map[string]string{"app": "custom-label"}, ownerUID: "policy-uid", wantDelete: true,
+		},
+		"unowned account with exporter label": {labels: map[string]string{"app": "nvidia-dcgm-exporter"}},
+		"another owner's account":             {ownerUID: "another-policy"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			n := newExporterAccountController(t)
+			n.singleton.Spec.DCGMExporter.Enabled = new(false)
+			sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+				Name: DCGMExporterDefaultServiceAccountName, Namespace: "operator", Labels: tc.labels,
+			}}
+			if tc.ownerUID != "" {
+				sa.OwnerReferences = []metav1.OwnerReference{{
+					APIVersion: "nvidia.com/v1", Kind: "ClusterPolicy", Name: "policy",
+					UID: types.UID(tc.ownerUID), Controller: new(true),
+				}}
+			}
+			require.NoError(t, n.client.Create(t.Context(), sa))
+			state, err := ServiceAccount(n)
+			require.NoError(t, err)
+			require.Equal(t, gpuv1.Disabled, state)
+			err = n.client.Get(t.Context(), client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{})
+			if tc.wantDelete {
+				require.True(t, apierrors.IsNotFound(err))
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestNonExporterServiceAccountDeletionIsUnchanged(t *testing.T) {

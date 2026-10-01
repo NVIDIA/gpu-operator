@@ -21,41 +21,8 @@ import (
 	"context"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// Marker is the label identifying the objects one operand created. Each controller
-// carries its own: the label has to be one the operator already applied before this
-// policy existed, so that objects created by an earlier release are still recognized
-// after an upgrade.
-type Marker struct {
-	Key   string
-	Value string
-}
-
-// Matches reports whether the labels carry this marker.
-func (m Marker) Matches(labels map[string]string) bool {
-	return labels[m.Key] == m.Value
-}
-
-// Apply stamps the marker onto an object the operand is about to create.
-func (m Marker) Apply(obj metav1.Object) {
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[m.Key] = m.Value
-	obj.SetLabels(labels)
-}
-
-// IsManaged reports whether obj is an object this operand created for owner: it carries
-// the operand's marker and owner is its controller. Both halves are required -- the
-// marker alone would match an object another CR created for the same operand, and the
-// controller reference alone would match every other operand of this CR.
-func IsManaged(obj metav1.Object, owner metav1.Object, m Marker) bool {
-	return m.Matches(obj.GetLabels()) && metav1.IsControlledBy(obj, owner)
-}
 
 // DeleteObserved deletes only the object version whose ownership was checked. UID
 // protects a replacement with the same name; resourceVersion protects a concurrent

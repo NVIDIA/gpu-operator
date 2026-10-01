@@ -33,7 +33,6 @@ import (
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
-	"github.com/NVIDIA/gpu-operator/internal/ownership"
 )
 
 const (
@@ -58,14 +57,6 @@ const (
 	// the state label of every object it applies.
 	dcgmExporterStateName = "state-dcgm-exporter"
 )
-
-// dcgmExporterServiceAccountMarker identifies the ServiceAccounts this state created.
-// It reuses the state label rather than introducing a new one so that accounts created
-// by an earlier release are still recognized after an upgrade.
-var dcgmExporterServiceAccountMarker = ownership.Marker{
-	Key:   consts.StateLabel,
-	Value: dcgmExporterStateName,
-}
 
 func NewStateDCGMExporter(
 	k8sClient client.Client,
@@ -198,7 +189,7 @@ func canDeleteDCGMExporterObject(owner metav1.Object, obj *unstructured.Unstruct
 		return true
 	}
 	return obj.GetName() == dcgmExporterDefaultServiceAccountName &&
-		ownership.IsManaged(obj, owner, dcgmExporterServiceAccountMarker)
+		metav1.IsControlledBy(obj, owner)
 }
 
 // serviceMonitorCRDServed reports whether the cluster serves the monitoring.coreos.com

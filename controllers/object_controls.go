@@ -336,12 +336,6 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
-// The existing exporter label and controller reference identify its default account.
-var dcgmExporterServiceAccountMarker = ownership.Marker{
-	Key:   "app",
-	Value: "nvidia-dcgm-exporter",
-}
-
 // deleteDefaultDCGMExporterServiceAccount leaves external accounts alone, including
 // a same-name replacement of the default. The default is retained during identity
 // changes so running pods can keep using it until the exporter is disabled.
@@ -354,7 +348,7 @@ func (n ClusterPolicyController) deleteDefaultDCGMExporterServiceAccount() (gpuv
 	if err != nil {
 		return gpuv1.NotReady, err
 	}
-	if ownership.IsManaged(sa, n.singleton, dcgmExporterServiceAccountMarker) {
+	if metav1.IsControlledBy(sa, n.singleton) {
 		if err := ownership.DeleteObserved(n.ctx, n.client, sa); err != nil {
 			return gpuv1.NotReady, err
 		}
@@ -397,7 +391,6 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 			}
 			return gpuv1.Ready, nil
 		}
-		dcgmExporterServiceAccountMarker.Apply(obj)
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
