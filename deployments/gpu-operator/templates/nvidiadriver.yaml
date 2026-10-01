@@ -65,6 +65,9 @@ spec:
   {{- if .Values.driver.repoConfig.configMapName }}
   repoConfig:
     name: {{ .Values.driver.repoConfig.configMapName }}
+    {{- with .Values.driver.repoConfig.nodeLocalPaths }}
+    nodeLocalPaths: {{ toYaml . | nindent 6 }}
+    {{- end }}
   {{- end }}
   {{- if .Values.driver.certConfig.name }}
   certConfig:

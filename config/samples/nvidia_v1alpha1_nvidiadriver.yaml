@@ -43,6 +43,10 @@ spec:
   # Private mirror repository configuration
   repoConfig:
     name: ""
+    # absolute host directories holding a node-local package repository referenced
+    # by the repo config above, bind-mounted read-only at the same path
+    # nodeLocalPaths:
+    #   - /opt/local-packages
   # custom ssl key/certificate configuration
   certConfig:
     name: ""

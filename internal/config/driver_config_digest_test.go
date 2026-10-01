@@ -20,7 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 func TestExtractEnvVars(t *testing.T) {
@@ -386,4 +389,39 @@ func TestDriverConfigDigestFromPodSpec(t *testing.T) {
 			assert.Equal(t, tt.want, DriverConfigDigestFromPodSpec(tt.spec))
 		})
 	}
+}
+
+// TestDriverInstallStateDigestChangesWithHostPath pins the behaviour that a change to a
+// host path volume — such as a node-local package repository path — produces a different
+// driver config digest, and therefore rolls the driver pods. See VolumeConfig.HostPath.
+func TestDriverInstallStateDigestChangesWithHostPath(t *testing.T) {
+	base := &DriverInstallState{
+		DriverImage: "nvcr.io/nvidia/driver:580.126.16",
+		AdditionalVolumes: []VolumeConfig{
+			{Name: "node-local-repo-0", HostPath: "/opt/local-packages"},
+		},
+		AdditionalVolumeMounts: []VolumeMountConfig{
+			{Name: "node-local-repo-0", MountPath: "/opt/local-packages", ReadOnly: true},
+		},
+	}
+
+	changedHostPath := &DriverInstallState{
+		DriverImage: base.DriverImage,
+		AdditionalVolumes: []VolumeConfig{
+			{Name: "node-local-repo-0", HostPath: "/srv/pkgs"},
+		},
+		AdditionalVolumeMounts: base.AdditionalVolumeMounts,
+	}
+
+	noHostPath := &DriverInstallState{
+		DriverImage: base.DriverImage,
+	}
+
+	baseDigest := utils.GetObjectHashIgnoreEmptyKeys(base)
+	require.NotEqual(t, baseDigest, utils.GetObjectHashIgnoreEmptyKeys(changedHostPath),
+		"changing a host path must change the driver config digest")
+	require.NotEqual(t, baseDigest, utils.GetObjectHashIgnoreEmptyKeys(noHostPath),
+		"adding a host path volume must change the driver config digest")
+	require.Equal(t, baseDigest, utils.GetObjectHashIgnoreEmptyKeys(base),
+		"the driver config digest must be stable for identical configuration")
 }

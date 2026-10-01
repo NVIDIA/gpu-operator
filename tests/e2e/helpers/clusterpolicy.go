@@ -123,6 +123,24 @@ func (h *ClusterPolicyClient) SetMIGStrategy(ctx context.Context, name, strategy
 	})
 }
 
+// SetDriverRepoConfig sets the driver repository configuration. An empty configMapName
+// with non-empty nodeLocalPaths is a deliberate misconfiguration used by the negative test.
+func (h *ClusterPolicyClient) SetDriverRepoConfig(ctx context.Context, name, configMapName string, nodeLocalPaths []string) error {
+	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+		clusterPolicy.Spec.Driver.RepoConfig = &nvidiav1.DriverRepoConfigSpec{
+			ConfigMapName:  configMapName,
+			NodeLocalPaths: nodeLocalPaths,
+		}
+	})
+}
+
+// ClearDriverRepoConfig removes any driver repository configuration.
+func (h *ClusterPolicyClient) ClearDriverRepoConfig(ctx context.Context, name string) error {
+	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+		clusterPolicy.Spec.Driver.RepoConfig = nil
+	})
+}
+
 func (h *ClusterPolicyClient) WaitForReady(ctx context.Context, name string, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, defaultPollingInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		clusterPolicy, err := h.Get(ctx, name)
