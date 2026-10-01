@@ -453,6 +453,12 @@ type DriverRepoConfigSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="ConfigMap Name"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
 	Name string `json:"name,omitempty"`
+
+	// UseHostSubscription mounts the host RHEL subscription configuration with this custom repo configuration.
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Use Host RHEL Subscription"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	UseHostSubscription bool `json:"useHostSubscription,omitempty"`
 }
 
 // DriverLicensingConfigSpec defines licensing server configuration for NVIDIA Driver container

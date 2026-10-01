@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -3723,12 +3724,15 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
 		}
+		removeConfigMapVolumeAndMounts(podSpec, config.Driver.RepoConfig.ConfigMapName)
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
 	}
 
 	// set any custom ssl key/certificate configuration provided
 	if config.Driver.CertConfig != nil && config.Driver.CertConfig.Name != "" {
+		sharedRepoConfig := config.Driver.RepoConfig != nil &&
+			config.Driver.RepoConfig.ConfigMapName == config.Driver.CertConfig.Name
 		destinationDir, err := n.getCertConfigPath()
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get destination directory for custom cert config: %v", err)
@@ -3737,8 +3741,13 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 		}
+		if !sharedRepoConfig {
+			removeConfigMapVolumeAndMounts(podSpec, config.Driver.CertConfig.Name)
+		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
-		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+		if !sharedRepoConfig {
+			podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+		}
 	}
 
 	secretName := config.Driver.SecretEnv
@@ -3752,8 +3761,9 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (osID == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || osID == "sles" || osID == "sl-micro" {
 		pathToVolumeSource := MountPathToVolumeSource{}
-		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && osID == "rhel" {
-			n.logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", osID)
+		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" &&
+			!config.Driver.RepoConfig.UseHostSubscription && osID == "rhel" {
+			n.logger.Info("Skipping host subscription mounts because repoConfig is enabled and useHostSubscription is false", "OS", osID)
 		} else {
 			n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
 			pathToVolumeSource, err = n.getSubscriptionPathsToVolumeSources()
@@ -3769,8 +3779,15 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		sort.Strings(mountPaths)
 
-		for num, mountPath := range mountPaths {
-			volMountSubscriptionName := fmt.Sprintf("subscription-config-%d", num)
+		removeSubscriptionMountsAndVolumes(driverContainer, podSpec)
+
+		usedVolumeNames := make(map[string]struct{}, len(podSpec.Volumes)+len(mountPaths))
+		for _, volume := range podSpec.Volumes {
+			usedVolumeNames[volume.Name] = struct{}{}
+		}
+		volumeIndex := 0
+		for _, mountPath := range mountPaths {
+			volMountSubscriptionName := nextSubscriptionVolumeName(usedVolumeNames, &volumeIndex)
 
 			volMountSubscription := corev1.VolumeMount{
 				Name:      volMountSubscriptionName,
@@ -3796,6 +3813,60 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 	}
 	return nil
+}
+
+// removeConfigMapVolumeAndMounts removes an operator-managed ConfigMap volume and its mounts before rebuilding it.
+func removeConfigMapVolumeAndMounts(podSpec *corev1.PodSpec, configMapName string) {
+	configMapVolumeNames := map[string]struct{}{}
+	podSpec.Volumes = slices.DeleteFunc(podSpec.Volumes, func(volume corev1.Volume) bool {
+		if volume.Name != configMapName || volume.ConfigMap == nil || volume.ConfigMap.Name != configMapName {
+			return false
+		}
+		configMapVolumeNames[volume.Name] = struct{}{}
+		return true
+	})
+	for containerIndex := range podSpec.Containers {
+		podSpec.Containers[containerIndex].VolumeMounts = slices.DeleteFunc(podSpec.Containers[containerIndex].VolumeMounts, func(volumeMount corev1.VolumeMount) bool {
+			_, found := configMapVolumeNames[volumeMount.Name]
+			return found
+		})
+	}
+}
+
+// nextSubscriptionVolumeName returns an unused subscription volume name and records it as used.
+func nextSubscriptionVolumeName(usedVolumeNames map[string]struct{}, volumeIndex *int) string {
+	for {
+		volumeName := fmt.Sprintf("%s%d", consts.SubscriptionVolumeNamePrefix, *volumeIndex)
+		*volumeIndex += 1
+		if _, found := usedVolumeNames[volumeName]; found {
+			continue
+		}
+		usedVolumeNames[volumeName] = struct{}{}
+		return volumeName
+	}
+}
+
+// removeSubscriptionMountsAndVolumes removes host subscription volumes and their mounts before rebuilding them.
+// It removes only volumes with the subscription prefix that are backed by hostPath, then removes only
+// mounts that reference those volumes. ConfigMap-backed volumes with the same prefix are preserved.
+func removeSubscriptionMountsAndVolumes(driverContainer *corev1.Container, podSpec *corev1.PodSpec) {
+	subscriptionVolumeNames := map[string]struct{}{}
+	podSpec.Volumes = slices.DeleteFunc(podSpec.Volumes, func(volume corev1.Volume) bool {
+		if !isHostSubscriptionVolume(volume) {
+			return false
+		}
+		subscriptionVolumeNames[volume.Name] = struct{}{}
+		return true
+	})
+	driverContainer.VolumeMounts = slices.DeleteFunc(driverContainer.VolumeMounts, func(volumeMount corev1.VolumeMount) bool {
+		_, found := subscriptionVolumeNames[volumeMount.Name]
+		return found
+	})
+}
+
+// isHostSubscriptionVolume reports whether a volume is managed for host subscriptions.
+func isHostSubscriptionVolume(volume corev1.Volume) bool {
+	return strings.HasPrefix(volume.Name, consts.SubscriptionVolumeNamePrefix) && volume.HostPath != nil
 }
 
 func createSecretEnvReference(ctx context.Context, ctrlClient client.Client, secretName string,
