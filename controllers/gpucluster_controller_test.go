@@ -35,6 +35,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 )
 
@@ -112,6 +113,65 @@ func TestGPUClusterReconcileReady(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: cfg.Name}, instance))
 	require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
 	require.Equal(t, "test-namespace", instance.Status.Namespace)
+}
+
+// Operand states that are not ready without an error are named in the OperandNotReady condition.
+func TestGPUClusterReconcileOperandNotReady(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "config"},
+	}
+	r, c := newGPUClusterReconciler(t, cfg)
+	r.stateManager = &fakeStateManager{results: state.Results{
+		Status: state.SyncStateNotReady,
+		StatesStatus: []state.Result{
+			{StateName: "state-dra-driver", Status: state.SyncStateNotReady},
+			{StateName: "state-dra-validator", Status: state.SyncStateReady},
+		},
+	}}
+	updater := &FakeConditionUpdater{}
+	r.conditionUpdater = updater
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
+	require.Equal(t, conditions.OperandNotReady, updater.LastErrorReason)
+	require.Equal(t, "Waiting for operand pods to be ready; states not ready: [state-dra-driver]", updater.LastErrorMessage)
+}
+
+func TestGPUClusterOperandNotReadyMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		results  []state.Result
+		expected string
+	}{
+		{
+			name:     "no results",
+			expected: "Waiting for operand pods to be ready",
+		},
+		{
+			name: "ready and ignored states are omitted",
+			results: []state.Result{
+				{StateName: "state-a", Status: state.SyncStateReady},
+				{StateName: "state-b", Status: state.SyncStateIgnore},
+			},
+			expected: "Waiting for operand pods to be ready",
+		},
+		{
+			name: "not ready and errored states are listed in order",
+			results: []state.Result{
+				{StateName: "state-a", Status: state.SyncStateNotReady},
+				{StateName: "state-b", Status: state.SyncStateReady},
+				{StateName: "state-c", Status: state.SyncStateError},
+			},
+			expected: "Waiting for operand pods to be ready; states not ready: [state-a state-c]",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, gpuClusterOperandNotReadyMessage(tc.results))
+		})
+	}
 }
 
 func TestGPUClusterReconcileLabelsNamespaceForAdminAccess(t *testing.T) {
