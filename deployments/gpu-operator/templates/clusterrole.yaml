@@ -79,6 +79,7 @@ rules:
   - list
   - watch
   - delete
+  - patch
 - apiGroups:
   - events.k8s.io
   resources:
