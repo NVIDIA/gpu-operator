@@ -66,6 +66,7 @@ spec:
       honorLabels: false
       additionalLabels: {}
       relabelings: []
+      metricRelabelings: []
   # Host paths used in host-path volumes for various components
   hostPaths:
     rootFS: "/"

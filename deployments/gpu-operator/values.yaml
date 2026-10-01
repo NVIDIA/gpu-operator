@@ -154,6 +154,12 @@ operator:
   #     #   targetLabel: instance
   #     #   replacement: $1
   #     #   action: replace
+  #     metricRelabelings: []
+  #     # - sourceLabels:
+  #     #     - exported_namespace
+  #     #   regex: (.+)
+  #     #   targetLabel: namespace
+  #     #   action: replace
 
 mig:
   strategy: single
@@ -359,6 +365,12 @@ dcgmExporter:
     #   regex: (.*)
     #   targetLabel: instance
     #   replacement: $1
+    #   action: replace
+    metricRelabelings: []
+    # - sourceLabels:
+    #     - exported_namespace
+    #   regex: (.+)
+    #   targetLabel: namespace
     #   action: replace
   # DCGM Exporter configuration
   # This block is used to configure DCGM Exporter to emit a customized list of metrics.

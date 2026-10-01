@@ -178,6 +178,12 @@ type ServiceMonitorConfig struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Relabelings allows to rewrite labels on metric sets"
 	Relabelings []*promv1.RelabelConfig `json:"relabelings,omitempty"`
+
+	// MetricRelabelings allows to rewrite labels on samples scraped from the target,
+	// applied after the scrape and before ingestion
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="MetricRelabelings allows to rewrite labels on scraped samples"
+	MetricRelabelings []*promv1.RelabelConfig `json:"metricRelabelings,omitempty"`
 }
 
 // The Alias for backward compatibility

@@ -33,4 +33,10 @@ spec:
     - {{ . | toJson }}
     {{- end }}
     {{- end }}
+    {{- if .DCGMExporter.Spec.ServiceMonitor.MetricRelabelings }}
+    metricRelabelings:
+    {{- range .DCGMExporter.Spec.ServiceMonitor.MetricRelabelings }}
+    - {{ . | toJson }}
+    {{- end }}
+    {{- end }}
 {{- end }}
