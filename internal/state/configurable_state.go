@@ -104,5 +104,5 @@ func (s *configurableState) getManifestObjects(ctx context.Context, cr *nvidiav1
 		return nil, err
 	}
 
-	return s.renderObjects(ctx, renderData)
+	return s.renderGPUClusterObjects(ctx, cr, renderData)
 }
