@@ -5,8 +5,11 @@ metadata:
   namespace: {{ .Namespace }}
   labels:
     app: nvidia-dcgm-exporter-dra
+    nvidia.com/gpu-operator.dcgm-exporter: "true"
     {{- range $k, $v := .Daemonsets.Labels }}
+    {{- if ne $k "nvidia.com/gpu-operator.dcgm-exporter" }}
     {{ $k }}: {{ $v | quote }}
+    {{- end }}
     {{- end }}
   {{- if .Daemonsets.Annotations }}
   annotations:
@@ -24,8 +27,9 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm-exporter-dra
+        nvidia.com/gpu-operator.dcgm-exporter: "true"
         {{- range $k, $v := .Daemonsets.Labels }}
-        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
+        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") (ne $k "nvidia.com/gpu-operator.dcgm-exporter") }}
         {{ $k }}: {{ $v | quote }}
         {{- end }}
         {{- end }}

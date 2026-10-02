@@ -100,6 +100,23 @@ metadata:
   annotations:
     prometheus.io/scrape: "true"
   labels:
+    app: nvidia-dcgm-exporter
+  name: nvidia-dcgm-exporter
+  namespace: test-operator
+spec:
+  ports:
+  - name: gpu-metrics
+    port: 9400
+    protocol: TCP
+    targetPort: 9400
+  selector:
+    app: nvidia-dcgm-exporter-dra
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
     app: nvidia-dcgm-exporter-dra
   name: nvidia-dcgm-exporter-dra
   namespace: test-operator
@@ -118,6 +135,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-dcgm-exporter-dra
+    nvidia.com/gpu-operator.dcgm-exporter: "true"
   name: nvidia-dcgm-exporter-dra
   namespace: test-operator
 spec:
@@ -128,6 +146,7 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm-exporter-dra
+        nvidia.com/gpu-operator.dcgm-exporter: "true"
     spec:
       automountServiceAccountToken: true
       containers:

@@ -57,6 +57,15 @@ func findByKind(objs []*unstructured.Unstructured, kind string) *unstructured.Un
 	return nil
 }
 
+func findByKindAndName(objs []*unstructured.Unstructured, kind, name string) *unstructured.Unstructured {
+	for _, o := range objs {
+		if o.GetKind() == kind && o.GetName() == name {
+			return o
+		}
+	}
+	return nil
+}
+
 // claimHasAdminAccess verifies the ResourceClaimTemplate requests all GPUs with adminAccess.
 func claimHasAdminAccess(t *testing.T, rct *unstructured.Unstructured) {
 	t.Helper()
@@ -117,11 +126,13 @@ func TestDCGMEnabled(t *testing.T) {
 	assert.Equal(t, 1, kinds["RoleBinding"])
 	assert.Equal(t, 1, kinds["ResourceClaimTemplate"])
 	assert.Equal(t, 1, kinds["DaemonSet"])
-	assert.Equal(t, 1, kinds["Service"])
+	assert.Equal(t, 2, kinds["Service"])
 
 	claimHasAdminAccess(t, findByKind(objs, "ResourceClaimTemplate"))
 
 	ds := findDaemonSet(t, objs)
+	assert.Equal(t, "true", ds.Labels["nvidia.com/gpu-operator.dcgm"])
+	assert.Equal(t, "true", ds.Spec.Template.Labels["nvidia.com/gpu-operator.dcgm"])
 	podSpec := ds.Spec.Template.Spec
 	assert.Equal(t, "true", podSpec.NodeSelector["nvidia.com/gpu.deploy.dcgm-dra"])
 	require.Len(t, podSpec.Containers, 1)
@@ -138,13 +149,32 @@ func TestDCGMEnabled(t *testing.T) {
 	require.Len(t, ctr.Resources.Claims, 1)
 	assert.Equal(t, "admin-gpus", ctr.Resources.Claims[0].Name)
 
-	// The exporter targets this Service on port 5555.
-	svc := findByKind(objs, "Service")
-	port, found, err := unstructured.NestedSlice(svc.Object, "spec", "ports")
+	for _, name := range []string{"nvidia-dcgm", "nvidia-dcgm-dra"} {
+		svc := findByKindAndName(objs, "Service", name)
+		require.NotNil(t, svc)
+		selector, found, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
+		require.NoError(t, err)
+		require.True(t, found)
+		assert.Equal(t, map[string]string{"app": "nvidia-dcgm-dra"}, selector)
+		port, found, err := unstructured.NestedSlice(svc.Object, "spec", "ports")
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Len(t, port, 1)
+		assert.Equal(t, int64(5555), port[0].(map[string]any)["port"])
+	}
+}
+
+func TestDCGMCommonLabelCannotBeOverridden(t *testing.T) {
+	s := newTestDCGMState(t)
+	cr := sampleGPUCluster()
+	cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
+	cr.Spec.Daemonsets.Labels = map[string]string{"nvidia.com/gpu-operator.dcgm": "false"}
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
-	require.True(t, found)
-	require.Len(t, port, 1)
-	assert.Equal(t, int64(5555), port[0].(map[string]any)["port"])
+	ds := findDaemonSet(t, objs)
+	assert.Equal(t, "true", ds.Labels["nvidia.com/gpu-operator.dcgm"])
+	assert.Equal(t, "true", ds.Spec.Template.Labels["nvidia.com/gpu-operator.dcgm"])
 }
 
 func TestDCGMImageFromEnvFallback(t *testing.T) {
