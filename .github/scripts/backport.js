@@ -57,6 +57,18 @@ for (const targetBranch of branches) {
   core.info(`Backporting to ${targetBranch}`);
   core.info(`========================================`);
   const backportBranch = `backport-${prNumber}-to-${targetBranch}`;
+  const stagingRef = `${backportBranch}-staging-${context.runId}`;
+  const removeStagingRef = async () => {
+    try {
+      await github.rest.git.deleteRef({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref: `heads/${stagingRef}`
+      });
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
+  };
   try {
     // Create/reset backport branch from target release branch
     core.info(`Creating/resetting branch ${backportBranch} from ${targetBranch}`);
@@ -97,21 +109,18 @@ for (const targetBranch of branches) {
         }
       }
     }
-    // Push the backport branch (force to handle updates)
-    core.info(`Pushing ${backportBranch} to origin`);
-    execSync(`git push --force-with-lease origin ${backportBranch}`, { stdio: 'inherit' });
+    // Push cherry-picks to a staging ref until API commit recreation succeeds
+    core.info(`Pushing ${backportBranch} to staging ref ${stagingRef}`);
+    execSync(`git push --force-with-lease origin ${backportBranch}:${stagingRef}`, { stdio: 'inherit' });
 
     // Re-create each new commit through the Git Data API so the resulting chain shows as "Verified"
     core.info(`Re-creating commits via the Git Data API to get verified signatures`);
     const newCommitShas = execSync(`git log --format=%H ${targetBranch}..${backportBranch}`, { encoding: 'utf-8' })
       .trim().split('\n').filter(Boolean).reverse(); // oldest -> newest
 
-    const { data: baseRef } = await github.rest.git.getRef({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      ref: `heads/${targetBranch}`
-    });
-    let parentSha = baseRef.object.sha;
+    // Use the checked-out target SHA so the recreated parent matches the cherry-pick base
+    const targetSha = execSync(`git rev-parse ${targetBranch}`, { encoding: 'utf-8' }).trim();
+    let parentSha = targetSha;
 
     for (const sha of newCommitShas) {
       const treeSha = execSync(`git rev-parse ${sha}^{tree}`, { encoding: 'utf-8' }).trim();
@@ -127,14 +136,39 @@ for (const targetBranch of branches) {
       parentSha = newCommit.sha;
     }
 
+    await removeStagingRef();
+
     core.info(`Repointing ${backportBranch} at signed commit ${parentSha}`);
-    await github.rest.git.updateRef({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      ref: `heads/${backportBranch}`,
-      sha: parentSha,
-      force: true
-    });
+    let backportRefExists = true;
+    try {
+      await github.rest.git.getRef({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref: `heads/${backportBranch}`
+      });
+    } catch (error) {
+      if (error.status === 404) {
+        backportRefExists = false;
+      } else {
+        throw error;
+      }
+    }
+    if (backportRefExists) {
+      await github.rest.git.updateRef({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref: `heads/${backportBranch}`,
+        sha: parentSha,
+        force: true
+      });
+    } else {
+      await github.rest.git.createRef({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref: `refs/heads/${backportBranch}`,
+        sha: parentSha
+      });
+    }
 
     // Check if a PR already exists for this backport branch
     const { data: existingPRs } = await github.rest.pulls.list({
@@ -299,6 +333,9 @@ This backport was automatically created by the backport bot.`;
       error: error.message
     });
   } finally {
+    await removeStagingRef().catch(error => {
+      core.warning(`Failed to remove staging ref ${stagingRef}: ${error.message}`);
+    });
     // Clean up: go back to main branch
     try {
       execSync('git checkout main', { stdio: 'inherit' });
