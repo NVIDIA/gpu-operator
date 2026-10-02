@@ -40,11 +40,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/NVIDIA/gpu-operator/api/image"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
-	"github.com/NVIDIA/gpu-operator/internal/image"
 	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )

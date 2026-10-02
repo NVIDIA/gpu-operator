@@ -51,7 +51,6 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 const (
@@ -336,8 +335,8 @@ func TestLabelNodesWithOrphanedDriverPodsRequestsUpgradeOnlyForOwnedAllowedState
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-without-upgrade-state",
 			Labels: map[string]string{
-				"gpu":                         "true",
-				consts.NVIDIADriverOwnerLabel: driverName,
+				"gpu":                                 "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: driverName,
 			},
 		},
 	}
@@ -345,9 +344,9 @@ func TestLabelNodesWithOrphanedDriverPodsRequestsUpgradeOnlyForOwnedAllowedState
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-with-done-state",
 			Labels: map[string]string{
-				"gpu":                         "true",
-				consts.NVIDIADriverOwnerLabel: driverName,
-				upgradeStateLabel:             upgrade.UpgradeStateDone,
+				"gpu":                                 "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: driverName,
+				upgradeStateLabel:                     upgrade.UpgradeStateDone,
 			},
 		},
 	}
@@ -355,9 +354,9 @@ func TestLabelNodesWithOrphanedDriverPodsRequestsUpgradeOnlyForOwnedAllowedState
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-with-active-state",
 			Labels: map[string]string{
-				"gpu":                         "true",
-				consts.NVIDIADriverOwnerLabel: driverName,
-				upgradeStateLabel:             upgrade.UpgradeStatePodRestartRequired,
+				"gpu":                                 "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: driverName,
+				upgradeStateLabel:                     upgrade.UpgradeStatePodRestartRequired,
 			},
 		},
 	}
@@ -365,9 +364,9 @@ func TestLabelNodesWithOrphanedDriverPodsRequestsUpgradeOnlyForOwnedAllowedState
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-with-failed-state",
 			Labels: map[string]string{
-				"gpu":                         "true",
-				consts.NVIDIADriverOwnerLabel: driverName,
-				upgradeStateLabel:             upgrade.UpgradeStateFailed,
+				"gpu":                                 "true",
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: driverName,
+				upgradeStateLabel:                     upgrade.UpgradeStateFailed,
 			},
 		},
 	}
@@ -426,7 +425,7 @@ func TestLabelNodesWithOrphanedDriverPodsReturnsPatchError(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-with-orphaned-pod",
 			Labels: map[string]string{
-				consts.NVIDIADriverOwnerLabel: driverName,
+				nvidiav1alpha1.NVIDIADriverOwnerLabel: driverName,
 			},
 		},
 	}

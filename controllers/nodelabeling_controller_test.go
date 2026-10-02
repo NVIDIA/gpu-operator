@@ -102,14 +102,14 @@ func TestNodeLabelingReconcileDefersDependentOperationsAfterGPULabelChanges(t *t
 	updatedNode := &corev1.Node{}
 	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, updatedNode))
 	assert.Equal(t, commonGPULabelValue, updatedNode.Labels[commonGPULabelKey])
-	assert.NotContains(t, updatedNode.Labels, consts.NVIDIADriverOwnerLabel)
+	assert.NotContains(t, updatedNode.Labels, nvidiav1alpha1.NVIDIADriverOwnerLabel)
 
 	result, err = reconciler.Reconcile(ctx, reconcile.Request{})
 	require.NoError(t, err)
 	assert.Zero(t, result.RequeueAfter)
 
 	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, updatedNode))
-	assert.Equal(t, consts.DefaultNVIDIADriverName, updatedNode.Labels[consts.NVIDIADriverOwnerLabel])
+	assert.Equal(t, consts.DefaultNVIDIADriverName, updatedNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestNodeLabelingReconcileDoesNotDeferDependentOperationsForStateLabelChanges(t *testing.T) {
@@ -160,7 +160,7 @@ func TestNodeLabelingReconcileDoesNotDeferDependentOperationsForStateLabelChange
 	updatedNode := &corev1.Node{}
 	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, updatedNode))
 	assert.Equal(t, "true", updatedNode.Labels["nvidia.com/gpu.deploy.driver"])
-	assert.Equal(t, consts.DefaultNVIDIADriverName, updatedNode.Labels[consts.NVIDIADriverOwnerLabel])
+	assert.Equal(t, consts.DefaultNVIDIADriverName, updatedNode.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel])
 }
 
 func TestNodeLabelUpdateReasonsDetectsLabelChanges(t *testing.T) {
@@ -900,7 +900,7 @@ func TestApplyDriverAutoUpgradeAnnotationNoClusterPolicy(t *testing.T) {
 	}
 	owned := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 		Name:   "owned-node",
-		Labels: map[string]string{consts.NVIDIADriverOwnerLabel: "gpu-driver"},
+		Labels: map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: "gpu-driver"},
 	}}
 	unowned := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "unowned-node"}}
 
@@ -932,7 +932,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 	// ownedNode returns a node that carries the NVIDIADriverOwnerLabel for driverName
 	// and optionally an upgrade state label.
 	ownedNode := func(name, upgradeState string) *corev1.Node {
-		labels := map[string]string{consts.NVIDIADriverOwnerLabel: driverName}
+		labels := map[string]string{nvidiav1alpha1.NVIDIADriverOwnerLabel: driverName}
 		if upgradeState != "" {
 			labels[upgradeStateLabel] = upgradeState
 		}

@@ -5,7 +5,9 @@ version: 2
 updates:
   - package-ecosystem: "gomod"
     target-branch: main
-    directory: "/"
+    directories:
+      - "/"
+      - "/api"
     schedule:
       interval: "daily"
     cooldown:
@@ -20,6 +22,10 @@ updates:
           - k8s.io/*
         exclude-patterns:
           - k8s.io/klog/*
+      cross-directory:
+        patterns:
+          - "*"
+        group-by: dependency-name
 
   - package-ecosystem: "gomod"
     target-branch: main

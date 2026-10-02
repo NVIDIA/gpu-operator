@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/NVIDIA/gpu-operator/api/image"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/image"
 )
 
 // configurableState is a State implementation shared by the GPUCluster operands

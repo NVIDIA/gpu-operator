@@ -121,7 +121,7 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 		gpuWorkloadConfigChanged:     oldGPUWorkloadConfig != newGPUWorkloadConfig,
 		migCapableLabelChanged:       hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels),
 		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
-		nvidiaDriverOwnerLabelChange: oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
+		nvidiaDriverOwnerLabelChange: oldLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel] != newLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel],
 	}
 }
 
@@ -499,7 +499,7 @@ func (nlc *nodeLabelingController) applyDriverAutoUpgradeAnnotationForNVD(ctx co
 
 	for _, nvd := range nvidiaDriverList.Items {
 		nodeList := &corev1.NodeList{}
-		if err := nlc.client.List(ctx, nodeList, client.MatchingLabels{consts.NVIDIADriverOwnerLabel: nvd.Name}); err != nil {
+		if err := nlc.client.List(ctx, nodeList, client.MatchingLabels{nvidiav1alpha1.NVIDIADriverOwnerLabel: nvd.Name}); err != nil {
 			nlc.logger.Error(err, "Failed to list nodes for NVIDIADriver", "name", nvd.Name)
 			return err
 		}
@@ -571,14 +571,14 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 
 // nodeOwnedByNVIDIADriver returns true when the node has an owner label matching a live NVIDIADriver.
 func nodeOwnedByNVIDIADriver(node *corev1.Node, nvidiaDrivers []nvidiav1alpha1.NVIDIADriver) bool {
-	if node.Labels == nil || node.Labels[consts.NVIDIADriverOwnerLabel] == "" {
+	if node.Labels == nil || node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel] == "" {
 		return false
 	}
 	for _, nvidiaDriver := range nvidiaDrivers {
 		if nvidiaDriver.HasDeletionTimestamp() {
 			continue
 		}
-		if node.Labels[consts.NVIDIADriverOwnerLabel] == nvidiaDriver.Name {
+		if node.Labels[nvidiav1alpha1.NVIDIADriverOwnerLabel] == nvidiaDriver.Name {
 			return true
 		}
 	}
@@ -693,8 +693,8 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			// When an NVIDIADriver daemonset pod is running on the node, check if any
 			// label which is configured in the NVIDIADriver's node selector has changed.
 			nvidiaDriverNodeSelectorLabelChanged := false
-			if !needsUpdate && newLabels[consts.NVIDIADriverOwnerLabel] != "" {
-				name := newLabels[consts.NVIDIADriverOwnerLabel]
+			if !needsUpdate && newLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel] != "" {
+				name := newLabels[nvidiav1alpha1.NVIDIADriverOwnerLabel]
 				nvidiaDriver := &nvidiav1alpha1.NVIDIADriver{}
 				err := r.Get(ctx, types.NamespacedName{Name: name}, nvidiaDriver)
 				if err != nil {
