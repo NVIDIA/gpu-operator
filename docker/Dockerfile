@@ -86,7 +86,7 @@ RUN apt-get update \
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v4.1.4@sha256:b1deb9e97732ab5da2f1f6e0d3ac1e56bdc2df0a5bf900180662a4740f05957c
+FROM nvcr.io/nvidia/distroless/cc:v4.1.5@sha256:01f5d2ae32758c039149b91aee949a62cbf9eacb0b47631cf206327125a264de
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
