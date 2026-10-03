@@ -1,0 +1,18 @@
+suite: nodefeaturerules
+templates:
+  - nodefeaturerules.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: does not render NodeFeatureRule by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot when nodefeaturerules is enabled
+    set:
+      nfd:
+        nodefeaturerules: true
+    asserts:
+      - matchSnapshot: {}
