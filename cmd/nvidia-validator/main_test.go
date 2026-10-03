@@ -24,6 +24,11 @@ import (
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 func Test_isValidComponent(t *testing.T) {
@@ -344,4 +349,128 @@ func TestCountNvidiaDevices(t *testing.T) {
 			require.Equal(t, tc.expected, countNvidiaDevices(tc.output))
 		})
 	}
+}
+
+func TestIsDevicePluginDisabledByNodeLabel(t *testing.T) {
+	tests := []struct {
+		name   string
+		node   *corev1.Node
+		wantOK bool
+	}{
+		{
+			name:   "nil node is treated as plugin-enabled",
+			node:   nil,
+			wantOK: false,
+		},
+		{
+			name:   "node with no labels is plugin-enabled",
+			node:   &corev1.Node{},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin label absent, other labels present",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"foo": "bar",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin explicitly true keeps validation active",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "true",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin explicitly false triggers skip",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "false",
+			}}},
+			wantOK: true,
+		},
+		{
+			name: "device-plugin empty value is not treated as disabled",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin paused value is not treated as disabled",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin": "paused-for-driver-upgrade",
+			}}},
+			wantOK: false,
+		},
+		{
+			name: "device-plugin false alongside unrelated labels triggers skip",
+			node: &corev1.Node{ObjectMeta: meta_v1.ObjectMeta{Labels: map[string]string{
+				"nvidia.com/gpu.deploy.device-plugin":      "false",
+				"nvidia.com/gpu.deploy.operator-validator": "true",
+			}}},
+			wantOK: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.wantOK, isDevicePluginDisabledByNodeLabel(tt.node))
+		})
+	}
+}
+
+func TestValidateGPUResourceSkipsWhenDevicePluginDisabledOnNode(t *testing.T) {
+	const testNodeName = "test-node"
+
+	originalNodeName := nodeNameFlag
+	nodeNameFlag = testNodeName
+	t.Cleanup(func() {
+		nodeNameFlag = originalNodeName
+	})
+
+	node := &corev1.Node{
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: testNodeName,
+			Labels: map[string]string{
+				devicePluginDeployLabelKey: "false",
+			},
+		},
+		Status: corev1.NodeStatus{
+			Capacity: corev1.ResourceList{
+				genericGPUResourceType: resource.MustParse("1"),
+			},
+		},
+	}
+	plugin := &Plugin{
+		ctx:        context.Background(),
+		kubeClient: &staticNodeClient{node: node},
+	}
+
+	require.ErrorIs(t, plugin.validateGPUResource(), errDevicePluginDisabledOnNode)
+}
+
+type staticNodeClient struct {
+	kubernetes.Interface
+	node *corev1.Node
+}
+
+func (c *staticNodeClient) CoreV1() coreclientv1.CoreV1Interface {
+	return &staticCoreV1Client{node: c.node}
+}
+
+type staticCoreV1Client struct {
+	coreclientv1.CoreV1Interface
+	node *corev1.Node
+}
+
+func (c *staticCoreV1Client) Nodes() coreclientv1.NodeInterface {
+	return &staticNodesClient{node: c.node}
+}
+
+type staticNodesClient struct {
+	coreclientv1.NodeInterface
+	node *corev1.Node
+}
+
+func (c *staticNodesClient) Get(_ context.Context, _ string, _ meta_v1.GetOptions) (*corev1.Node, error) {
+	return c.node, nil
 }
