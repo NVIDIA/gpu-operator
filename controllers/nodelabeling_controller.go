@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
@@ -86,14 +87,15 @@ type gpuNodeLabelsUpdateResult struct {
 
 // nodeLabelUpdateReasons captures why a node update event should trigger node-label reconciliation.
 type nodeLabelUpdateReasons struct {
-	gpuCommonLabelMissing        bool
-	gpuCommonLabelOutdated       bool
-	gpuCommonLabelChanged        bool
-	commonOperandsLabelChanged   bool
-	gpuWorkloadConfigChanged     bool
-	migCapableLabelChanged       bool
-	osTreeLabelChanged           bool
-	nvidiaDriverOwnerLabelChange bool
+	gpuCommonLabelMissing                bool
+	gpuCommonLabelOutdated               bool
+	gpuCommonLabelChanged                bool
+	commonOperandsLabelChanged           bool
+	gpuWorkloadConfigChanged             bool
+	migCapableLabelChanged               bool
+	osTreeLabelChanged                   bool
+	nvidiaDriverOwnerLabelChange         bool
+	nvidiaDriverNodeSelectorLabelChanged bool
 }
 
 // needsUpdate reports whether any tracked node-label change requires reconciliation.
@@ -105,15 +107,16 @@ func (r nodeLabelUpdateReasons) needsUpdate() bool {
 		r.gpuWorkloadConfigChanged ||
 		r.migCapableLabelChanged ||
 		r.osTreeLabelChanged ||
-		r.nvidiaDriverOwnerLabelChange
+		r.nvidiaDriverOwnerLabelChange ||
+		r.nvidiaDriverNodeSelectorLabelChanged
 }
 
-// getNodeLabelUpdateReasons compares old and new node labels for changes that affect GPU Operator labels.
-func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabelUpdateReasons {
+// getNodeLabelUpdateReasons collects changes that can affect GPU labels or driver pool membership.
+func (r *NodeLabelingReconciler) getNodeLabelUpdateReasons(ctx context.Context, nodeName string, oldLabels, newLabels map[string]string) (nodeLabelUpdateReasons, error) {
 	oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
 	newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
 
-	return nodeLabelUpdateReasons{
+	reasons := nodeLabelUpdateReasons{
 		gpuCommonLabelMissing:        hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels),
 		gpuCommonLabelOutdated:       !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels),
 		gpuCommonLabelChanged:        oldLabels[commonGPULabelKey] != newLabels[commonGPULabelKey],
@@ -123,6 +126,64 @@ func getNodeLabelUpdateReasons(oldLabels, newLabels map[string]string) nodeLabel
 		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
 		nvidiaDriverOwnerLabelChange: oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
 	}
+
+	if reasons.needsUpdate() || maps.Equal(oldLabels, newLabels) {
+		return reasons, nil
+	}
+
+	// A node can enter another driver's pool even when its current owner is
+	// the default driver or it has no owner, so inspect every live selector.
+	drivers := &nvidiav1alpha1.NVIDIADriverList{}
+	if err := r.List(ctx, drivers); err != nil {
+		r.Log.Error(err, "failed to list NVIDIADrivers for node label update", "node", nodeName)
+		return reasons, err
+	}
+	for _, driver := range drivers.Items {
+		if driver.HasDeletionTimestamp() {
+			continue
+		}
+		for key := range driver.Spec.NodeSelector {
+			oldValue, oldPresent := oldLabels[key]
+			newValue, newPresent := newLabels[key]
+			if oldValue != newValue || oldPresent != newPresent {
+				reasons.nvidiaDriverNodeSelectorLabelChanged = true
+				return reasons, nil
+			}
+		}
+	}
+
+	return reasons, nil
+}
+
+// nodeUpdateRequiresReconcile reports whether a node label change requires reconciliation.
+// Driver lookup failures also trigger reconciliation so the update is not lost.
+func (r *NodeLabelingReconciler) nodeUpdateRequiresReconcile(ctx context.Context, oldNode, newNode *corev1.Node) bool {
+	newLabels := newNode.GetLabels()
+	oldLabels := oldNode.GetLabels()
+	nodeName := newNode.GetName()
+
+	reasons, err := r.getNodeLabelUpdateReasons(ctx, nodeName, oldLabels, newLabels)
+	if err != nil {
+		// Enqueue reconciliation so a transient cache error cannot drop the update.
+		return true
+	}
+
+	needsUpdate := reasons.needsUpdate()
+	if needsUpdate {
+		r.Log.Info("Node needs an update",
+			"name", nodeName,
+			"gpuCommonLabelMissing", reasons.gpuCommonLabelMissing,
+			"gpuCommonLabelOutdated", reasons.gpuCommonLabelOutdated,
+			"gpuCommonLabelChanged", reasons.gpuCommonLabelChanged,
+			"commonOperandsLabelChanged", reasons.commonOperandsLabelChanged,
+			"gpuWorkloadConfigLabelChanged", reasons.gpuWorkloadConfigChanged,
+			"migCapableLabelChanged", reasons.migCapableLabelChanged,
+			"osTreeLabelChanged", reasons.osTreeLabelChanged,
+			"nvidiaDriverOwnerLabelChanged", reasons.nvidiaDriverOwnerLabelChange,
+			"nvidiaDriverNodeSelectorLabelChanged", reasons.nvidiaDriverNodeSelectorLabelChanged,
+		)
+	}
+	return needsUpdate
 }
 
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
@@ -683,48 +744,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			return hasGPULabels(labels)
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Node]) bool {
-			newLabels := e.ObjectNew.GetLabels()
-			oldLabels := e.ObjectOld.GetLabels()
-			nodeName := e.ObjectNew.GetName()
-
-			reasons := getNodeLabelUpdateReasons(oldLabels, newLabels)
-			needsUpdate := reasons.needsUpdate()
-
-			// When an NVIDIADriver daemonset pod is running on the node, check if any
-			// label which is configured in the NVIDIADriver's node selector has changed.
-			nvidiaDriverNodeSelectorLabelChanged := false
-			if !needsUpdate && newLabels[consts.NVIDIADriverOwnerLabel] != "" {
-				name := newLabels[consts.NVIDIADriverOwnerLabel]
-				nvidiaDriver := &nvidiav1alpha1.NVIDIADriver{}
-				err := r.Get(ctx, types.NamespacedName{Name: name}, nvidiaDriver)
-				if err != nil {
-					r.Log.Error(err, "failed to get NVIDIADriver object that owns this node", "name", name, "node", nodeName)
-					return false
-				}
-				for key := range nvidiaDriver.Spec.NodeSelector {
-					if oldLabels[key] != newLabels[key] {
-						nvidiaDriverNodeSelectorLabelChanged = true
-						needsUpdate = true
-						break
-					}
-				}
-			}
-
-			if needsUpdate {
-				r.Log.Info("Node needs an update",
-					"name", nodeName,
-					"gpuCommonLabelMissing", reasons.gpuCommonLabelMissing,
-					"gpuCommonLabelOutdated", reasons.gpuCommonLabelOutdated,
-					"gpuCommonLabelChanged", reasons.gpuCommonLabelChanged,
-					"commonOperandsLabelChanged", reasons.commonOperandsLabelChanged,
-					"gpuWorkloadConfigLabelChanged", reasons.gpuWorkloadConfigChanged,
-					"migCapableLabelChanged", reasons.migCapableLabelChanged,
-					"osTreeLabelChanged", reasons.osTreeLabelChanged,
-					"nvidiaDriverOwnerLabelChanged", reasons.nvidiaDriverOwnerLabelChange,
-					"nvidiaDriverNodeSelectorLabelChanged", nvidiaDriverNodeSelectorLabelChanged,
-				)
-			}
-			return needsUpdate
+			return r.nodeUpdateRequiresReconcile(ctx, e.ObjectOld, e.ObjectNew)
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
 			return false

@@ -197,10 +197,141 @@ func TestNodeLabelUpdateReasonsDetectsLabelChanges(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			reasons := getNodeLabelUpdateReasons(tc.old, tc.new)
+			r := &NodeLabelingReconciler{}
+			reasons, err := r.getNodeLabelUpdateReasons(context.Background(), "gpu-node", tc.old, tc.new)
+			require.NoError(t, err)
 
 			tc.assert(t, reasons)
 			assert.True(t, reasons.needsUpdate())
+		})
+	}
+}
+
+func TestNodeUpdateRequiresReconcileForDriverSelectors(t *testing.T) {
+	const waitLabel = "network.nvidia.com/operator.mofed.wait"
+	tests := map[string]struct {
+		owner      string
+		oldLabels  map[string]string
+		newLabels  map[string]string
+		deleting   bool
+		listError  bool
+		skipList   bool
+		wantUpdate bool
+	}{
+		"default owner becomes eligible": {
+			owner:      consts.DefaultNVIDIADriverName,
+			oldLabels:  map[string]string{waitLabel: "true"},
+			newLabels:  map[string]string{waitLabel: "false"},
+			wantUpdate: true,
+		},
+		"unowned node becomes eligible": {
+			oldLabels:  map[string]string{waitLabel: "true"},
+			newLabels:  map[string]string{waitLabel: "false"},
+			wantUpdate: true,
+		},
+		"selected owner becomes ineligible": {
+			owner:      "selected-driver",
+			oldLabels:  map[string]string{waitLabel: "false"},
+			newLabels:  map[string]string{waitLabel: "true"},
+			wantUpdate: true,
+		},
+		"another owner becomes eligible": {
+			owner:      "other-driver",
+			oldLabels:  map[string]string{waitLabel: "true"},
+			newLabels:  map[string]string{waitLabel: "false"},
+			wantUpdate: true,
+		},
+		"selector label added": {
+			newLabels:  map[string]string{waitLabel: "false"},
+			wantUpdate: true,
+		},
+		"selector label removed": {
+			oldLabels:  map[string]string{waitLabel: "false"},
+			wantUpdate: true,
+		},
+		"empty selector label added": {
+			newLabels:  map[string]string{waitLabel: ""},
+			wantUpdate: true,
+		},
+		"unrelated label changed": {
+			oldLabels: map[string]string{"unrelated": "old"},
+			newLabels: map[string]string{"unrelated": "new"},
+		},
+		"labels unchanged": {
+			oldLabels: map[string]string{waitLabel: "false"},
+			newLabels: map[string]string{waitLabel: "false"},
+			listError: true,
+			skipList:  true,
+		},
+		"known label change skips driver lookup": {
+			newLabels:  map[string]string{commonGPULabelKey: "changed", waitLabel: "false"},
+			listError:  true,
+			skipList:   true,
+			wantUpdate: true,
+		},
+		"deleting driver's selector ignored": {
+			oldLabels: map[string]string{waitLabel: "true"},
+			newLabels: map[string]string{waitLabel: "false"},
+			deleting:  true,
+		},
+		"list failure does not drop event": {
+			oldLabels:  map[string]string{waitLabel: "true"},
+			newLabels:  map[string]string{waitLabel: "false"},
+			listError:  true,
+			wantUpdate: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+			driver := &nvidiav1alpha1.NVIDIADriver{
+				ObjectMeta: metav1.ObjectMeta{Name: "selected-driver"},
+				Spec: nvidiav1alpha1.NVIDIADriverSpec{
+					NodeSelector: map[string]string{waitLabel: "false"},
+				},
+			}
+			if tc.deleting {
+				now := metav1.Now()
+				driver.DeletionTimestamp = &now
+				driver.Finalizers = []string{"test-finalizer"}
+			}
+			defaultDriver := &nvidiav1alpha1.NVIDIADriver{
+				ObjectMeta: metav1.ObjectMeta{Name: consts.DefaultNVIDIADriverName},
+				Spec:       nvidiav1alpha1.NVIDIADriverSpec{Default: true},
+			}
+			listCalls := 0
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(driver, defaultDriver).
+				WithInterceptorFuncs(interceptor.Funcs{
+					List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+						listCalls++
+						if tc.listError {
+							return errors.New("list failed")
+						}
+						return c.List(ctx, list, opts...)
+					},
+				}).Build()
+			r := &NodeLabelingReconciler{Client: fakeClient, Log: logr.Discard()}
+			baseLabels := map[string]string{
+				"feature.node.kubernetes.io/pci-10de.present": "true",
+				commonGPULabelKey: commonGPULabelValue,
+			}
+			if tc.owner != "" {
+				baseLabels[consts.NVIDIADriverOwnerLabel] = tc.owner
+			}
+			oldNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "gpu-node", Labels: mergeLabels(baseLabels, tc.oldLabels),
+			}}
+			newNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name: "gpu-node", Labels: mergeLabels(baseLabels, tc.newLabels),
+			}}
+			assert.Equal(t, tc.wantUpdate, r.nodeUpdateRequiresReconcile(context.Background(), oldNode, newNode))
+			if tc.skipList {
+				assert.Zero(t, listCalls)
+			} else {
+				assert.Equal(t, 1, listCalls)
+			}
 		})
 	}
 }
