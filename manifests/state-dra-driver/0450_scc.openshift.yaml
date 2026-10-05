@@ -2,7 +2,7 @@
 allowHostDirVolumePlugin: true
 allowHostIPC: false
 allowHostNetwork: true
-allowHostPID: false
+allowHostPID: true
 allowHostPorts: true
 allowPrivilegeEscalation: true
 allowPrivilegedContainer: true

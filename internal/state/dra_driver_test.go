@@ -135,6 +135,12 @@ func TestDRADriverRenderGPUsCut(t *testing.T) {
 
 	env := envMap(gpus.Env)
 	assert.Equal(t, "nvcr.io/nvidia/k8s-dra-driver-gpu:v0.1.0", env["IMAGE_NAME"])
+	assert.Contains(t, gpus.Env, corev1.EnvVar{
+		Name: "SERVICE_ACCOUNT_NAME",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.serviceAccountName"},
+		},
+	})
 	// FEATURE_GATES is sorted so reconciles do not churn the pod spec.
 	assert.Equal(t, "AdminAccess=false,MPSSupport=true", env["FEATURE_GATES"])
 	// NVIDIA_DRIVER_ROOT / DRIVER_ROOT_CTR_PATH must be sourced, never hardcoded.
@@ -176,6 +182,36 @@ func TestDRADriverHealthcheckPortOverride(t *testing.T) {
 	assert.Equal(t, int32(52000), gpus.StartupProbe.GRPC.Port)
 	require.NotNil(t, gpus.LivenessProbe)
 	assert.Equal(t, int32(52000), gpus.LivenessProbe.GRPC.Port)
+}
+
+func TestDRADriverMPSImagePullSecrets(t *testing.T) {
+	for name, tc := range map[string]struct {
+		secrets []string
+		value   string
+	}{
+		"unset":    {},
+		"empty":    {secrets: []string{}},
+		"single":   {secrets: []string{"registry-secret"}, value: "registry-secret"},
+		"multiple": {secrets: []string{"registry-secret", "other-secret"}, value: "registry-secret,other-secret"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.DRADriver.ImagePullSecrets = tc.secrets
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			require.NoError(t, err)
+			ds := findDaemonSet(t, objs)
+			podSpec := ds.Spec.Template.Spec
+			env := envMap(containerByName(t, ds, "gpus").Env)
+			value, found := env["IMAGE_PULL_SECRETS"]
+			require.Equal(t, len(tc.secrets) > 0, found)
+			require.Equal(t, tc.value, value)
+			require.Len(t, podSpec.ImagePullSecrets, len(tc.secrets))
+			for i, secret := range tc.secrets {
+				require.Equal(t, secret, podSpec.ImagePullSecrets[i].Name)
+			}
+		})
+	}
 }
 
 func TestDRADriverValidationResources(t *testing.T) {
