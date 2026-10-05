@@ -58,6 +58,40 @@ func sccUsers(t *testing.T, scc *unstructured.Unstructured) []string {
 	return users
 }
 
+func TestDRADriverSCCAllowsMPSHostPID(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUCluster()
+	cr.Spec.DRADriver.FeatureGates["MPSSupport"] = true
+
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedOpenshiftCatalog())
+	require.NoError(t, err)
+	scc := findSCC(t, objs, "nvidia-dra-driver")
+	require.NotNil(t, scc)
+
+	// MPS daemon templates use SERVICE_ACCOUNT_NAME rather than inheriting
+	// the kubelet plugin's ServiceAccount automatically.
+	ds := findDaemonSet(t, objs)
+	foundServiceAccountEnv := false
+	for _, env := range containerByName(t, ds, "gpus").Env {
+		if env.Name != "SERVICE_ACCOUNT_NAME" {
+			continue
+		}
+		foundServiceAccountEnv = true
+		require.Empty(t, env.Value)
+		require.NotNil(t, env.ValueFrom)
+		require.NotNil(t, env.ValueFrom.FieldRef)
+		require.Equal(t, "spec.serviceAccountName", env.ValueFrom.FieldRef.FieldPath)
+	}
+	require.True(t, foundServiceAccountEnv)
+	serviceAccount := ds.Spec.Template.Spec.ServiceAccountName
+	require.NotEmpty(t, serviceAccount)
+	require.Contains(t, sccUsers(t, scc), "system:serviceaccount:test-operator:"+serviceAccount)
+	allowHostPID, found, err := unstructured.NestedBool(scc.Object, "allowHostPID")
+	require.NoError(t, err)
+	require.True(t, found)
+	require.True(t, allowHostPID, "MPS control daemon pods require hostPID")
+}
+
 func TestGPUClusterOperandSCCs(t *testing.T) {
 	testCases := []struct {
 		name    string

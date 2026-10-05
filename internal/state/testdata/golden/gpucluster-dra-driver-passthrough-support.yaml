@@ -246,6 +246,10 @@ spec:
               fieldPath: metadata.namespace
         - name: IMAGE_NAME
           value: nvcr.io/nvidia/k8s-dra-driver-gpu:v0.1.0
+        - name: SERVICE_ACCOUNT_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
         - name: KUBELET_REGISTRAR_DIRECTORY_PATH
           value: /var/lib/kubelet/plugins_registry
         - name: KUBELET_PLUGINS_DIRECTORY_PATH
