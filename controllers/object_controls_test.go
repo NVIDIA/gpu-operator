@@ -1261,7 +1261,9 @@ func TestVGPUManagerAssets(t *testing.T) {
 
 // TestOperandToolkitReadinessWaitsForLiveDriver verifies that every operand
 // launched through the NVIDIA runtime waits for a live Linux NVIDIA module, or
-// the supported WSL2 kernel path, as well as the toolkit status file.
+// the supported WSL2 kernel path, as well as the toolkit status file. The
+// module is live only once its sysfs initstate reads "live"; /proc/modules also
+// lists a module that is still loading or already unloading.
 func TestOperandToolkitReadinessWaitsForLiveDriver(t *testing.T) {
 	manifests := []string{
 		"assets/gpu-feature-discovery/0500_daemonset.yaml",
@@ -1291,7 +1293,7 @@ func TestOperandToolkitReadinessWaitsForLiveDriver(t *testing.T) {
 				}
 			}
 			require.NotEmpty(t, args, "toolkit-validation init container not found")
-			expectedGate := "until [ -f /run/nvidia/validations/toolkit-ready ] && { grep -q '^nvidia ' /proc/modules || [ -e /dev/dxg ]; }; do"
+			expectedGate := "until [ -f /run/nvidia/validations/toolkit-ready ] && { grep -qsx live /sys/module/nvidia/initstate || [ -e /dev/dxg ]; }; do"
 			require.True(t, strings.HasPrefix(args, expectedGate),
 				"toolkit readiness and a supported live-driver check must gate operand startup")
 		})
