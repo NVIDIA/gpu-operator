@@ -37,6 +37,7 @@ import (
 // env/resources on both kubelet plugins.
 func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 	cr := sampleGPUCluster()
+	cr.Spec.DRADriver.ImagePullSecrets = []string{"registry-secret", "other-secret"}
 	cr.Spec.DRADriver.GPUs.KubeletPlugin = nvidiav1alpha1.DRADriverKubeletPluginSpec{
 		Env: []nvidiav1.EnvVar{{Name: "GPUS_EXTRA", Value: "1"}},
 		Resources: &nvidiav1.ResourceRequirements{

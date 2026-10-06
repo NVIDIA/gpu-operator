@@ -182,6 +182,14 @@ spec:
               fieldPath: metadata.namespace
         - name: IMAGE_NAME
           value: {{ .DRADriver.ImagePath | quote }}
+        {{- if .DRADriver.Spec.ImagePullSecrets }}
+        - name: IMAGE_PULL_SECRETS
+          value: {{ join "," .DRADriver.Spec.ImagePullSecrets | quote }}
+        {{- end }}
+        - name: SERVICE_ACCOUNT_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
         - name: KUBELET_REGISTRAR_DIRECTORY_PATH
           value: {{ printf "%s/plugins_registry" (.HostPaths.KubeletRootDir | default "/var/lib/kubelet") | quote }}
         - name: KUBELET_PLUGINS_DIRECTORY_PATH
