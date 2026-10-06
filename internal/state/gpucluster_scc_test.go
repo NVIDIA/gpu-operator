@@ -91,6 +91,59 @@ func TestDRADriverSCCAllowsMPSHostPID(t *testing.T) {
 	require.True(t, allowHostPID, "MPS control daemon pods require hostPID")
 }
 
+func TestComputeDomainDaemonAnyUIDBinding(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		openshift      bool
+		computeDomains bool
+	}{
+		{name: "openshift-enabled", openshift: true, computeDomains: true},
+		{name: "openshift-disabled", openshift: true},
+		{name: "kubernetes-enabled", computeDomains: true},
+		{name: "kubernetes-disabled"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.DRADriver.ComputeDomains.Enabled = new(tc.computeDomains)
+			catalog := draSupportedCatalog()
+			if tc.openshift {
+				catalog = draSupportedOpenshiftCatalog()
+			}
+			objs, err := s.getManifestObjects(context.Background(), cr, catalog)
+			require.NoError(t, err)
+			var binding *unstructured.Unstructured
+			for _, obj := range objs {
+				if obj.GetKind() == "ClusterRoleBinding" && obj.GetName() == "compute-domain-daemon-openshift-anyuid-role-binding" {
+					binding = obj
+				}
+			}
+			if tc.openshift && tc.computeDomains {
+				require.NotNil(t, binding)
+				require.Equal(t, map[string]any{
+					"apiGroup": "rbac.authorization.k8s.io",
+					"kind":     "ClusterRole",
+					"name":     "system:openshift:scc:anyuid",
+				}, binding.Object["roleRef"])
+				require.Equal(t, []any{map[string]any{
+					"kind":      "ServiceAccount",
+					"name":      "compute-domain-daemon-service-account",
+					"namespace": "test-operator",
+				}}, binding.Object["subjects"])
+			} else {
+				require.Nil(t, binding)
+			}
+			if tc.openshift {
+				scc := findSCC(t, objs, "nvidia-dra-driver")
+				require.NotNil(t, scc)
+				require.Contains(t, sccUsers(t, scc), "system:serviceaccount:test-operator:compute-domain-daemon-service-account")
+				require.Contains(t, scc.Object, "priority")
+				require.Nil(t, scc.Object["priority"])
+			}
+		})
+	}
+}
+
 func TestGPUClusterOperandSCCs(t *testing.T) {
 	testCases := []struct {
 		name    string
