@@ -101,6 +101,7 @@ metadata:
     prometheus.io/scrape: "true"
   labels:
     app: nvidia-dcgm-exporter-dra
+    app.kubernetes.io/component: nvidia-dcgm-exporter
   name: nvidia-dcgm-exporter-dra
   namespace: test-operator
 spec:
@@ -118,6 +119,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-dcgm-exporter-dra
+    app.kubernetes.io/component: nvidia-dcgm-exporter
   name: nvidia-dcgm-exporter-dra
   namespace: test-operator
 spec:
@@ -128,6 +130,7 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm-exporter-dra
+        app.kubernetes.io/component: nvidia-dcgm-exporter
     spec:
       automountServiceAccountToken: true
       containers:

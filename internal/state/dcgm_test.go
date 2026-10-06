@@ -159,3 +159,46 @@ func TestDCGMImageFromEnvFallback(t *testing.T) {
 	ds := findDaemonSet(t, objs)
 	assert.Equal(t, "nvcr.io/nvidia/cloud-native/dcgm:test", ds.Spec.Template.Spec.Containers[0].Image)
 }
+
+func TestDCGMComponentLabels(t *testing.T) {
+	cases := map[string]func(*testing.T) *configurableState{
+		"nvidia-dcgm": newTestDCGMState,
+		"nvidia-dcgm-exporter": func(t *testing.T) *configurableState {
+			return newTestDCGMExporterState(t, false)
+		},
+	}
+	for component, newState := range cases {
+		t.Run(component, func(t *testing.T) {
+			s := newState(t)
+			cr := exporterCR(&nvidiav1.DCGMExporterSpec{})
+			cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
+			for _, labels := range []map[string]string{nil, {
+				"app.kubernetes.io/component": "custom-component",
+				"team":                        "platform",
+			}} {
+				cr.Spec.Daemonsets.Labels = labels
+				objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+				require.NoError(t, err)
+				ds := findDaemonSet(t, objs)
+				assert.Equal(t, component, ds.Labels["app.kubernetes.io/component"])
+				assert.Equal(t, component, ds.Spec.Template.Labels["app.kubernetes.io/component"])
+				assert.Equal(t, component+"-dra", ds.Labels["app"])
+				assert.Equal(t, component+"-dra", ds.Spec.Template.Labels["app"])
+				assert.Equal(t, map[string]string{"app": component + "-dra"}, ds.Spec.Selector.MatchLabels)
+				if labels != nil {
+					assert.Equal(t, "platform", ds.Labels["team"])
+					assert.Equal(t, "platform", ds.Spec.Template.Labels["team"])
+				}
+				svc := findByKind(objs, "Service")
+				require.NotNil(t, svc)
+				assert.Equal(t, component, svc.GetLabels()["app.kubernetes.io/component"])
+				assert.Equal(t, component+"-dra", svc.GetLabels()["app"])
+				assert.Equal(t, component+"-dra", svc.GetName())
+				selector, found, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
+				require.NoError(t, err)
+				require.True(t, found)
+				assert.Equal(t, map[string]string{"app": component + "-dra"}, selector)
+			}
+		})
+	}
+}

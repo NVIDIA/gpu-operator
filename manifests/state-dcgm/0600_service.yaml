@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .Namespace }}
   labels:
     app: nvidia-dcgm-dra
+    app.kubernetes.io/component: nvidia-dcgm
 spec:
   type: ClusterIP
   internalTrafficPolicy: Local
