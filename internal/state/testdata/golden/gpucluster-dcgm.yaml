@@ -53,6 +53,7 @@ kind: DaemonSet
 metadata:
   labels:
     app: nvidia-dcgm-dra
+    app.kubernetes.io/component: nvidia-dcgm
   name: nvidia-dcgm-dra
   namespace: test-operator
 spec:
@@ -63,6 +64,7 @@ spec:
     metadata:
       labels:
         app: nvidia-dcgm-dra
+        app.kubernetes.io/component: nvidia-dcgm
     spec:
       containers:
       - image: nvcr.io/nvidia/cloud-native/dcgm:test
@@ -102,6 +104,7 @@ kind: Service
 metadata:
   labels:
     app: nvidia-dcgm-dra
+    app.kubernetes.io/component: nvidia-dcgm
   name: nvidia-dcgm-dra
   namespace: test-operator
 spec:

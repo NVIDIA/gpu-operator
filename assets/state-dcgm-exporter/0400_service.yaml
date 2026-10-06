@@ -5,6 +5,7 @@ metadata:
   name: nvidia-dcgm-exporter
   labels:
     app: nvidia-dcgm-exporter
+    app.kubernetes.io/component: nvidia-dcgm-exporter
   annotations:
     prometheus.io/scrape: "true"
 spec:
