@@ -3,6 +3,7 @@ kind: Service
 metadata:
   labels:
     app: nvidia-dcgm
+    app.kubernetes.io/component: nvidia-dcgm
   name: nvidia-dcgm
   namespace: "FILLED BY THE OPERATOR"
 spec:

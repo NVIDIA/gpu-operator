@@ -17,11 +17,13 @@
 package controllers
 
 import (
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr/funcr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/yaml"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
@@ -792,10 +795,11 @@ func TestApplyHostNetworkConfig(t *testing.T) {
 
 func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 	testCases := []struct {
-		description string
-		ds          Daemonset
-		dsSpec      gpuv1.DaemonsetsSpec
-		expectedDs  Daemonset
+		description    string
+		ds             Daemonset
+		dsSpec         gpuv1.DaemonsetsSpec
+		expectedDs     Daemonset
+		expectedLabels map[string]string
 	}{
 		{
 			description: "empty daemonset spec configuration",
@@ -804,15 +808,29 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 			expectedDs:  NewDaemonset(),
 		},
 		{
+			description: "empty labels map on an unlabeled operand",
+			ds:          NewDaemonset(),
+			dsSpec:      gpuv1.DaemonsetsSpec{Labels: map[string]string{}},
+			expectedDs:  NewDaemonset(),
+		},
+		{
 			description: "common daemonset labels configured",
 			ds:          NewDaemonset(),
 			dsSpec: gpuv1.DaemonsetsSpec{Labels: map[string]string{
-				"key":                       "value",
-				"app":                       "value",
-				"app.kubernetes.io/part-of": "value",
+				"key":                         "value",
+				"app.kubernetes.io/component": "custom-component",
+				"app":                         "value",
+				"app.kubernetes.io/part-of":   "value",
 			}},
+			expectedLabels: map[string]string{
+				"key":                         "value",
+				"app.kubernetes.io/component": "custom-component",
+				"app":                         "value",
+				"app.kubernetes.io/part-of":   "value",
+			},
 			expectedDs: NewDaemonset().WithPodLabels(map[string]string{
-				"key": "value",
+				"key":                         "value",
+				"app.kubernetes.io/component": "custom-component",
 			}),
 		},
 		{
@@ -833,7 +851,12 @@ func TestApplyCommonDaemonsetMetadata(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			applyCommonDaemonsetMetadata(tc.ds.DaemonSet, &tc.dsSpec)
+			applyCommonDaemonsetMetadata(tc.ds.DaemonSet, &tc.dsSpec, ctrl.Log.WithName("test"))
+			require.NotNil(t, tc.ds.Labels, "the DaemonSet label map must always be writable")
+			tc.expectedDs.Labels = tc.expectedLabels
+			if tc.expectedDs.Labels == nil {
+				tc.expectedDs.Labels = map[string]string{}
+			}
 			require.EqualValues(t, tc.expectedDs, tc.ds)
 		})
 	}
@@ -5077,4 +5100,128 @@ func TestHashDriverInstallConfigZeroFieldInvariant(t *testing.T) {
 	changedDigest := utils.GetObjectHashIgnoreEmptyKeys(extended)
 	assert.NotEqual(t, originalDigest, changedDigest,
 		"a non-zero new field should change the digest")
+}
+
+func TestOperandComponentLabels(t *testing.T) {
+	cases := map[string]struct {
+		daemonset string
+		service   string
+	}{
+		"nvidia-driver": {
+			daemonset: "../assets/state-driver/0500_daemonset.yaml",
+		},
+		"nvidia-dcgm": {
+			daemonset: "../assets/state-dcgm/0400_dcgm.yml",
+			service:   "../assets/state-dcgm/0500_service.yaml",
+		},
+		"nvidia-dcgm-exporter": {
+			daemonset: "../assets/state-dcgm-exporter/0800_daemonset.yaml",
+			service:   "../assets/state-dcgm-exporter/0400_service.yaml",
+		},
+	}
+	for component, tc := range cases {
+		t.Run(component, func(t *testing.T) {
+			data, err := os.ReadFile(tc.daemonset)
+			require.NoError(t, err)
+			ds := &appsv1.DaemonSet{}
+			require.NoError(t, yaml.Unmarshal(data, ds))
+			for _, labels := range []map[string]string{nil, {
+				"app.kubernetes.io/component": "custom-component",
+				"team":                        "platform",
+			}} {
+				actual := ds.DeepCopy()
+				applyCommonDaemonsetMetadata(actual, &gpuv1.DaemonsetsSpec{Labels: labels}, ctrl.Log.WithName("test"))
+				assert.Equal(t, component, actual.Labels["app.kubernetes.io/component"])
+				assert.Equal(t, component, actual.Spec.Template.Labels["app.kubernetes.io/component"])
+				assert.Equal(t, ds.Name, actual.Labels["app"])
+				assert.Equal(t, ds.Name, actual.Spec.Template.Labels["app"])
+				assert.Equal(t, map[string]string{"app": ds.Name}, actual.Spec.Selector.MatchLabels)
+				if labels != nil {
+					assert.Equal(t, "platform", actual.Labels["team"])
+					assert.Equal(t, "platform", actual.Spec.Template.Labels["team"])
+				}
+			}
+			if tc.service == "" {
+				return
+			}
+			data, err = os.ReadFile(tc.service)
+			require.NoError(t, err)
+			svc := &corev1.Service{}
+			require.NoError(t, yaml.Unmarshal(data, svc))
+			assert.Equal(t, component, svc.Labels["app.kubernetes.io/component"])
+			assert.Equal(t, component, svc.Labels["app"])
+			assert.Equal(t, component, svc.Name)
+			assert.Equal(t, map[string]string{"app": component}, svc.Spec.Selector)
+		})
+	}
+}
+
+func TestApplyCommonDaemonsetMetadataPreservesComponent(t *testing.T) {
+	const componentLabel = "app.kubernetes.io/component"
+	cases := map[string]struct {
+		labels    map[string]string
+		podLabels map[string]string
+	}{
+		"DaemonSet only":    {labels: map[string]string{componentLabel: "nvidia-driver"}},
+		"pod template only": {podLabels: map[string]string{componentLabel: "nvidia-driver"}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			expectedComponent := tc.labels[componentLabel]
+			expectedPodComponent := tc.podLabels[componentLabel]
+			ds := NewDaemonset().WithPodLabels(tc.podLabels)
+			ds.Labels = tc.labels
+			applyCommonDaemonsetMetadata(ds.DaemonSet, &gpuv1.DaemonsetsSpec{
+				Labels: map[string]string{componentLabel: "custom-component"},
+			}, ctrl.Log.WithName("test"))
+			assert.Equal(t, expectedComponent, ds.Labels[componentLabel])
+			assert.Equal(t, expectedPodComponent, ds.Spec.Template.Labels[componentLabel])
+		})
+	}
+}
+
+func TestApplyCommonDaemonsetMetadataLogging(t *testing.T) {
+	const componentLabel = "app.kubernetes.io/component"
+	cases := map[string]struct {
+		key, value, objectValue, podValue string
+		podLabelPresent                   bool
+		wantLogs                          int
+	}{
+		"matching component":                       {key: componentLabel, value: "nvidia-driver", objectValue: "nvidia-driver", podValue: "nvidia-driver"},
+		"matching metadata-only component":         {key: componentLabel, value: "nvidia-driver", objectValue: "nvidia-driver"},
+		"matching pod-only component":              {key: componentLabel, value: "nvidia-driver", podValue: "nvidia-driver"},
+		"conflicting component":                    {key: componentLabel, value: "custom", objectValue: "nvidia-driver", podValue: "nvidia-driver", wantLogs: 1},
+		"conflicting pod component":                {key: componentLabel, value: "nvidia-driver", objectValue: "nvidia-driver", podValue: "other", wantLogs: 1},
+		"custom component on unlabeled operand":    {key: componentLabel, value: "custom"},
+		"custom app on unlabeled pod template":     {key: "app", value: "custom"},
+		"custom part-of on unlabeled pod template": {key: "app.kubernetes.io/part-of", value: "custom"},
+		"conflicting empty app":                    {key: "app", value: "custom", podLabelPresent: true, wantLogs: 1},
+		"conflicting empty part-of":                {key: "app.kubernetes.io/part-of", value: "custom", podLabelPresent: true, wantLogs: 1},
+		"matching app":                             {key: "app", value: "nvidia-dcgm", podValue: "nvidia-dcgm"},
+		"conflicting app":                          {key: "app", value: "custom", podValue: "nvidia-dcgm", wantLogs: 1},
+		"matching part-of":                         {key: "app.kubernetes.io/part-of", value: "gpu-operator", podValue: "gpu-operator"},
+		"conflicting part-of":                      {key: "app.kubernetes.io/part-of", value: "custom", podValue: "gpu-operator", wantLogs: 1},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ds := NewDaemonset()
+			if tc.objectValue != "" {
+				ds.Labels = map[string]string{tc.key: tc.objectValue}
+			}
+			if tc.podValue != "" || tc.podLabelPresent {
+				ds.Spec.Template.Labels = map[string]string{tc.key: tc.podValue}
+			}
+			var logs []string
+			logger := funcr.New(func(_, message string) { logs = append(logs, message) }, funcr.Options{})
+			applyCommonDaemonsetMetadata(ds.DaemonSet, &gpuv1.DaemonsetsSpec{
+				Labels: map[string]string{tc.key: tc.value},
+			}, logger)
+			require.Len(t, logs, tc.wantLogs)
+			if tc.wantLogs > 0 {
+				assert.Contains(t, logs[0], "Skipping custom")
+				assert.Contains(t, logs[0], tc.key)
+				assert.Contains(t, logs[0], tc.value)
+			}
+		})
+	}
 }
