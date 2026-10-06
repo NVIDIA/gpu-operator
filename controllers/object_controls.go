@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
@@ -778,28 +779,22 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return err
 	}
 
-	// apply custom Labels and Annotations to the podSpec if any
-	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets)
+	// apply custom labels and pod annotations
+	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets, logger)
 
 	return nil
 }
 
-// applyCommonDaemonsetMetadata adds additional labels and annotations to the daemonset podSpec if there are any specified
-// by the user in the podSpec.
-func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec) {
-	if len(dsSpec.Labels) > 0 {
-		if obj.Spec.Template.Labels == nil {
-			obj.Spec.Template.Labels = make(map[string]string)
-		}
-		for labelKey, labelValue := range dsSpec.Labels {
-			// if the user specifies an override of the "app" or the "app.kubernetes.io/part-of" key, we skip it.
-			// DaemonSet pod selectors are immutable, so we still want the pods to be selectable as before and working
-			// with the existing daemon set selectors.
-			if labelKey == "app" || labelKey == "app.kubernetes.io/part-of" {
-				continue
-			}
-			obj.Spec.Template.Labels[labelKey] = labelValue
-		}
+// applyCommonDaemonsetMetadata merges user labels and pod annotations while preserving operand identity.
+func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.DaemonsetsSpec, logger logr.Logger) {
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+	if len(dsSpec.Labels) > 0 && obj.Spec.Template.Labels == nil {
+		obj.Spec.Template.Labels = make(map[string]string)
+	}
+	for labelKey, labelValue := range dsSpec.Labels {
+		applyCommonDaemonsetLabel(obj, labelKey, labelValue, logger)
 	}
 
 	if len(dsSpec.Annotations) > 0 {
@@ -807,6 +802,37 @@ func applyCommonDaemonsetMetadata(obj *appsv1.DaemonSet, dsSpec *gpuv1.Daemonset
 			obj.Spec.Template.Annotations = make(map[string]string)
 		}
 		maps.Copy(obj.Spec.Template.Annotations, dsSpec.Annotations)
+	}
+}
+
+// applyCommonDaemonsetLabel merges a custom label while preserving existing component
+// labels and pod identity labels.
+func applyCommonDaemonsetLabel(obj *appsv1.DaemonSet, labelKey, labelValue string, logger logr.Logger) {
+	daemonsetValue := obj.Labels[labelKey]
+	podValue, hasPodLabel := obj.Spec.Template.Labels[labelKey]
+	// Preserve existing component labels used for operand discovery and anti-affinity.
+	hasComponentLabel := labelKey == "app.kubernetes.io/component" &&
+		(daemonsetValue != "" || podValue != "")
+	componentConflict := (daemonsetValue != "" && daemonsetValue != labelValue) ||
+		(podValue != "" && podValue != labelValue)
+	// Ignore custom app and app.kubernetes.io/part-of pod labels so pods keep matching
+	// the immutable DaemonSet selectors.
+	isPodIdentityLabel := labelKey == "app" || labelKey == "app.kubernetes.io/part-of"
+
+	if hasComponentLabel {
+		if componentConflict {
+			logger.Info("Skipping custom label override for protected operand labels",
+				"label", labelKey, "value", labelValue)
+		}
+		return
+	}
+
+	obj.Labels[labelKey] = labelValue
+	if !isPodIdentityLabel {
+		obj.Spec.Template.Labels[labelKey] = labelValue
+	} else if hasPodLabel && podValue != labelValue {
+		logger.Info("Skipping custom pod label override for immutable DaemonSet selectors",
+			"label", labelKey, "value", labelValue)
 	}
 }
 
@@ -4734,12 +4760,6 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		logger.Info("SetControllerReference failed", "Error", err)
 		return gpuv1.NotReady, err
 	}
-
-	if obj.Labels == nil {
-		obj.Labels = make(map[string]string)
-	}
-
-	maps.Copy(obj.Labels, n.singleton.Spec.Daemonsets.Labels)
 
 	// Daemonsets will always have at least one annotation applied, so allocate if necessary
 	if obj.Annotations == nil {

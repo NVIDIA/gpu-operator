@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .Namespace }}
   labels:
     app: nvidia-dcgm-exporter-dra
+    app.kubernetes.io/component: nvidia-dcgm-exporter
   annotations:
     prometheus.io/scrape: "true"
 spec:
