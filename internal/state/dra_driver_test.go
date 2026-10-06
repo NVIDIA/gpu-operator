@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -473,6 +474,28 @@ func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
 	depEnv := envMap(depCtr.Env)
 	assert.Equal(t, "false", depEnv["LEADER_ELECTION_ENABLED"])
 	assert.Equal(t, "test-operator", depEnv["LEADER_ELECTION_LEASE_LOCK_NAMESPACE"])
+}
+
+func TestComputeDomainDaemonCliquePermissions(t *testing.T) {
+	s := newTestDRAState(t)
+	cr := sampleGPUCluster()
+	cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+	require.NoError(t, err)
+	for _, obj := range objs {
+		if obj.GetKind() != "ClusterRole" || obj.GetName() != "compute-domain-daemon" {
+			continue
+		}
+		role := &rbacv1.ClusterRole{}
+		require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, role))
+		require.Contains(t, role.Rules, rbacv1.PolicyRule{
+			APIGroups: []string{"resource.nvidia.com"},
+			Resources: []string{"computedomaincliques"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+		}, "owner-reference admission requires delete permission on the dependent clique")
+		return
+	}
+	t.Fatal("compute-domain-daemon ClusterRole not found")
 }
 
 func TestDRADriverDaemonsetsLabels(t *testing.T) {
