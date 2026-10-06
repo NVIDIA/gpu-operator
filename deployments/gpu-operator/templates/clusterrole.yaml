@@ -190,6 +190,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups:
   - coordination.k8s.io
   resources:

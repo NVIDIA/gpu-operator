@@ -35,6 +35,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups:
   - ""
   resources:
@@ -57,4 +58,19 @@ roleRef:
   kind: ClusterRole
   name: compute-domain-daemon
   apiGroup: rbac.authorization.k8s.io
+{{- if .OpenshiftVersion }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: compute-domain-daemon-openshift-anyuid-role-binding
+subjects:
+- kind: ServiceAccount
+  name: compute-domain-daemon-service-account
+  namespace: {{ .Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
 {{- end }}
