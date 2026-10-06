@@ -18,11 +18,13 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -37,38 +39,27 @@ func NewNodeClient(client kubernetes.Interface) *NodeClient {
 }
 
 func (h *NodeClient) LabelNode(ctx context.Context, nodeName, key, value string) error {
-	node, err := h.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get node: %w", err)
-	}
-
-	if node.Labels == nil {
-		node.Labels = make(map[string]string)
-	}
-
-	node.Labels[key] = value
-
-	_, err = h.client.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to update node: %w", err)
-	}
-
-	return nil
+	return h.patchNodeLabels(ctx, nodeName, map[string]any{key: value})
 }
 
 func (h *NodeClient) UnlabelNode(ctx context.Context, nodeName, key string) error {
-	node, err := h.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	// A null value in a JSON merge patch deletes the key.
+	return h.patchNodeLabels(ctx, nodeName, map[string]any{key: nil})
+}
+
+func (h *NodeClient) patchNodeLabels(ctx context.Context, nodeName string, nodeLabels map[string]any) error {
+	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"labels": nodeLabels,
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get node: %w", err)
+		return fmt.Errorf("failed to build label patch: %w", err)
 	}
 
-	if node.Labels != nil {
-		delete(node.Labels, key)
-	}
-
-	_, err = h.client.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.client.CoreV1().Nodes().Patch(ctx, nodeName, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to update node: %w", err)
+		return fmt.Errorf("failed to patch node: %w", err)
 	}
 
 	return nil
