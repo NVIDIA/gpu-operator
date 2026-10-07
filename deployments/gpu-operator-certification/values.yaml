@@ -1,0 +1,44 @@
+testTimeout: "15m"
+# TestSets to run. Use "all" for all sets, "!name" to exclude.
+#
+# Available TestSets:
+#   TS1000 - Default Settings (operands, allocatable, GFD labels, DCGM metrics, workload)
+#   TS1001 - GPU Sharing via Timeslicing
+#   TS1002 - DCGM Standalone
+#   TS1003 - Driver Update
+#   TS1004 - MIG mode (single strategy)  — skipped if no MIG-capable GPUs detected
+#   TS1005 - MIG mode (mixed strategy)   — skipped if no MIG-capable GPUs detected
+#   TS1006 - GPUDirectRDMA               — skipped if fewer than 2 GPU nodes with RDMA hardware
+#   TS1007 - GPUDirectRDMA with DMA-BUF   — skipped if fewer than 2 GPU nodes with RDMA hardware
+#   TS1008 - GDRCopy                      — skipped if no operator-managed driver pods
+#
+# Examples:
+#   ["all"]                  - run all registered sets
+#   ["all", "!TS1003"]       - run all except driver update
+#   ["TS1000", "TS1003"]     - run only default settings and driver update
+#   []                       - run nothing (safe default)
+testSets:
+  - "all"
+
+# -- TS1000 (Default Settings) --
+# Container image for the GPU workload validation pod.
+testWorkloadImage: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04"
+
+# -- TS1003 (Driver Update) --
+# Leave empty to skip TS1003.
+targetDriver:
+  repository: ""  # e.g., "nvcr.io/nvidia"
+  image: ""       # e.g., "driver"
+  version: ""     # e.g., "580.126.16"
+
+# -- TS1006/TS1007 (RDMA) --
+# Base CUDA image for RDMA test pods (must have glibc >= host MOFED libs).
+rdmaBaseImage: "nvcr.io/nvidia/cuda:13.1.1-base-ubuntu24.04"
+
+image:
+  repository: nvcr.io/ea-cnt/nv_only/gpu-operator-certification
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets: []
+# - name: "image-pull-secret"

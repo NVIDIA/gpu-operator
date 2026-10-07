@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "gpu-operator-certification.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator-certification.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "gpu-operator-certification.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "gpu-operator-certification.fullname" . }}
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: certification
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: TEST_TIMEOUT
+              value: {{ .Values.testTimeout | quote }}
+            - name: TEST_SETS
+              value: {{ .Values.testSets | join "," | quote }}
+            - name: TEST_WORKLOAD_IMAGE
+              value: {{ .Values.testWorkloadImage | quote }}
+            - name: TARGET_DRIVER_REPOSITORY
+              value: {{ .Values.targetDriver.repository | quote }}
+            - name: TARGET_DRIVER_IMAGE
+              value: {{ .Values.targetDriver.image | quote }}
+            - name: TARGET_DRIVER_VERSION
+              value: {{ .Values.targetDriver.version | quote }}
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: RDMA_BASE_IMAGE
+              value: {{ .Values.rdmaBaseImage | quote }}
+            - name: RESULTS_CONFIGMAP_NAME
+              value: "{{ include "gpu-operator-certification.fullname" . }}-results"
