@@ -1,0 +1,37 @@
+suite: mig-manager custom config
+templates:
+  - mig_config.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: does not render the ConfigMap by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render the ConfigMap when create=true but data is empty
+    set:
+      migManager:
+        config:
+          create: true
+          name: custom-mig-parted
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot when create=true and data is provided
+    set:
+      migManager:
+        config:
+          create: true
+          name: custom-mig-parted
+          data:
+            config.yaml: |-
+              version: v1
+              mig-configs:
+                all-disabled:
+                  - devices: all
+                    mig-enabled: false
+    asserts:
+      - matchSnapshot: {}

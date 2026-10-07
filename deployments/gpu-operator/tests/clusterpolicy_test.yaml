@@ -1,0 +1,142 @@
+suite: clusterpolicy
+templates:
+  - clusterpolicy.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+chart:
+  appVersion: "v25.0.0"
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}
+
+  - it: should match snapshot when cleanupCRD is enabled (resource-policy=keep)
+    set:
+      operator:
+        cleanupCRD: true
+    asserts:
+      - matchSnapshot: {}
+
+  - it: includes kubeletRootDir when configured
+    set:
+      hostPaths:
+        kubeletRootDir: /var/lib/kubelet
+    asserts:
+      - equal:
+          path: spec.hostPaths.kubeletRootDir
+          value: /var/lib/kubelet
+
+  - it: propagates the nri plugin flag only when CDI is also enabled
+    set:
+      cdi:
+        enabled: true
+        nriPluginEnabled: true
+    asserts:
+      - equal:
+          path: spec.cdi.nriPluginEnabled
+          value: true
+
+  - it: prefers an explicit validator version when provided
+    set:
+      validator:
+        version: v9.9.9
+    asserts:
+      - equal:
+          path: spec.validator.version
+          value: v9.9.9
+
+  - it: surfaces device plugin config when a name is provided
+    set:
+      devicePlugin:
+        config:
+          name: my-config
+          default: default
+    asserts:
+      - equal:
+          path: spec.devicePlugin.config.name
+          value: my-config
+      - equal:
+          path: spec.devicePlugin.config.default
+          value: default
+
+  - it: surfaces dcgmExporter config name when provided
+    set:
+      dcgmExporter:
+        config:
+          name: custom-metrics
+    asserts:
+      - equal:
+          path: spec.dcgmExporter.config.name
+          value: custom-metrics
+
+  - it: surfaces migManager config.name when provided
+    set:
+      migManager:
+        config:
+          name: custom-mig-parted
+    asserts:
+      - equal:
+          path: spec.migManager.config.name
+          value: custom-mig-parted
+
+  - it: enables gds when toggled on
+    set:
+      gds:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.gds.enabled
+          value: true
+      - equal:
+          path: spec.gds.image
+          value: nvidia-fs
+
+  - it: enables nodeStatusExporter when toggled on
+    set:
+      nodeStatusExporter:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.nodeStatusExporter.enabled
+          value: true
+      - equal:
+          path: spec.nodeStatusExporter.version
+          value: v25.0.0
+
+  - it: surfaces operator initContainer when configured
+    set:
+      operator:
+        initContainer:
+          repository: my-registry
+          image: my-init
+          version: v1.2.3
+          imagePullPolicy: Always
+    asserts:
+      - equal:
+          path: spec.operator.initContainer.repository
+          value: my-registry
+      - equal:
+          path: spec.operator.initContainer.image
+          value: my-init
+      - equal:
+          path: spec.operator.initContainer.version
+          value: v1.2.3
+      - equal:
+          path: spec.operator.initContainer.imagePullPolicy
+          value: Always
+
+  - it: surfaces serviceMonitor settings on the operator section
+    set:
+      operator:
+        metrics:
+          serviceMonitor:
+            interval: 30s
+            honorLabels: true
+    asserts:
+      - equal:
+          path: spec.operator.metrics.serviceMonitor.interval
+          value: 30s
+      - equal:
+          path: spec.operator.metrics.serviceMonitor.honorLabels
+          value: true
