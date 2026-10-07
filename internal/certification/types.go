@@ -3,7 +3,7 @@ package certification
 import (
 	"context"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 )
 
 // Test is the fundamental unit of validation. Tests are reusable building blocks

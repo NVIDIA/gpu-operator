@@ -11,7 +11,7 @@ import (
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 )
 
 // OriginalSettings holds the initial ClusterPolicy and NVIDIADriver CR specs

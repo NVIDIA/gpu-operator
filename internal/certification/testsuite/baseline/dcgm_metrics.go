@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification"
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/certification"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 )
 
 const (

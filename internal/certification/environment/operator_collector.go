@@ -3,7 +3,7 @@ package environment
 import (
 	"context"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 )
 
 type operatorCollector struct{}

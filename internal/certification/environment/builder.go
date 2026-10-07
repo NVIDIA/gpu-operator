@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 )
 
 // SnapshotBuilder constructs EnvironmentSnapshot using the builder pattern.

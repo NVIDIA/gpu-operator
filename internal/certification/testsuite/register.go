@@ -1,9 +1,9 @@
 package testsuite
 
 import (
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification"
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/testsuite/baseline"
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/testsuite/clusterpolicy"
+	"github.com/NVIDIA/gpu-operator/internal/certification"
+	"github.com/NVIDIA/gpu-operator/internal/certification/testsuite/baseline"
+	"github.com/NVIDIA/gpu-operator/internal/certification/testsuite/clusterpolicy"
 )
 
 // Reusable test primitives - can be composed into any TestSet

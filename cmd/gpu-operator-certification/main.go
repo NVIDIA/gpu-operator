@@ -8,12 +8,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification"
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification/k8s"
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/reporting"
+	"github.com/NVIDIA/gpu-operator/internal/certification"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/certification/reporting"
 
 	// Register TestSets
-	_ "github.com/NVIDIA/gpu-operator-self-certification/internal/testsuite"
+	_ "github.com/NVIDIA/gpu-operator/internal/certification/testsuite"
 )
 
 func main() {

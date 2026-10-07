@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"html/template"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/certification"
+	"github.com/NVIDIA/gpu-operator/internal/certification"
 )
 
 var reportTemplate = template.Must(template.New("report").Parse(htmlTemplateStr))

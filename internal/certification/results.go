@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/NVIDIA/gpu-operator-self-certification/internal/environment"
-	timeutils "github.com/NVIDIA/gpu-operator-self-certification/internal/utils/time"
+	"github.com/NVIDIA/gpu-operator/internal/certification/environment"
+	timeutils "github.com/NVIDIA/gpu-operator/internal/certification/utils/time"
 )
 
 type Status string
