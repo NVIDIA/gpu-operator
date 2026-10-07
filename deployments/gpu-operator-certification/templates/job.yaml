@@ -20,8 +20,9 @@ spec:
       {{- end }}
       containers:
         - name: certification
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          command: ["gpu-operator-certification"]
           env:
             - name: NAMESPACE
               valueFrom:

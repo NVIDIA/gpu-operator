@@ -36,8 +36,9 @@ targetDriver:
 rdmaBaseImage: "nvcr.io/nvidia/cuda:13.1.1-base-ubuntu24.04"
 
 image:
-  repository: nvcr.io/ea-cnt/nv_only/gpu-operator-certification
-  tag: latest
+  repository: nvcr.io/nvidia/gpu-operator
+  # If tag is not specified, then default is to use chart.AppVersion
+  tag: ""
   pullPolicy: Always
 
 imagePullSecrets: []
