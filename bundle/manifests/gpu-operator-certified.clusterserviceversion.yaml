@@ -1153,6 +1153,30 @@ spec:
                     value: "nvcr.io/nvidia/cloud-native/gdrdrv@sha256:eef1b6663d78555f0e5c49c156196b67e8a3008bc22aaa02b03dad53887ee0f1"
               terminationGracePeriodSeconds: 10
               serviceAccountName: gpu-operator
+              affinity:
+                nodeAffinity:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 1
+                    preference:
+                      matchExpressions:
+                      - key: "node-role.kubernetes.io/master"
+                        operator: In
+                        values: [""]
+                  - weight: 1
+                    preference:
+                      matchExpressions:
+                      - key: "node-role.kubernetes.io/control-plane"
+                        operator: In
+                        values: [""]
+              tolerations:
+              - key: "node-role.kubernetes.io/master"
+                operator: "Equal"
+                value: ""
+                effect: "NoSchedule"
+              - key: "node-role.kubernetes.io/control-plane"
+                operator: "Equal"
+                value: ""
+                effect: "NoSchedule"
     strategy: deployment
   installModes:
   - supported: true
