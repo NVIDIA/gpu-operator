@@ -279,6 +279,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, condErr
 		}
 	}
+	// External ServiceAccounts are not watched. Recheck policies using them so
+	// deletion or replacement cannot leave their status stale indefinitely.
+	if instance.Spec.DCGMExporter.IsEnabled() && instance.Spec.DCGMExporter.HasServiceAccountName() {
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
 	return ctrl.Result{}, nil
 }
 

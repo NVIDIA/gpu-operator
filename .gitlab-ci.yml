@@ -74,6 +74,8 @@ unit-tests:
   extends:
     - .requires-build-image
   stage: unit-tests
+  before_script:
+    - curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
   script:
     - make coverage
 
