@@ -42,6 +42,11 @@ const (
 	// upstream k8s-dra-driver-gpu Helm chart.
 	defaultGPUsHealthcheckPort           = int32(51516)
 	defaultComputeDomainsHealthcheckPort = int32(51515)
+
+	// Metrics ports of the kubelet-plugin containers, mirroring the hardcoded
+	// HTTP_ENDPOINT values in manifests/state-dra-driver/0500_daemonset.yaml.
+	gpusMetricsPort           = int32(8080)
+	computeDomainsMetricsPort = int32(8081)
 )
 
 // resolveHealthcheckPort returns the spec-provided health service port, or the
@@ -56,19 +61,40 @@ func resolveHealthcheckPort(hc *nvidiav1alpha1.DRADriverHealthcheckSpec, default
 	return defaultPort
 }
 
-// validateHealthcheckPorts rejects a GPUCluster whose two kubelet-plugin containers
-// would bind the same gRPC health port. Both containers share the pod's network
-// namespace, so the second bind fails with EADDRINUSE and that container crash-loops;
-// which one loses is a startup race. The check runs on resolved ports so a user who
-// sets only one port to the other container's default is caught too. A port <= 0
-// means the health service is disabled, so no bind happens.
-func validateHealthcheckPorts(computeDomainsEnabled bool, gpusPort, computeDomainsPort int32) error {
-	if !computeDomainsEnabled || gpusPort <= 0 || gpusPort != computeDomainsPort {
-		return nil
+// validateKubeletPluginPorts rejects a GPUCluster whose kubelet-plugin containers
+// would bind the same TCP port twice. Every listener in the pod, health services and
+// metrics endpoints alike, shares one network namespace, so the second bind fails
+// with EADDRINUSE and that container crash-loops; between containers, which one
+// loses is a startup race. The check runs on resolved health ports so a user who
+// sets only one port to the other container's default is caught too. A health port
+// <= 0 means the service is disabled, so it never binds.
+func validateKubeletPluginPorts(computeDomainsEnabled bool, gpusPort, computeDomainsPort int32) error {
+	type listener struct {
+		name string
+		port int32
 	}
-	return fmt.Errorf("spec.draDriver.gpus.kubeletPlugin.healthcheck.port and "+
-		"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port must differ "+
-		"when computeDomains is enabled; both resolve to %d", gpusPort)
+	listeners := []listener{
+		{"the gpus container metrics endpoint", gpusMetricsPort},
+		{"spec.draDriver.gpus.kubeletPlugin.healthcheck.port", gpusPort},
+	}
+	if computeDomainsEnabled {
+		listeners = append(listeners,
+			listener{"the compute-domains container metrics endpoint", computeDomainsMetricsPort},
+			listener{"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port", computeDomainsPort},
+		)
+	}
+
+	owner := map[int32]string{}
+	for _, l := range listeners {
+		if l.port <= 0 {
+			continue
+		}
+		if prev, ok := owner[l.port]; ok {
+			return fmt.Errorf("%s and %s must differ; both resolve to %d", prev, l.name, l.port)
+		}
+		owner[l.port] = l.name
+	}
+	return nil
 }
 
 type stateDRADriver struct {
@@ -137,9 +163,9 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck, defaultGPUsHealthcheckPort)
 	computeDomainsHealthcheckPort := resolveHealthcheckPort(
 		cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort)
-	if err := validateHealthcheckPorts(cr.Spec.DRADriver.IsComputeDomainsEnabled(),
+	if err := validateKubeletPluginPorts(cr.Spec.DRADriver.IsComputeDomainsEnabled(),
 		gpusHealthcheckPort, computeDomainsHealthcheckPort); err != nil {
-		return nil, fmt.Errorf("invalid DRA driver healthcheck configuration: %w", err)
+		return nil, fmt.Errorf("invalid DRA driver kubelet-plugin port configuration: %w", err)
 	}
 
 	renderData := &draDriverRenderData{
