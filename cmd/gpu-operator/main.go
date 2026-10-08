@@ -286,6 +286,15 @@ func gpuPodSpecFilter(ctx context.Context, c client.Reader) func(pod corev1.Pod)
 				return true
 			}
 		}
+		// Native sidecars (init containers with restartPolicy Always) run for the
+		// pod's lifetime, so their GPU resources must be considered. Regular init
+		// containers are not checked here.
+		for _, ctr := range pod.Spec.InitContainers {
+			if ctr.RestartPolicy != nil && *ctr.RestartPolicy == corev1.ContainerRestartPolicyAlways &&
+				(gpuInResourceList(ctr.Resources.Limits) || gpuInResourceList(ctr.Resources.Requests)) {
+				return true
+			}
+		}
 		return controllers.PodHasNVIDIAGPUClaim(ctx, c, &pod, false)
 	}
 }
