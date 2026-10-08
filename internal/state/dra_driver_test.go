@@ -383,6 +383,31 @@ func TestDRADriverHealthcheckPortCollision(t *testing.T) {
 		"gpus healthcheck on 8081 is fine with computeDomains disabled": {
 			gpus: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8081))},
 		},
+		// The compute-domains healthcheck collides with either metrics endpoint
+		// the same way; both directions of the check need covering.
+		"computeDomains healthcheck on the gpus metrics port": {
+			computeDomainsEnabled: true,
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
+			wantErr: []string{
+				"the gpus container metrics endpoint",
+				"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port",
+				"both resolve to 8080",
+			},
+		},
+		"computeDomains healthcheck on the compute-domains metrics port": {
+			computeDomainsEnabled: true,
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8081))},
+			wantErr: []string{
+				"the compute-domains container metrics endpoint",
+				"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port",
+				"both resolve to 8081",
+			},
+		},
+		// With computeDomains off its healthcheck is never bound, so its value
+		// cannot collide with anything.
+		"computeDomains healthcheck on 8080 is fine with computeDomains disabled": {
+			computeDomains: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
+		},
 		"different ports": {
 			computeDomainsEnabled: true,
 			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
