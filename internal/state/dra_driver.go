@@ -56,6 +56,21 @@ func resolveHealthcheckPort(hc *nvidiav1alpha1.DRADriverHealthcheckSpec, default
 	return defaultPort
 }
 
+// validateHealthcheckPorts rejects a GPUCluster whose two kubelet-plugin containers
+// would bind the same gRPC health port. Both containers share the pod's network
+// namespace, so the second bind fails with EADDRINUSE and that container crash-loops;
+// which one loses is a startup race. The check runs on resolved ports so a user who
+// sets only one port to the other container's default is caught too. A port <= 0
+// means the health service is disabled, so no bind happens.
+func validateHealthcheckPorts(computeDomainsEnabled bool, gpusPort, computeDomainsPort int32) error {
+	if !computeDomainsEnabled || gpusPort <= 0 || gpusPort != computeDomainsPort {
+		return nil
+	}
+	return fmt.Errorf("spec.draDriver.gpus.kubeletPlugin.healthcheck.port and "+
+		"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port must differ "+
+		"when computeDomains is enabled; both resolve to %d", gpusPort)
+}
+
 type stateDRADriver struct {
 	stateSkel
 }
@@ -118,18 +133,25 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		return nil, fmt.Errorf("failed to get OpenShift version: %w", err)
 	}
 
+	gpusHealthcheckPort := resolveHealthcheckPort(
+		cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck, defaultGPUsHealthcheckPort)
+	computeDomainsHealthcheckPort := resolveHealthcheckPort(
+		cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort)
+	if err := validateHealthcheckPorts(cr.Spec.DRADriver.IsComputeDomainsEnabled(),
+		gpusHealthcheckPort, computeDomainsHealthcheckPort); err != nil {
+		return nil, fmt.Errorf("invalid DRA driver healthcheck configuration: %w", err)
+	}
+
 	renderData := &draDriverRenderData{
-		DRADriver:             draDriverSpec,
-		HostPaths:             &hostPaths,
-		Daemonsets:            &daemonsets,
-		Namespace:             s.namespace,
-		OpenshiftVersion:      openshiftVersion,
-		DeviceClassAPIVersion: apiVersion,
-		FeatureGates:          cr.Spec.DRADriver.FeatureGates,
-		GPUsHealthcheckPort: resolveHealthcheckPort(
-			cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck, defaultGPUsHealthcheckPort),
-		ComputeDomainsHealthcheckPort: resolveHealthcheckPort(
-			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort),
+		DRADriver:                     draDriverSpec,
+		HostPaths:                     &hostPaths,
+		Daemonsets:                    &daemonsets,
+		Namespace:                     s.namespace,
+		OpenshiftVersion:              openshiftVersion,
+		DeviceClassAPIVersion:         apiVersion,
+		FeatureGates:                  cr.Spec.DRADriver.FeatureGates,
+		GPUsHealthcheckPort:           gpusHealthcheckPort,
+		ComputeDomainsHealthcheckPort: computeDomainsHealthcheckPort,
 	}
 
 	return s.renderObjects(ctx, renderData)
