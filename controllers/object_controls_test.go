@@ -2651,3 +2651,104 @@ func TestDriverPrecompiledLibModulesSuse(t *testing.T) {
 		})
 	}
 }
+
+// TestDCGMExporterRBACSubjects verifies that exporter RBAC and SCC users follow
+// the configured account while unrelated subjects and resource names are preserved.
+func TestDCGMExporterRBACSubjects(t *testing.T) {
+	const (
+		testNamespace = "test-namespace"
+		filled        = "FILLED BY THE OPERATOR"
+		customSA      = "metrics-identity"
+	)
+
+	testScheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(testScheme))
+	require.NoError(t, rbacv1.AddToScheme(testScheme))
+	require.NoError(t, secv1.AddToScheme(testScheme))
+	require.NoError(t, gpuv1.AddToScheme(testScheme))
+
+	spec := gpuv1.ClusterPolicySpec{
+		DCGMExporter: gpuv1.DCGMExporterSpec{
+			EnablePodLabels: new(true),
+			ServiceAccount:  &gpuv1.DCGMExporterServiceAccountConfig{Name: customSA},
+		},
+	}
+
+	testCases := map[string]struct {
+		resources Resources
+		// control applies the object and returns the resulting state.
+		control func(ClusterPolicyController) (gpuv1.State, error)
+		assert  func(t *testing.T, k8s client.Client)
+	}{
+		"RoleBinding subject follows the configured ServiceAccount": {
+			resources: Resources{RoleBinding: rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: gpuv1.DCGMExporterDefaultServiceAccountName},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.ServiceAccountKind, Name: gpuv1.DCGMExporterDefaultServiceAccountName, Namespace: filled},
+					// Kept verbatim, mirroring 0500_prom_rolebinding_openshift.yaml.
+					{Kind: rbacv1.ServiceAccountKind, Name: "prometheus-k8s", Namespace: "openshift-monitoring"},
+				},
+			}},
+			control: RoleBinding,
+			assert: func(t *testing.T, k8s client.Client) {
+				found := &rbacv1.RoleBinding{}
+				require.NoError(t, k8s.Get(context.Background(),
+					types.NamespacedName{Namespace: testNamespace, Name: gpuv1.DCGMExporterDefaultServiceAccountName}, found))
+				require.Equal(t, customSA, found.Subjects[0].Name)
+				require.Equal(t, testNamespace, found.Subjects[0].Namespace)
+				require.Equal(t, "prometheus-k8s", found.Subjects[1].Name)
+				require.Equal(t, "openshift-monitoring", found.Subjects[1].Namespace)
+			},
+		},
+		"ClusterRoleBinding subject follows the configured ServiceAccount": {
+			resources: Resources{ClusterRoleBinding: rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "nvidia-dcgm-exporter-read-pods"},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.ServiceAccountKind, Name: gpuv1.DCGMExporterDefaultServiceAccountName, Namespace: filled},
+				},
+			}},
+			control: ClusterRoleBinding,
+			assert: func(t *testing.T, k8s client.Client) {
+				found := &rbacv1.ClusterRoleBinding{}
+				require.NoError(t, k8s.Get(context.Background(),
+					types.NamespacedName{Namespace: testNamespace, Name: "nvidia-dcgm-exporter-read-pods"}, found))
+				require.Equal(t, customSA, found.Subjects[0].Name)
+			},
+		},
+		"SCC user follows the ServiceAccount while the SCC name is unchanged": {
+			resources: Resources{SecurityContextConstraints: secv1.SecurityContextConstraints{
+				ObjectMeta: metav1.ObjectMeta{Name: gpuv1.DCGMExporterDefaultServiceAccountName},
+				Users:      []string{filled},
+			}},
+			control: SecurityContextConstraints,
+			assert: func(t *testing.T, k8s client.Client) {
+				found := &secv1.SecurityContextConstraints{}
+				require.NoError(t, k8s.Get(context.Background(),
+					types.NamespacedName{Namespace: testNamespace, Name: gpuv1.DCGMExporterDefaultServiceAccountName}, found))
+				require.Equal(t, []string{fmt.Sprintf("system:serviceaccount:%s:%s", testNamespace, customSA)}, found.Users)
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			k8s := fake.NewClientBuilder().WithScheme(testScheme).Build()
+			n := ClusterPolicyController{
+				client:            k8s,
+				ctx:               context.Background(),
+				singleton:         &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", UID: "cp-uid"}, Spec: spec},
+				scheme:            testScheme,
+				operatorNamespace: testNamespace,
+				resources:         []Resources{tc.resources},
+				stateNames:        []string{"state-dcgm-exporter"},
+				idx:               0,
+				logger:            ctrl.Log.WithName("test"),
+			}
+
+			state, err := tc.control(n)
+			require.NoError(t, err)
+			require.Equal(t, gpuv1.Ready, state)
+			tc.assert(t, k8s)
+		})
+	}
+}

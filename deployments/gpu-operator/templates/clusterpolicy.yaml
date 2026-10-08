@@ -571,6 +571,12 @@ spec:
     {{- if .Values.dcgmExporter.service }}
     service: {{ toYaml .Values.dcgmExporter.service | nindent 6 }}
     {{- end }}
+    {{- with .Values.dcgmExporter.serviceAccount }}
+    {{- if and (ne .name nil) (ne (.name | toString) "") }}
+    serviceAccount:
+      name: {{ .name | toString | quote }}
+    {{- end }}
+    {{- end }}
     {{- if .Values.dcgmExporter.hostPID }}
     hostPID: {{ .Values.dcgmExporter.hostPID }}
     {{- end }}
