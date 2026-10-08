@@ -430,6 +430,58 @@ func TestDRADriverHealthcheckPortCollision(t *testing.T) {
 	}
 }
 
+func TestDRADriverKubeletPluginReservedEnv(t *testing.T) {
+	for name, tc := range map[string]struct {
+		computeDomainsEnabled bool
+		gpusEnv               []nvidiav1.EnvVar
+		computeDomainsEnv     []nvidiav1.EnvVar
+		wantErr               []string
+	}{
+		"gpus overrides HEALTHCHECK_PORT": {
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51515"}},
+			wantErr: []string{"spec.draDriver.gpus.kubeletPlugin.env", "HEALTHCHECK_PORT"},
+		},
+		"gpus overrides HTTP_ENDPOINT": {
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":9090"}},
+			wantErr: []string{"spec.draDriver.gpus.kubeletPlugin.env", "HTTP_ENDPOINT"},
+		},
+		"computeDomains overrides HEALTHCHECK_PORT": {
+			computeDomainsEnabled: true,
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51516"}},
+			wantErr:               []string{"spec.draDriver.computeDomains.kubeletPlugin.env", "HEALTHCHECK_PORT"},
+		},
+		// The second container is not rendered, so its env is never applied.
+		"computeDomains env ignored when disabled": {
+			computeDomainsEnv: []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51516"}},
+		},
+		"unrelated env is allowed": {
+			computeDomainsEnabled: true,
+			gpusEnv:               []nvidiav1.EnvVar{{Name: "LOG_VERBOSITY", Value: "6"}},
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "ALT_PROC_DEVICES_PATH", Value: "/host/proc-devices"}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.DRADriver.ComputeDomains.Enabled = new(tc.computeDomainsEnabled)
+			cr.Spec.DRADriver.GPUs.KubeletPlugin.Env = tc.gpusEnv
+			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Env = tc.computeDomainsEnv
+
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			if len(tc.wantErr) > 0 {
+				require.Error(t, err)
+				for _, want := range tc.wantErr {
+					assert.ErrorContains(t, err, want)
+				}
+				assert.Nil(t, objs)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotEmpty(t, objs)
+		})
+	}
+}
+
 func TestDRADriverRenderDRAUnsupported(t *testing.T) {
 	s := newTestDRAState(t)
 

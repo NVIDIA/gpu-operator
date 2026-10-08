@@ -49,6 +49,12 @@ const (
 	computeDomainsMetricsPort = int32(8081)
 )
 
+// reservedKubeletPluginEnv lists the environment variables the kubelet-plugin
+// template owns. A later entry with the same name in kubeletPlugin.env would win
+// inside the container and move a listener behind the back of the port
+// validation, so they are rejected.
+var reservedKubeletPluginEnv = []string{"HEALTHCHECK_PORT", "HTTP_ENDPOINT"}
+
 // resolveHealthcheckPort returns the spec-provided health service port, or the
 // container's default when unset; -1 (disabled) omits the probes at render time.
 func resolveHealthcheckPort(hc *nvidiav1alpha1.DRADriverHealthcheckSpec, defaultPort int32) int32 {
@@ -93,6 +99,33 @@ func validateKubeletPluginPorts(computeDomainsEnabled bool, gpusPort, computeDom
 			return fmt.Errorf("%s and %s must differ; both resolve to %d", prev, l.name, l.port)
 		}
 		owner[l.port] = l.name
+	}
+	return nil
+}
+
+// validateKubeletPluginEnv rejects a GPUCluster whose kubeletPlugin.env would
+// override a listener address the template renders. The gpus container is always
+// rendered; the compute-domains container only when enabled, so its env is only
+// checked then.
+func validateKubeletPluginEnv(computeDomainsEnabled bool, gpusEnv, computeDomainsEnv []nvidiav1.EnvVar) error {
+	type envList struct {
+		field string
+		env   []nvidiav1.EnvVar
+	}
+	lists := []envList{{"spec.draDriver.gpus.kubeletPlugin.env", gpusEnv}}
+	if computeDomainsEnabled {
+		lists = append(lists, envList{"spec.draDriver.computeDomains.kubeletPlugin.env", computeDomainsEnv})
+	}
+
+	for _, l := range lists {
+		for _, e := range l.env {
+			for _, reserved := range reservedKubeletPluginEnv {
+				if e.Name == reserved {
+					return fmt.Errorf("%s must not set %s; it is managed by the operator "+
+						"(use the healthcheck.port field for the health service port)", l.field, reserved)
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -166,6 +199,10 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 	if err := validateKubeletPluginPorts(cr.Spec.DRADriver.IsComputeDomainsEnabled(),
 		gpusHealthcheckPort, computeDomainsHealthcheckPort); err != nil {
 		return nil, fmt.Errorf("invalid DRA driver kubelet-plugin port configuration: %w", err)
+	}
+	if err := validateKubeletPluginEnv(cr.Spec.DRADriver.IsComputeDomainsEnabled(),
+		cr.Spec.DRADriver.GPUs.KubeletPlugin.Env, cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Env); err != nil {
+		return nil, fmt.Errorf("invalid DRA driver kubelet-plugin env configuration: %w", err)
 	}
 
 	renderData := &draDriverRenderData{
