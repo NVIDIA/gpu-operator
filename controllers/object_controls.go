@@ -38,6 +38,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +52,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/ownership"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
@@ -332,37 +334,72 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 
 type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
+// deleteDefaultDCGMExporterServiceAccount leaves external accounts alone, including
+// a same-name replacement of the default. The default is retained during identity
+// changes so running pods can keep using it until the exporter is disabled.
+func (n ClusterPolicyController) deleteDefaultDCGMExporterServiceAccount() (gpuv1.State, error) {
+	sa := &corev1.ServiceAccount{}
+	err := n.client.Get(n.ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: gpuv1.DCGMExporterDefaultServiceAccountName}, sa)
+	if apierrors.IsNotFound(err) {
+		return gpuv1.Disabled, nil
+	}
+	if err != nil {
+		return gpuv1.NotReady, err
+	}
+	if metav1.IsControlledBy(sa, n.singleton) {
+		if err := ownership.DeleteObserved(n.ctx, n.client, sa); err != nil {
+			return gpuv1.NotReady, err
+		}
+	}
+	return gpuv1.Disabled, nil
+}
+
 // ServiceAccount creates ServiceAccount resource
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
-
+	isDCGMExporter := n.stateNames[state] == "state-dcgm-exporter"
 	logger := n.logger.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
+	if !n.isStateEnabled(n.stateNames[state]) {
+		if isDCGMExporter {
+			return n.deleteDefaultDCGMExporterServiceAccount()
+		}
+		if err := n.client.Delete(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
 			logger.Info("Couldn't delete", "Error", err)
 			return gpuv1.NotReady, err
 		}
 		return gpuv1.Disabled, nil
 	}
 
+	if isDCGMExporter {
+		if n.singleton.Spec.DCGMExporter.HasServiceAccountName() {
+			name := dcgmExporterServiceAccountName(&n.singleton.Spec)
+			if name == gpuv1.DCGMExporterDefaultServiceAccountName {
+				return gpuv1.NotReady, fmt.Errorf("ServiceAccount name %q is reserved for operator management; omit dcgmExporter.serviceAccount.name to use it", name)
+			}
+			found := &corev1.ServiceAccount{}
+			if err := n.client.Get(ctx, types.NamespacedName{Namespace: n.operatorNamespace, Name: name}, found); err != nil {
+				return gpuv1.NotReady, fmt.Errorf("cannot use DCGM Exporter ServiceAccount %q in namespace %q: %w", name, n.operatorNamespace, err)
+			}
+			if !found.DeletionTimestamp.IsZero() {
+				return gpuv1.NotReady, fmt.Errorf("DCGM Exporter ServiceAccount %q in namespace %q is being deleted", name, n.operatorNamespace)
+			}
+			return gpuv1.Ready, nil
+		}
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
-
 	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, skipping update")
-			return gpuv1.Ready, nil
+		if !apierrors.IsAlreadyExists(err) {
+			logger.Info("Couldn't create", "Error", err)
+			return gpuv1.NotReady, err
 		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
+		logger.Info("Found Resource, skipping update")
 	}
 	return gpuv1.Ready, nil
 }
@@ -436,6 +473,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
+	rewriteDCGMExporterSubjects(obj.Subjects, n.stateNames[state], &n.singleton.Spec)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -466,12 +504,38 @@ var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
 	},
 }
 
+// dcgmExporterServiceAccountName returns the name of the ServiceAccount that every
+// DCGM Exporter operand -- the DaemonSet, its RBAC bindings and the OpenShift SCC --
+// has to reference.
+func dcgmExporterServiceAccountName(config *gpuv1.ClusterPolicySpec) string {
+	return config.DCGMExporter.GetServiceAccountName()
+}
+
 func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
 	gate, ok := rbacGates[name]
 	if !ok {
 		return true
 	}
 	return gate(config)
+}
+
+// rewriteDCGMExporterSubjects points the DCGM Exporter ServiceAccount subjects at the
+// configured ServiceAccount. Only subjects naming the default ServiceAccount are
+// rewritten, so unrelated subjects -- such as the Prometheus one kept in
+// 0500_prom_rolebinding_openshift.yaml -- are preserved.
+func rewriteDCGMExporterSubjects(subjects []rbacv1.Subject, stateName string, config *gpuv1.ClusterPolicySpec) {
+	if stateName != "state-dcgm-exporter" {
+		return
+	}
+	saName := dcgmExporterServiceAccountName(config)
+	if saName == gpuv1.DCGMExporterDefaultServiceAccountName {
+		return
+	}
+	for idx := range subjects {
+		if subjects[idx].Kind == rbacv1.ServiceAccountKind && subjects[idx].Name == gpuv1.DCGMExporterDefaultServiceAccountName {
+			subjects[idx].Name = saName
+		}
+	}
 }
 
 // ClusterRole creates ClusterRole resource
@@ -555,6 +619,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	for idx := range obj.Subjects {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
+	rewriteDCGMExporterSubjects(obj.Subjects, n.stateNames[state], &n.singleton.Spec)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -1832,6 +1897,12 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// set image pull secrets
 	if len(config.DCGMExporter.ImagePullSecrets) > 0 {
 		addPullSecrets(&obj.Spec.Template.Spec, config.DCGMExporter.ImagePullSecrets)
+	}
+
+	// The asset already references the default ServiceAccount, so only a
+	// user-configured name has to be applied here.
+	if saName := dcgmExporterServiceAccountName(config); saName != gpuv1.DCGMExporterDefaultServiceAccountName {
+		obj.Spec.Template.Spec.ServiceAccountName = saName
 	}
 
 	// merge extra annotations at the pod template level
@@ -4889,11 +4960,17 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 		return gpuv1.Disabled, nil
 	}
 
+	// The SCC name and the openshift.io/scc annotation on the DaemonSet stay tied to
+	// the asset name; only the user entry follows the configured ServiceAccount.
+	sccServiceAccountName := obj.Name
+	if n.stateNames[state] == "state-dcgm-exporter" {
+		sccServiceAccountName = dcgmExporterServiceAccountName(&n.singleton.Spec)
+	}
 	for idx := range obj.Users {
 		if obj.Users[idx] != "FILLED BY THE OPERATOR" {
 			continue
 		}
-		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
+		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, sccServiceAccountName)
 	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
