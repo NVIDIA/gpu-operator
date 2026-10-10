@@ -23,153 +23,176 @@ get_helm_release_name() {
 }
 
 wait_for_legacy_driver_daemonset_deleted() {
-    local elapsed_time=0
+    local deadline=$((SECONDS + 300))
 
     echo "Waiting for ClusterPolicy-owned driver DaemonSet to be deleted"
     while :; do
-        daemonset_count=$(kubectl get daemonset -l app=nvidia-driver-daemonset -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null | wc -l)
-        if [[ "${daemonset_count}" -eq 0 ]]; then
-            break
+        if daemonsets=$(kubectl get daemonset -l app=nvidia-driver-daemonset -n "${TEST_NAMESPACE}" -o name --ignore-not-found --request-timeout="${KUBECTL_REQUEST_TIMEOUT}"); then
+            if [[ -z "${daemonsets}" ]]; then
+                break
+            fi
+        else
+            api_unreachable "checking for the ClusterPolicy-owned driver DaemonSet"
         fi
 
-        if [[ "${elapsed_time}" -gt 300 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for legacy driver DaemonSet deletion"
-            kubectl get daemonset -n "${TEST_NAMESPACE}" -o wide
+            kubectl get daemonset -n "${TEST_NAMESPACE}" -o wide --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" || true
             exit 1
         fi
 
         sleep 5
-        elapsed_time=$((${elapsed_time} + 5))
     done
 }
 
 wait_for_orphaned_legacy_driver_pod() {
     local pod_name=$1
-    local elapsed_time=0
+    local deadline=$((SECONDS + 300))
 
     echo "Waiting for legacy driver pod/${pod_name} to become orphaned"
     while :; do
-        owner_count=$(kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o json | jq '.metadata.ownerReferences | length')
-        if [[ "${owner_count}" -eq 0 ]]; then
-            echo "legacy driver pod/${pod_name} is orphaned"
-            break
+        if pod_json=$(kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o json --request-timeout="${KUBECTL_REQUEST_TIMEOUT}"); then
+            owner_count=$(echo "${pod_json}" | jq '.metadata.ownerReferences | length')
+            if [[ "${owner_count}" -eq 0 ]]; then
+                echo "legacy driver pod/${pod_name} is orphaned"
+                break
+            fi
+        else
+            api_unreachable "checking whether legacy driver pod/${pod_name} is orphaned"
         fi
 
-        if [[ "${elapsed_time}" -gt 300 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for legacy driver pod to become orphaned"
-            kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o yaml
+            kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o yaml --request-timeout="${KUBECTL_LOG_TIMEOUT}" || true
             exit 1
         fi
 
         sleep 5
-        elapsed_time=$((${elapsed_time} + 5))
     done
 }
 
 wait_for_default_nvidiadriver() {
-    local elapsed_time=0
+    local deadline=$((SECONDS + 300))
 
     echo "Waiting for default NVIDIADriver to be rendered"
     while :; do
-        default_count=$(kubectl get nvidiadriver -o json 2>/dev/null | jq '[.items[] | select(.spec.default == true)] | length')
-        if [[ "${default_count}" -eq 1 ]]; then
-            break
+        if nvidiadrivers=$(kubectl get nvidiadriver -o json --request-timeout="${KUBECTL_REQUEST_TIMEOUT}"); then
+            default_count=$(echo "${nvidiadrivers}" | jq '[.items[] | select(.spec.default == true)] | length')
+            if [[ "${default_count}" -eq 1 ]]; then
+                break
+            fi
+        else
+            api_unreachable "counting the default NVIDIADrivers"
         fi
 
-        if [[ "${elapsed_time}" -gt 300 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for default NVIDIADriver"
-            kubectl get nvidiadriver || true
+            kubectl get nvidiadriver --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" || true
             exit 1
         fi
 
         sleep 5
-        elapsed_time=$((${elapsed_time} + 5))
     done
 }
 
 wait_for_nvidiadriver_owner_labels() {
     local driver_name=$1
-    local elapsed_time=0
-    local gpu_node_count
+    local deadline=$((SECONDS + 300))
+    local gpu_node_count=""
+    local node_count=""
+    local owned_count
 
-    gpu_node_count=$(kubectl get node -l nvidia.com/gpu.present=true --no-headers | wc -l)
-    echo "Waiting for ${gpu_node_count} GPU node(s) to be owned by NVIDIADriver/${driver_name}"
+    echo "Waiting for the GPU node(s) to be owned by NVIDIADriver/${driver_name}"
 
     while :; do
-        owned_count=$(kubectl get nodes -l "nvidia.com/gpu.present=true,nvidia.com/gpu-operator.driver.owner=${driver_name}" --no-headers | wc -l)
-        if [[ "${owned_count}" -eq "${gpu_node_count}" ]]; then
-            break
+        if [[ "${gpu_node_count:-0}" -le 0 ]]; then
+            if node_count=$(kubectl_count get node -l nvidia.com/gpu.present=true --no-headers); then
+                if (( node_count > 0 )); then
+                    gpu_node_count="${node_count}"
+                fi
+            else
+                api_unreachable "counting the GPU nodes"
+            fi
         fi
 
-        if [[ "${elapsed_time}" -gt 300 ]]; then
+        if owned_count=$(kubectl_count get nodes -l "nvidia.com/gpu.present=true,nvidia.com/gpu-operator.driver.owner=${driver_name}" --no-headers); then
+            if [[ "${gpu_node_count:-0}" -gt 0 ]] && [[ "${owned_count}" -eq "${gpu_node_count}" ]]; then
+                break
+            fi
+        else
+            api_unreachable "counting the nodes owned by NVIDIADriver/${driver_name}"
+        fi
+
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for NVIDIADriver owner labels"
-            kubectl get nodes -l nvidia.com/gpu.present=true -o json |
-                jq -r '.items[] | [.metadata.name, (.metadata.labels["nvidia.com/gpu-operator.driver.owner"] // "-")] | @tsv'
+            kubectl get nodes -l nvidia.com/gpu.present=true -o json --request-timeout="${KUBECTL_LOG_TIMEOUT}" |
+                jq -r '.items[] | [.metadata.name, (.metadata.labels["nvidia.com/gpu-operator.driver.owner"] // "-")] | @tsv' || true
             exit 1
         fi
 
         sleep 5
-        elapsed_time=$((${elapsed_time} + 5))
     done
 }
 
 wait_for_nvidiadriver_daemonset() {
     local driver_name=$1
-    local elapsed_time=0
+    local deadline=$((SECONDS + 300))
 
     echo "Waiting for NVIDIADriver-owned driver DaemonSet"
     while :; do
-        daemonset_count=$(kubectl get daemonset -l "app.kubernetes.io/component=nvidia-driver" -n "${TEST_NAMESPACE}" -o json |
+        daemonset_count=$(kubectl get daemonset -l "app.kubernetes.io/component=nvidia-driver" -n "${TEST_NAMESPACE}" -o json --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" |
             jq --arg driver_name "${driver_name}" '[.items[] | select(.spec.template.spec.nodeSelector["nvidia.com/gpu-operator.driver.owner"] == $driver_name)] | length')
         if [[ "${daemonset_count}" -gt 0 ]]; then
             break
         fi
 
-        if [[ "${elapsed_time}" -gt 300 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for NVIDIADriver-owned driver DaemonSet"
-            kubectl get daemonset -n "${TEST_NAMESPACE}" -o yaml
+            kubectl get daemonset -n "${TEST_NAMESPACE}" -o yaml --request-timeout="${KUBECTL_LOG_TIMEOUT}" || true
             exit 1
         fi
 
         sleep 5
-        elapsed_time=$((${elapsed_time} + 5))
     done
 }
 
 wait_for_legacy_driver_pod_deleted() {
     local pod_name=$1
-    local elapsed_time=0
+    local deadline=$((SECONDS + 300))
 
     echo "Waiting for orphaned legacy driver pod/${pod_name} to be deleted by the upgrade flow"
     while :; do
-        if ! kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" >/dev/null 2>&1; then
-            break
+        if legacy_pod=$(kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o name --ignore-not-found --request-timeout="${KUBECTL_REQUEST_TIMEOUT}"); then
+            if [[ -z "${legacy_pod}" ]]; then
+                break
+            fi
+        else
+            api_unreachable "checking whether legacy driver pod/${pod_name} is deleted"
         fi
 
-        if [[ "${elapsed_time}" -gt 300 ]]; then
+        if (( SECONDS > deadline )); then
             echo "timeout reached waiting for orphaned legacy driver pod deletion"
             print_driver_upgrade_debug
-            kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o yaml || true
+            kubectl get pod "${pod_name}" -n "${TEST_NAMESPACE}" -o yaml --request-timeout="${KUBECTL_LOG_TIMEOUT}" || true
             exit 1
         fi
 
         print_driver_upgrade_debug
         sleep 5
-        elapsed_time=$((${elapsed_time} + 5))
     done
 }
 
 legacy_driver_pod=$(kubectl get pod -l app=nvidia-driver-daemonset -n "${TEST_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}')
 if [[ -z "${legacy_driver_pod}" ]]; then
     echo "legacy ClusterPolicy driver pod not found"
-    kubectl get pods -n "${TEST_NAMESPACE}" -o wide
+    kubectl get pods -n "${TEST_NAMESPACE}" -o wide --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" || true
     exit 1
 fi
 
 operator_name=$(get_helm_release_name)
 if [[ -z "${operator_name}" ]]; then
     echo "GPU Operator Helm release not found in namespace ${TEST_NAMESPACE}"
-    ${HELM} list -n "${TEST_NAMESPACE}"
+    ${HELM} list -n "${TEST_NAMESPACE}" || true
     exit 1
 fi
 
