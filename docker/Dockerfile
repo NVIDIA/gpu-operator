@@ -121,6 +121,7 @@ RUN ["/busybox/ln", "-s", "/busybox/sh", "/bin/sh"]
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/busybox
 
 COPY --from=builder /workspace/gpu-operator /usr/bin/
+COPY --from=builder /workspace/gpu-operator-webhook /usr/bin/
 COPY --from=builder /workspace/manage-crds /usr/bin/
 COPY --from=builder /workspace/cleanup-gpuclusters /usr/bin/
 COPY --from=builder /workspace/nvidia-validator /usr/bin/
