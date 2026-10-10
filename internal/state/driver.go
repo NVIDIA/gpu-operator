@@ -332,7 +332,7 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 
 		renderData.AdditionalConfigs, err = s.getDriverAdditionalConfigs(ctx, cr, clusterInfo, nodePool)
 		if err != nil {
-			logger.Error(err, "error rendering addition driver volume", "NodePool", nodePool.name)
+			return nil, fmt.Errorf("failed to construct additional configs for node pool %q: %w", nodePool.name, err)
 		}
 
 		logger.Info("Rendering manifests for node pool", "NodePool", nodePool.name)
