@@ -143,8 +143,7 @@ func (c *nodeCollector) extractNodeInfo(node *corev1.Node) NodeInfo {
 	// Deploy states
 	info.DeployStates = make(map[string]string)
 	for k, v := range labels {
-		if strings.HasPrefix(k, "nvidia.com/gpu.deploy.") {
-			key := strings.TrimPrefix(k, "nvidia.com/gpu.deploy.")
+		if key, ok := strings.CutPrefix(k, "nvidia.com/gpu.deploy."); ok {
 			info.DeployStates[key] = v
 		}
 	}
@@ -197,8 +196,7 @@ func nodeStatus(node *corev1.Node) string {
 func nodeRoles(node *corev1.Node) string {
 	var roles []string
 	for k := range node.Labels {
-		if strings.HasPrefix(k, "node-role.kubernetes.io/") {
-			role := strings.TrimPrefix(k, "node-role.kubernetes.io/")
+		if role, ok := strings.CutPrefix(k, "node-role.kubernetes.io/"); ok {
 			if role != "" {
 				roles = append(roles, role)
 			}

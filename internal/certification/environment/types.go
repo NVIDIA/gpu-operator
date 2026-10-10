@@ -27,7 +27,7 @@ type EnvironmentSnapshot struct {
 
 	Cluster       ClusterInfo    `json:"cluster"`
 	Operator      OperatorInfo   `json:"operator"`
-	Policy        PolicyInfo     `json:"policy,omitempty"`
+	Policy        PolicyInfo     `json:"policy"`
 	Drivers       []DriverInfo   `json:"drivers,omitempty"`
 	SharingConfig *SharingConfig `json:"sharingConfig,omitempty"`
 	Operands      []OperandInfo  `json:"operands"`
@@ -63,7 +63,7 @@ type ClusterInfo struct {
 	GPUNodeCount         int      `json:"gpuNodeCount"`
 	GPUPCINodeCount      int      `json:"gpuPciNodeCount"`
 	GPUPCINodes          []string `json:"gpuPciNodes,omitempty"`
-	PodSecurityAdmission string `json:"podSecurityAdmission,omitempty"`
+	PodSecurityAdmission string   `json:"podSecurityAdmission,omitempty"`
 	NvidiaSmiOutput      []string `json:"nvidiaSmiOutput,omitempty"`
 }
 

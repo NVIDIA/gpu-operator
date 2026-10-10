@@ -80,12 +80,12 @@ func (r *Reporter) writeLocalFiles(jsonOutput []byte, htmlOutput string) error {
 	}
 
 	jsonPath := filepath.Join(r.cfg.OutputDir, "results.json")
-	if err := os.WriteFile(jsonPath, jsonOutput, 0o644); err != nil {
+	if err := os.WriteFile(jsonPath, jsonOutput, 0o600); err != nil {
 		return fmt.Errorf("writing results.json: %w", err)
 	}
 
 	htmlPath := filepath.Join(r.cfg.OutputDir, "report.html")
-	if err := os.WriteFile(htmlPath, []byte(htmlOutput), 0o644); err != nil {
+	if err := os.WriteFile(htmlPath, []byte(htmlOutput), 0o600); err != nil {
 		return fmt.Errorf("writing report.html: %w", err)
 	}
 

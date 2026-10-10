@@ -131,7 +131,7 @@ func parseConfig(spec *nvidiav1.ClusterPolicySpec) PolicyConfig {
 	// Sandbox workloads
 	if spec.SandboxWorkloads.IsEnabled() {
 		cfg.SandboxWorkloadsEnabled = true
-		cfg.SandboxDefaultWorkload = string(spec.SandboxWorkloads.DefaultWorkload)
+		cfg.SandboxDefaultWorkload = spec.SandboxWorkloads.DefaultWorkload
 	}
 
 	// Sharing configs

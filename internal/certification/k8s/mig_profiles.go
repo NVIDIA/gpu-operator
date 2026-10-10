@@ -31,7 +31,7 @@ type migPartedConfig struct {
 }
 
 type migPartedEntry struct {
-	DeviceFilter interface{}    `json:"device-filter"`
+	DeviceFilter any            `json:"device-filter"`
 	MIGEnabled   bool           `json:"mig-enabled"`
 	MIGDevices   map[string]int `json:"mig-devices"`
 }
@@ -93,7 +93,6 @@ func (c *Clients) SelectSingleMIGProfileFromNode(ctx context.Context, namespace,
 	return "", fmt.Errorf("configmap %s has no all-1g.* profile with more than 1 instance", configMapName)
 }
 
-
 func migDeviceCount(entries []migPartedEntry) int {
 	var total int
 	for _, entry := range entries {
@@ -144,7 +143,7 @@ func normalizeHexID(id string) string {
 
 // filterMatchesDevice checks whether a device ID matches an entry's device-filter.
 // A nil/omitted device-filter matches every device.
-func filterMatchesDevice(filter interface{}, deviceID string) bool {
+func filterMatchesDevice(filter any, deviceID string) bool {
 	if filter == nil {
 		return true
 	}
@@ -157,11 +156,11 @@ func filterMatchesDevice(filter interface{}, deviceID string) bool {
 }
 
 // parseDeviceFilter handles both string and []string YAML forms.
-func parseDeviceFilter(v interface{}) []string {
+func parseDeviceFilter(v any) []string {
 	switch val := v.(type) {
 	case string:
 		return []string{val}
-	case []interface{}:
+	case []any:
 		out := make([]string, 0, len(val))
 		for _, item := range val {
 			if s, ok := item.(string); ok {

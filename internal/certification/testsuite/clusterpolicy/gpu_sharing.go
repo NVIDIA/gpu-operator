@@ -53,12 +53,12 @@ func (t *GPUSharing) Run(ctx context.Context, clients *k8s.Clients, cfg certific
 
 	// Step 1: Create time-slicing ConfigMap
 	// The ConfigMap key name must match what we set in the node label
-	configData := map[string]interface{}{
+	configData := map[string]any{
 		"version": "v1",
-		"sharing": map[string]interface{}{
-			"timeSlicing": map[string]interface{}{
+		"sharing": map[string]any{
+			"timeSlicing": map[string]any{
 				"renameByDefault": true,
-				"resources": []map[string]interface{}{
+				"resources": []map[string]any{
 					{
 						"name":     "nvidia.com/gpu",
 						"replicas": timeslicingReplicas,

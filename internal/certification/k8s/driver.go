@@ -91,7 +91,7 @@ func (c *Clients) EnableRDMA(ctx context.Context) error {
 	}
 
 	if len(drivers) > 0 {
-		patch, err := json.Marshal([]map[string]interface{}{
+		patch, err := json.Marshal([]map[string]any{
 			{"op": "replace", "path": "/spec/rdma/enabled", "value": true},
 			{"op": "replace", "path": "/spec/rdma/useHostMofed", "value": hostMofed},
 		})
@@ -107,7 +107,7 @@ func (c *Clients) EnableRDMA(ctx context.Context) error {
 		return errors.Join(errs...)
 	}
 
-	patch, err := json.Marshal([]map[string]interface{}{
+	patch, err := json.Marshal([]map[string]any{
 		{"op": "replace", "path": "/spec/driver/rdma/enabled", "value": true},
 		{"op": "replace", "path": "/spec/driver/rdma/useHostMofed", "value": hostMofed},
 	})
@@ -229,7 +229,7 @@ func (c *Clients) UpdateDriverImage(ctx context.Context, repository, imageName, 
 		pathPrefix = "/spec"
 	}
 
-	patch, err := json.Marshal([]map[string]interface{}{
+	patch, err := json.Marshal([]map[string]any{
 		{"op": "replace", "path": pathPrefix + "/repository", "value": repository},
 		{"op": "replace", "path": pathPrefix + "/image", "value": imageName},
 		{"op": "replace", "path": pathPrefix + "/version", "value": version},

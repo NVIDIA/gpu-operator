@@ -34,9 +34,9 @@ import (
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	if err := run(ctx); err != nil {
+	err := run(ctx)
+	cancel()
+	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 }

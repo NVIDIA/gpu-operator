@@ -39,7 +39,7 @@ type Config struct {
 func LoadConfigFromEnv() Config {
 	var testSets []string
 	if raw := os.Getenv("TEST_SETS"); raw != "" {
-		for _, s := range strings.Split(raw, ",") {
+		for s := range strings.SplitSeq(raw, ",") {
 			if t := strings.TrimSpace(s); t != "" {
 				testSets = append(testSets, t)
 			}

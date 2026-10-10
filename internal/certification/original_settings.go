@@ -138,7 +138,7 @@ func (s *OriginalSettings) restoreClusterPolicy(ctx context.Context, clients *k8
 		return false
 	}
 
-	patch, _ := json.Marshal([]map[string]interface{}{
+	patch, _ := json.Marshal([]map[string]any{
 		{"op": "replace", "path": "/spec", "value": json.RawMessage(specJSON)},
 	})
 	if err := clients.ModifyClusterPolicy(ctx, patch); err != nil {
@@ -180,7 +180,7 @@ func (s *OriginalSettings) restoreNVIDIADrivers(ctx context.Context, clients *k8
 			continue
 		}
 
-		patch, _ := json.Marshal([]map[string]interface{}{
+		patch, _ := json.Marshal([]map[string]any{
 			{"op": "replace", "path": "/spec", "value": json.RawMessage(specJSON)},
 		})
 		if err := clients.ModifyNVIDIADriver(ctx, saved.Name, patch); err != nil {

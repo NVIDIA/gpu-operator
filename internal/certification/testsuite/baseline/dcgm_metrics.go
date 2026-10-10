@@ -89,7 +89,8 @@ func (d *DCGMMetrics) Run(ctx context.Context, clients *k8s.Clients, cfg certifi
 	sampleCount := 0
 	for _, line := range lines {
 		if strings.HasPrefix(line, dcgmMetricPrefix) && !strings.HasPrefix(line, "# ") {
-			metricName := strings.Split(strings.Split(line, " ")[0], "{")[0]
+			metricWithLabels, _, _ := strings.Cut(line, " ")
+			metricName, _, _ := strings.Cut(metricWithLabels, "{")
 			result.AddDetail("sample metric: %s", metricName)
 			sampleCount++
 			if sampleCount >= 3 {

@@ -80,7 +80,7 @@ func (c *Clients) GetGPUPCIDeviceID(ctx context.Context, namespace, nodeName str
 		return "", fmt.Errorf("querying GPU device IDs: %w", err)
 	}
 
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if id, mode, ok := strings.Cut(line, ","); ok && !strings.Contains(mode, "Not Supported") {
 			return strings.TrimSpace(id), nil
 		}

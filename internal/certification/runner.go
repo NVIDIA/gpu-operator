@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 	"github.com/NVIDIA/gpu-operator/internal/certification/environment"
+	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 	timeutils "github.com/NVIDIA/gpu-operator/internal/certification/utils/time"
 )
 
