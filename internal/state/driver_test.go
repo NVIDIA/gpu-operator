@@ -118,13 +118,32 @@ func findContainerByName(containers []corev1.Container, name string) *corev1.Con
 	return nil
 }
 
-func hasSubscriptionVolumeMount(volumeMounts []corev1.VolumeMount) bool {
+// hasSubscriptionVolumeMount reports whether any host subscription volume is mounted.
+func hasSubscriptionVolumeMount(volumes []corev1.Volume, volumeMounts []corev1.VolumeMount) bool {
+	subscriptionVolumeNames := map[string]struct{}{}
+	for _, volume := range volumes {
+		if isHostSubscriptionVolume(volume) {
+			subscriptionVolumeNames[volume.Name] = struct{}{}
+		}
+	}
 	for _, volumeMount := range volumeMounts {
-		if strings.HasPrefix(volumeMount.Name, "subscription-config-") {
+		if _, found := subscriptionVolumeNames[volumeMount.Name]; found {
 			return true
 		}
 	}
 	return false
+}
+
+// assertUniqueVolumeMountPaths verifies that each volume mount has a distinct destination path.
+func assertUniqueVolumeMountPaths(t *testing.T, volumeMounts []corev1.VolumeMount) {
+	t.Helper()
+
+	mountPaths := map[string]struct{}{}
+	for _, volumeMount := range volumeMounts {
+		_, found := mountPaths[volumeMount.MountPath]
+		assert.Falsef(t, found, "duplicate volume mount path %q", volumeMount.MountPath)
+		mountPaths[volumeMount.MountPath] = struct{}{}
+	}
 }
 
 func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
@@ -136,10 +155,9 @@ func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, ex
 
 	actual := map[string]corev1.HostPathType{}
 	for _, volume := range volumes {
-		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+		if !isHostSubscriptionVolume(volume) {
 			continue
 		}
-		require.NotNil(t, volume.HostPath)
 		require.NotNil(t, volume.HostPath.Type)
 		actual[volume.HostPath.Path] = *volume.HostPath.Type
 	}
@@ -628,7 +646,7 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
+			"custom.repo": "[test-repo]",
 		},
 	}
 
@@ -636,6 +654,9 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 		description                 string
 		osRelease                   string
 		repoConfigEnabled           bool
+		repoConfigName              string
+		kernelConfigName            string
+		useHostSubscription         bool
 		expectSubscriptionMounts    bool
 		expectedSubscriptionHostMap map[string]corev1.HostPathType
 	}{
@@ -655,19 +676,69 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 				"/etc/rhsm":                    corev1.HostPathDirectory,
 			},
 		},
+		{
+			description:              "rhel with repo config and host subscription mounts host subscription paths",
+			osRelease:                "rhel",
+			repoConfigEnabled:        true,
+			useHostSubscription:      true,
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+		},
+		{
+			description:              "rhel with colliding kernel config name uses unique subscription volume names",
+			osRelease:                "rhel",
+			kernelConfigName:         "subscription-config-0",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+		},
+		{
+			description:              "rhel with colliding repo config name uses unique subscription volume names",
+			osRelease:                "rhel",
+			repoConfigEnabled:        true,
+			repoConfigName:           "subscription-config-0",
+			useHostSubscription:      true,
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/pki/entitlement":         corev1.HostPathDirectory,
+				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
+				"/etc/rhsm":                    corev1.HostPathDirectory,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			repoConfigName := "test-repo-config"
+			if tc.repoConfigName != "" {
+				repoConfigName = tc.repoConfigName
+			}
+			configMap := repoConfigMap.DeepCopy()
+			configMap.Name = repoConfigName
+			kernelConfigMap := repoConfigMap.DeepCopy()
+			kernelConfigMap.Name = tc.kernelConfigName
 			stateDriver := &stateDriver{
 				stateSkel: stateSkel{
-					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap).Build(),
+					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(configMap, kernelConfigMap).Build(),
 					namespace: "test-ns",
 				},
 			}
 			driver := &nvidiav1alpha1.NVIDIADriver{}
 			if tc.repoConfigEnabled {
-				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
+				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{
+					Name:                repoConfigName,
+					UseHostSubscription: tc.useHostSubscription,
+				}
+			}
+			if tc.kernelConfigName != "" {
+				driver.Spec.KernelModuleConfig = &nvidiav1alpha1.KernelModuleConfigSpec{Name: tc.kernelConfigName}
 			}
 
 			configs, err := stateDriver.getDriverAdditionalConfigs(
@@ -678,9 +749,74 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 			)
 			require.NoError(t, err)
 
+			if tc.repoConfigEnabled && tc.useHostSubscription {
+				assertCustomRepoConfig(t, configs.Volumes, configs.VolumeMounts, repoConfigName)
+			}
 			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
-			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
+			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.Volumes, configs.VolumeMounts))
+			assertUniqueVolumeMountPaths(t, configs.VolumeMounts)
+			assertUniqueVolumeNames(t, configs.Volumes)
 		})
+	}
+}
+
+func TestDriverAdditionalConfigsSharedRepoAndCertConfig(t *testing.T) {
+	const name = "shared-config"
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns"}, Data: map[string]string{"custom.repo": "[test]", "ca.crt": "cert"}}
+	s := &stateDriver{stateSkel: stateSkel{client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(cm).Build(), namespace: "test-ns"}}
+	driver := &nvidiav1alpha1.NVIDIADriver{Spec: nvidiav1alpha1.NVIDIADriverSpec{
+		RepoConfig: &nvidiav1alpha1.DriverRepoConfigSpec{Name: name, UseHostSubscription: true},
+		CertConfig: &nvidiav1alpha1.DriverCertConfigSpec{Name: name},
+	}}
+	configs, err := s.getDriverAdditionalConfigs(context.Background(), driver, testClusterInfo{runtime: consts.Containerd}, nodePool{osRelease: "rhel", osVersion: "rhel"})
+	require.NoError(t, err)
+	volume := findVolumeByName(configs.Volumes, name)
+	require.NotNil(t, volume)
+	require.NotNil(t, volume.ConfigMap)
+	assert.Contains(t, volume.ConfigMap.Items, corev1.KeyToPath{Key: "custom.repo", Path: "custom.repo"})
+	assert.Contains(t, volume.ConfigMap.Items, corev1.KeyToPath{Key: "ca.crt", Path: "ca.crt"})
+	mountPaths := map[string]struct{}{}
+	for _, volumeMount := range configs.VolumeMounts {
+		if volumeMount.Name == name {
+			mountPaths[volumeMount.MountPath] = struct{}{}
+		}
+	}
+	assert.Contains(t, mountPaths, "/etc/yum.repos.d/custom.repo")
+	assert.Contains(t, mountPaths, "/etc/pki/ca-trust/extracted/pem/ca.crt")
+	assertUniqueVolumeNames(t, configs.Volumes)
+	assertUniqueVolumeMountPaths(t, configs.VolumeMounts)
+}
+
+// assertCustomRepoConfig verifies the custom repository ConfigMap volume and its mount.
+func assertCustomRepoConfig(t *testing.T, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, configMapName string) {
+	t.Helper()
+
+	const (
+		mountPath = "/etc/yum.repos.d/custom.repo"
+		fileName  = "custom.repo"
+	)
+
+	volume := findVolumeByName(volumes, configMapName)
+	require.NotNil(t, volume, "missing custom repository ConfigMap volume")
+	require.NotNil(t, volume.ConfigMap)
+	assert.Equal(t, configMapName, volume.ConfigMap.Name)
+	assert.Contains(t, volume.ConfigMap.Items, corev1.KeyToPath{Key: fileName, Path: fileName})
+
+	volumeMount := findVolumeMountByName(volumeMounts, configMapName)
+	require.NotNil(t, volumeMount, "missing custom repository volume mount")
+	assert.Equal(t, mountPath, volumeMount.MountPath)
+	assert.Equal(t, fileName, volumeMount.SubPath)
+}
+
+// assertUniqueVolumeNames verifies that each volume has a distinct name.
+func assertUniqueVolumeNames(t *testing.T, volumes []corev1.Volume) {
+	t.Helper()
+
+	volumeNames := map[string]struct{}{}
+	for _, volume := range volumes {
+		_, found := volumeNames[volume.Name]
+		assert.Falsef(t, found, "duplicate volume name %q", volume.Name)
+		volumeNames[volume.Name] = struct{}{}
 	}
 }
 

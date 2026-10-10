@@ -201,6 +201,11 @@ spec:
           path: driver.imagePullPolicy
           x-descriptors:
             - 'urn:alm:descriptor:com.tectonic.ui:imagePullPolicy'
+        - displayName: Use Host RHEL Subscription
+          description: Mount the host RHEL subscription configuration with this custom repo configuration.
+          path: driver.repoConfig.useHostSubscription
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
         - description: Group Feature Discovery Plugin config
           displayName: Group Feature Discovery Plugin config
           path: gfd
