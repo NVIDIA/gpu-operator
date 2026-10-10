@@ -1,0 +1,19 @@
+# disposition: project | first-party | third-party. Only third-party is listed;
+# every copied path needs a row so nothing reaches the image unattributed.
+# Write "-" for an absent value; an empty field is rejected.
+# source_path	component	disposition	version	license_identifier	license_file	notices_url	provenance_digest	attribution_note
+/busybox	busybox	third-party	1:1.37.0-6+b9	GPL-2.0-only	busybox/LICENSE	https://sources.debian.org/data/main/b/busybox/1%3A1.37.0-6/LICENSE	sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258	apt resolves the package at build time for this builder digest, and the shipped binary is a Debian binNMU rebuild of source version 1:1.37.0-6, so the notices URL points at that source version rather than the binary version
+/build/vectorAdd	vectorAdd	first-party	-	-	-	-	-	-
+/usr/local/cuda-${CUDA_SAMPLES_VERSION}/compat	CUDA compatibility libraries	first-party	-	-	-	-	-	-
+/workspace/gpu-operator	gpu-operator	project	-	-	-	-	-	-
+/workspace/manage-crds	manage-crds	project	-	-	-	-	-	-
+/workspace/cleanup-gpuclusters	cleanup-gpuclusters	project	-	-	-	-	-	-
+/workspace/nvidia-validator	nvidia-validator	project	-	-	-	-	-	-
+assets	assets	project	-	-	-	-	-	-
+manifests	manifests	project	-	-	-	-	-	-
+validator/manifests	validator-manifests	project	-	-	-	-	-	-
+deployments/gpu-operator/crds/nvidia.com_clusterpolicies.yaml	clusterpolicies-crd	project	-	-	-	-	-	-
+deployments/gpu-operator/crds/nvidia.com_nvidiadrivers.yaml	nvidiadrivers-crd	project	-	-	-	-	-	-
+deployments/gpu-operator/crds/nvidia.com_gpuclusters.yaml	gpuclusters-crd	project	-	-	-	-	-	-
+LICENSE	gpu-operator-license	project	-	-	-	-	-	-
+deployments/gpu-operator/charts/node-feature-discovery/crds/nfd-api-crds.yaml	node-feature-discovery CRDs	third-party	v0.19.0	Apache-2.0	node-feature-discovery/LICENSE	https://github.com/kubernetes-sigs/node-feature-discovery/blob/v0.19.0/LICENSE	-	generated CRD schema from the vendored Helm chart; the NFD programs themselves are not shipped in this image
