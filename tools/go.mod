@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/google/go-licenses/v2 v2.0.1
 	github.com/jandelgado/gcov2lcov v1.1.1
-	golang.org/x/tools v0.50.0
+	golang.org/x/tools v0.51.0
 	k8s.io/code-generator v0.37.1
 	sigs.k8s.io/controller-tools v0.22.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
@@ -56,7 +56,7 @@ require (
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
+	golang.org/x/telemetry v0.0.0-20260924152758-ed294f943157 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
