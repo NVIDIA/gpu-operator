@@ -17,7 +17,7 @@
 # CUDA SAMPLES v12.9 is used as that is the latest version with Maxwell support.
 ARG CUDA_SAMPLES_VERSION=12.9
 
-FROM golang:1.27.1@sha256:512690a5660563b57d37ecc31129e7f136e831db2aed24a1dbeb8ad7380dc0fa AS builder
+FROM golang:1.27.2@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c AS builder
 
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
