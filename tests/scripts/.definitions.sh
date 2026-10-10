@@ -23,6 +23,10 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 
 : ${OPERATOR_IMAGE:="nvcr.io/nvidia/gpu-operator"}
 
+# true installs HELM_CHART with the images it already names, for callers that bake and verify the chart
+# themselves; OPERATOR_IMAGE and OPERATOR_VERSION then only describe the operator and are not applied.
+: "${CHART_IMAGES_ONLY:="false"}"
+
 : ${CONTAINER_RUNTIME:="docker"}
 
 : ${PRIVATE_REGISTRY:="nvcr.io"}

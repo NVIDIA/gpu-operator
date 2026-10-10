@@ -138,8 +138,15 @@ test_gpu_sharing() {
 
     shared_product_name="${GPU_PRODUCT_NAME}-SHARED"
 
-    # set the operator validator image version in the plugin test spec
-    sed -i "s/image: nvcr.io\/nvidia\/cloud-native\/gpu-operator-validator:v1.10.1/image: ${OPERATOR_IMAGE//\//\\/}:${OPERATOR_VERSION}/g" ${TEST_DIR}/plugin-test.yaml
+    # The test pod runs vectorAdd from whatever validator image the operator deployed, which differs from
+    # OPERATOR_IMAGE for charts that ship a separate gpu-operator-validator image.
+    validator_image=$(kubectl get daemonset nvidia-operator-validator -n "${TEST_NAMESPACE}" --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="nvidia-operator-validator")].image}')
+    if [[ -z "${validator_image}" ]]; then
+        echo "cannot read the validator image from daemonset/nvidia-operator-validator"
+        exit 1
+    fi
+    sed -i "s|image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.10.1|image: ${validator_image}|g" "${TEST_DIR}/plugin-test.yaml"
     
     # set the name of GPU product in plugin test spec
     sed -i "s/nvidia.com\/gpu.product: Tesla-T4-SHARED/nvidia.com\/gpu.product: ${shared_product_name}/g" ${TEST_DIR}/plugin-test.yaml

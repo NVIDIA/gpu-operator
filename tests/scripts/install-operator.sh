@@ -17,9 +17,22 @@ if [[ -n "${VALUES_FILE:-}" ]]; then
 	USE_VALUES_FILE=true
 fi
 
+if [[ "${CHART_IMAGES_ONLY}" == "true" ]]; then
+	for image_override in VALUES_FILE TOOLKIT_CONTAINER_IMAGE DEVICE_PLUGIN_IMAGE MIG_MANAGER_IMAGE; do
+		if [[ -n "${!image_override:-}" ]]; then
+			echo "CHART_IMAGES_ONLY=true cannot be combined with ${image_override}, which overrides chart images"
+			exit 1
+		fi
+	done
+	if [[ "${GPU_MODE}" == "vgpu" ]]; then
+		echo "CHART_IMAGES_ONLY=true cannot be combined with GPU_MODE=vgpu, which overrides the driver image"
+		exit 1
+	fi
+fi
+
 # Build operator options conditionally
 : ${OPERATOR_OPTIONS:=""}
-if [[ "${USE_VALUES_FILE}" == "false" ]]; then
+if [[ "${USE_VALUES_FILE}" == "false" && "${CHART_IMAGES_ONLY}" != "true" ]]; then
 	# Traditional approach: build --set flags
 	OPERATOR_OPTIONS="${OPERATOR_OPTIONS} --set operator.repository=${OPERATOR_REPOSITORY} --set validator.repository=${OPERATOR_REPOSITORY}"
 	
@@ -101,7 +114,11 @@ fi
 # Run the helm install command
 echo ""
 echo "Installing GPU Operator with Helm..."
-echo "Operator image: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
+if [[ "${CHART_IMAGES_ONLY}" == "true" ]]; then
+	echo "Operator image: as named by ${CHART_REFERENCE}"
+else
+	echo "Operator image: ${OPERATOR_IMAGE}:${OPERATOR_VERSION}"
+fi
 
 if [[ "${USE_VALUES_FILE}" == "true" ]]; then
 	echo "Using values file approach: ${VALUES_FILE}"
