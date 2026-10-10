@@ -44,11 +44,6 @@ spec:
         app.kubernetes.io/name: nvidia-dra-validator
         app.kubernetes.io/component: nvidia-dra-validator
         app: nvidia-operator-validator
-        {{- range $k, $v := .Daemonsets.Labels }}
-        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") }}
-        {{ $k }}: {{ $v | quote }}
-        {{- end }}
-        {{- end }}
       {{- if .Daemonsets.Annotations }}
       annotations:
         {{- range $k, $v := .Daemonsets.Annotations }}
