@@ -39,8 +39,9 @@
 #      base64 < values-overrides.yaml | tr -d '\n'
 # 4. Optional input:
 #    - olm_bundle_os_suffix defaults to rhel9.6.
-# 5. Start the manual workflow. The Helm OCI chart and OLM bundle image are
-#    pushed to GHCR with release_tag, and dist/ is uploaded as a workflow
+# 5. Start the manual workflow. The gpu-operator and gpu-operator-certification
+#    Helm OCI charts and the OLM bundle image are pushed to GHCR with
+#    release_tag, and dist/ is uploaded as a workflow
 #    artifact.
 #
 name: Release RC Assets
@@ -198,6 +199,14 @@ jobs:
       - name: Lint Helm chart
         run: helm lint deployments/gpu-operator
 
+      - name: Point certification chart at the operator image
+        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4
+        with:
+          cmd: yq -i '.image.repository = (load("deployments/gpu-operator/values.yaml") | .operator.repository + "/" + .operator.image) | .image.tag = (load("deployments/gpu-operator/values.yaml") | .operator.version // "")' deployments/gpu-operator-certification/values.yaml
+
+      - name: Lint certification Helm chart
+        run: helm lint deployments/gpu-operator-certification
+
       - name: Update OLM bundle images and release metadata
         env:
           RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
@@ -275,6 +284,12 @@ jobs:
             --destination "${DIST_DIR}" \
             deployments/gpu-operator
 
+          helm package \
+            --version "${RELEASE_TAG}" \
+            --app-version "${RELEASE_TAG}" \
+            --destination "${DIST_DIR}" \
+            deployments/gpu-operator-certification
+
           (
             cd "${DIST_DIR}"
             sha256sum * > SHA256SUMS
@@ -286,7 +301,7 @@ jobs:
           echo "::notice::Packaged assets:"
           ls -lah "${DIST_DIR}"
 
-      - name: Publish Helm OCI chart
+      - name: Publish Helm OCI charts
         env:
           RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
           GH_REPOSITORY: ${{ github.repository }}
@@ -294,16 +309,19 @@ jobs:
           set -euo pipefail
 
           REPOSITORY="$(echo "${GH_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          CHART_PACKAGE="dist/gpu-operator-${RELEASE_TAG}.tgz"
           CHART_REPOSITORY="oci://ghcr.io/${REPOSITORY}/charts"
 
-          if [[ ! -f "${CHART_PACKAGE}" ]]; then
-            echo "::error::Helm chart package does not exist: ${CHART_PACKAGE}"
-            exit 1
-          fi
+          for CHART_NAME in gpu-operator gpu-operator-certification; do
+            CHART_PACKAGE="dist/${CHART_NAME}-${RELEASE_TAG}.tgz"
 
-          helm push "${CHART_PACKAGE}" "${CHART_REPOSITORY}"
-          echo "::notice::Published Helm chart to ${CHART_REPOSITORY}/gpu-operator:${RELEASE_TAG}"
+            if [[ ! -f "${CHART_PACKAGE}" ]]; then
+              echo "::error::Helm chart package does not exist: ${CHART_PACKAGE}"
+              exit 1
+            fi
+
+            helm push "${CHART_PACKAGE}" "${CHART_REPOSITORY}"
+            echo "::notice::Published Helm chart to ${CHART_REPOSITORY}/${CHART_NAME}:${RELEASE_TAG}"
+          done
 
       - name: Verify expected images are available
         env:
