@@ -50,12 +50,14 @@ type NVIDIADriverSpec struct {
 	// Default indicates that this NVIDIADriver acts as the fallback driver daemon set manager for GPU nodes
 	// that do not match any non-default NVIDIADriver nodeSelector.
 	// +kubebuilder:default=false
-	Default bool `json:"default"`
+	// +kubebuilder:validation:Optional
+	Default bool `json:"default,omitempty"`
 
 	// +kubebuilder:validation:Enum=gpu;vgpu;vgpu-host-manager
 	// +kubebuilder:default=gpu
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="driverType is an immutable field. Please create a new NvidiaDriver resource instead when you want to change this setting."
-	DriverType DriverType `json:"driverType"`
+	// +kubebuilder:validation:Optional
+	DriverType DriverType `json:"driverType,omitempty"`
 
 	// UsePrecompiled indicates if deployment of NVIDIA Driver using pre-compiled modules is enabled
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
