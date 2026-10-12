@@ -1081,8 +1081,6 @@ spec:
                     type: string
                 type: object
             required:
-            - default
-            - driverType
             - image
             type: object
             x-kubernetes-validations:
