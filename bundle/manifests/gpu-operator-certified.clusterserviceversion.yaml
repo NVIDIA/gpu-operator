@@ -245,7 +245,7 @@ spec:
     - name: gpu-operator-image
       image: ghcr.io/nvidia/gpu-operator:main-latest
     - name: nvidia-dra-driver-image
-      image: nvcr.io/nvidia/dra-driver-nvidia-gpu:v0.5.0@sha256:9b46984c0eb18def60e2b9817b874275f4b5b08d12d491de4f1a7b91b51d706c
+      image: nvcr.io/nvidia/dra-driver-nvidia-gpu:v0.5.1@sha256:ae591dbc8e630b49181b40dfddf8f0a3f0890b883acb7b2b420f5b207fda253e
     - name: dcgm-exporter-image
       image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003
     - name: dcgm-image
@@ -1116,7 +1116,7 @@ spec:
                   - name: "VALIDATOR_IMAGE"
                     value: "ghcr.io/nvidia/gpu-operator:main-latest"
                   - name: "DRA_DRIVER_IMAGE"
-                    value: "nvcr.io/nvidia/dra-driver-nvidia-gpu:v0.5.0@sha256:9b46984c0eb18def60e2b9817b874275f4b5b08d12d491de4f1a7b91b51d706c"
+                    value: "nvcr.io/nvidia/dra-driver-nvidia-gpu:v0.5.1@sha256:ae591dbc8e630b49181b40dfddf8f0a3f0890b883acb7b2b420f5b207fda253e"
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.20.1@sha256:27c1b2553a690ca3d29889dcd61df97525d46f58272c0be8dc63c2b18f120075"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
