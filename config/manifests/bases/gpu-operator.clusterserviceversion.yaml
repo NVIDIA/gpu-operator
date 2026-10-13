@@ -36,7 +36,7 @@ spec:
 
     Visit the official site of the [GPU Operator](https://github.com/NVIDIA/gpu-operator) for more information.
     For getting started with using the GPU Operator with OpenShift, see the instructions
-    [here](https://docs.nvidia.com/datacenter/kubernetes/openshift-on-gpu-install-guide/index.html).
+    [here](https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/index.html).
   apiservicedefinitions: {}
   relatedImages:
     - name: gpu-operator-image
