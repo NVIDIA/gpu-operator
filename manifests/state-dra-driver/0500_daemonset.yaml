@@ -42,7 +42,7 @@ spec:
         {{- end }}
       {{- end }}
     spec:
-      priorityClassName: {{ .Daemonsets.PriorityClassName | default "system-node-critical" }}
+      priorityClassName: {{ .Daemonsets.PriorityClassName | default "system-node-critical" | quote }}
       serviceAccountName: nvidia-dra-driver-kubeletplugin
       {{- if .DRADriver.Spec.ImagePullSecrets }}
       imagePullSecrets:
