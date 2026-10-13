@@ -17,11 +17,11 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= v26.7.1
+VERSION ?= v26.7.2
 
-GOLANG_VERSION ?= 1.27.1
+GOLANG_VERSION ?= 1.27.2
 
-GOLANGCI_LINT_VERSION ?= v2.13.1
+GOLANGCI_LINT_VERSION ?= v2.14.0
 
 REGCTL_VERSION ?= v0.11.5
 
