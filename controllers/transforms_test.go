@@ -5283,3 +5283,27 @@ func TestApplyCommonDaemonsetMetadataLogging(t *testing.T) {
 		})
 	}
 }
+
+// TestTransformValidatorComponentError verifies that an error from
+// TransformValidatorComponent is returned by TransformValidator rather than
+// only being logged, so that a partially transformed DaemonSet is not applied.
+func TestTransformValidatorComponentError(t *testing.T) {
+	cpSpec := &gpuv1.ClusterPolicySpec{
+		Validator: gpuv1.ValidatorSpec{
+			Repository: "nvcr.io/nvidia/cloud-native",
+			Image:      "gpu-operator-validator",
+			Version:    "v1.0.0",
+		},
+	}
+	// "nvidia-fs" is in the validator component list but has no case in
+	// TransformValidatorComponent, so its init container triggers the
+	// "invalid component" error after TransformValidatorShared succeeds.
+	ds := NewDaemonset().
+		WithInitContainer(corev1.Container{Name: "nvidia-fs-validation"}).
+		WithContainer(corev1.Container{Name: "dummy"})
+
+	err := TransformValidator(ds.DaemonSet, cpSpec, ClusterPolicyController{runtime: gpuv1.Containerd, logger: ctrl.Log.WithName("test")})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "errors transforming the validator containers")
+	require.ErrorContains(t, err, "invalid component provided to apply validator changes")
+}
