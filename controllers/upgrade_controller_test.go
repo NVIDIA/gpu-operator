@@ -25,8 +25,10 @@ import (
 	promcli "github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -127,6 +129,8 @@ type fakeUpgradeStateManager struct {
 	buildCalls      int
 	buildNamespace  string
 	buildLabels     map[string]string
+	daemonSets      []*appsv1.DaemonSet
+	selectedDSNames []string
 	applyCalls      int
 	appliedPolicies []*upgrade_v1alpha1.DriverUpgradePolicySpec
 }
@@ -160,6 +164,13 @@ func (f *fakeUpgradeStateManager) BuildState(_ context.Context, namespace string
 	f.buildCalls++
 	f.buildNamespace = namespace
 	f.buildLabels = driverLabels
+	f.selectedDSNames = nil
+	selector := labels.Set(driverLabels).AsSelector()
+	for _, daemonSet := range f.daemonSets {
+		if selector.Matches(labels.Set(daemonSet.Labels)) {
+			f.selectedDSNames = append(f.selectedDSNames, daemonSet.Name)
+		}
+	}
 	return &f.state, nil
 }
 
@@ -308,9 +319,10 @@ func TestUpgradeReconcileClusterPolicyPaths(t *testing.T) {
 			name          string
 			openshift     string
 			driverToolkit bool
+			expectedDS    []string
 		}{
-			{name: "before cluster policy initialization"},
-			{name: "OpenShift Driver Toolkit", openshift: "4.19", driverToolkit: true},
+			{name: "before cluster policy initialization", expectedDS: []string{"cluster-policy-driver", "driver-toolkit-4.19"}},
+			{name: "OpenShift Driver Toolkit", openshift: "4.19", driverToolkit: true, expectedDS: []string{"cluster-policy-driver", "driver-toolkit-4.19"}},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				previousOpenShift := clusterPolicyCtrl.openshift
@@ -325,11 +337,25 @@ func TestUpgradeReconcileClusterPolicyPaths(t *testing.T) {
 				cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
 				cp.Spec.Driver.UpgradePolicy = &upgrade_v1alpha1.DriverUpgradePolicySpec{AutoUpgrade: true}
 				r, stateManager := newTestUpgradeReconciler(t, cp)
+				stateManager.daemonSets = []*appsv1.DaemonSet{
+					{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy-driver", Labels: map[string]string{
+						AppComponentLabelKey: DriverAppComponentLabelValue,
+						DriverLabelKey:       DriverLabelValue,
+					}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "driver-toolkit-4.19", Labels: map[string]string{
+						AppComponentLabelKey: DriverAppComponentLabelValue,
+						DriverLabelKey:       "nvidia-driver-daemonset-openshift-4.19",
+					}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "unrelated-toolkit", Labels: map[string]string{
+						AppComponentLabelKey: "nvidia-container-toolkit",
+					}}},
+				}
 
 				result, err := r.Reconcile(context.Background(), upgradeSingletonRequest())
 				require.NoError(t, err)
 				assert.Equal(t, plannedRequeueInterval, result.RequeueAfter)
 				assert.Equal(t, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}, stateManager.buildLabels)
+				assert.ElementsMatch(t, tt.expectedDS, stateManager.selectedDSNames)
 				assert.Equal(t, 1, stateManager.applyCalls)
 			})
 		}
