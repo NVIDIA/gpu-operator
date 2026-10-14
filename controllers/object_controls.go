@@ -4036,6 +4036,10 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		n.logger.Error(err, "could not get daemonset", "name", name)
 		return gpuv1.NotReady
 	}
+	if ds.Status.ObservedGeneration < ds.Generation {
+		n.logger.V(2).Info("daemonset controller has not observed latest generation", "name", name)
+		return gpuv1.NotReady
+	}
 
 	if ds.Status.DesiredNumberScheduled == 0 {
 		n.logger.V(2).Info("Daemonset has desired pods of 0", "name", name)
