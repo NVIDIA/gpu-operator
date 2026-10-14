@@ -302,17 +302,37 @@ func TestUpgradeReconcileNVIDIADriverAutoUpgradeDisabledScope(t *testing.T) {
 	assert.Contains(t, updated.Labels, upgrade.GetUpgradeStateLabelKey())
 }
 
-func TestUpgradeReconcileClusterPolicyPathsUnchanged(t *testing.T) {
-	t.Run("legacy driver builds state with the daemonset app label", func(t *testing.T) {
-		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
-		cp.Spec.Driver.UpgradePolicy = &upgrade_v1alpha1.DriverUpgradePolicySpec{AutoUpgrade: true}
-		r, stateManager := newTestUpgradeReconciler(t, cp)
+func TestUpgradeReconcileClusterPolicyPaths(t *testing.T) {
+	t.Run("legacy driver selects all driver daemonsets", func(t *testing.T) {
+		for _, tt := range []struct {
+			name          string
+			openshift     string
+			driverToolkit bool
+		}{
+			{name: "before cluster policy initialization"},
+			{name: "OpenShift Driver Toolkit", openshift: "4.19", driverToolkit: true},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				previousOpenShift := clusterPolicyCtrl.openshift
+				previousDriverToolkit := clusterPolicyCtrl.ocpDriverToolkit.enabled
+				clusterPolicyCtrl.openshift = tt.openshift
+				clusterPolicyCtrl.ocpDriverToolkit.enabled = tt.driverToolkit
+				t.Cleanup(func() {
+					clusterPolicyCtrl.openshift = previousOpenShift
+					clusterPolicyCtrl.ocpDriverToolkit.enabled = previousDriverToolkit
+				})
 
-		result, err := r.Reconcile(context.Background(), upgradeSingletonRequest())
-		require.NoError(t, err)
-		assert.Equal(t, plannedRequeueInterval, result.RequeueAfter)
-		assert.Equal(t, map[string]string{DriverLabelKey: DriverLabelValue}, stateManager.buildLabels)
-		assert.Equal(t, 1, stateManager.applyCalls)
+				cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+				cp.Spec.Driver.UpgradePolicy = &upgrade_v1alpha1.DriverUpgradePolicySpec{AutoUpgrade: true}
+				r, stateManager := newTestUpgradeReconciler(t, cp)
+
+				result, err := r.Reconcile(context.Background(), upgradeSingletonRequest())
+				require.NoError(t, err)
+				assert.Equal(t, plannedRequeueInterval, result.RequeueAfter)
+				assert.Equal(t, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}, stateManager.buildLabels)
+				assert.Equal(t, 1, stateManager.applyCalls)
+			})
+		}
 	})
 
 	t.Run("sandbox workloads clean up and skip", func(t *testing.T) {
