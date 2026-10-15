@@ -1,0 +1,16 @@
+should match snapshot when create=true and data is provided:
+  1: |
+    apiVersion: v1
+    data:
+      dcgm-metrics.csv: |
+        DCGM_FI_DEV_SM_CLOCK, gauge, SM clock frequency (in MHz).
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: gpu-operator
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gpu-operator
+        app.kubernetes.io/version: main-latest
+        helm.sh/chart: gpu-operator-v1.0.0-devel
+      name: custom-metrics
+      namespace: gpu-operator
