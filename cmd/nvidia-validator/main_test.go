@@ -18,13 +18,131 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
+
+func TestWaitForPodFailed(t *testing.T) {
+	pod := &corev1.Pod{
+		TypeMeta:   meta_v1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: meta_v1.ObjectMeta{Name: "validation"},
+		Status: corev1.PodStatus{
+			Phase:   corev1.PodFailed,
+			Reason:  "Init:Error",
+			Message: "validation command failed",
+			InitContainerStatuses: []corev1.ContainerStatus{{
+				Name: "plugin-validation",
+				State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+					ExitCode: 1,
+					Reason:   "Error",
+					Message:  "no runtime for the requested GPU",
+				}},
+			}},
+		},
+	}
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(pod); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+	kubeClient, err := kubernetes.NewForConfig(&rest.Config{Host: server.URL})
+	require.NoError(t, err)
+
+	err = waitForPodWithPolling(context.Background(), kubeClient, pod.Name, "default", 3, 0)
+
+	require.Error(t, err)
+	require.EqualValues(t, 1, requests.Load())
+	require.ErrorContains(t, err, pod.Name)
+	require.ErrorContains(t, err, "no runtime for the requested GPU")
+	require.ErrorContains(t, err, "exit code 1")
+}
+
+func TestWaitForPodSucceeded(t *testing.T) {
+	pod := &corev1.Pod{
+		TypeMeta:   meta_v1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: meta_v1.ObjectMeta{Name: "validation"},
+		Status:     corev1.PodStatus{Phase: corev1.PodSucceeded},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(pod); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+	kubeClient, err := kubernetes.NewForConfig(&rest.Config{Host: server.URL, QPS: 1000, Burst: 1000})
+	require.NoError(t, err)
+
+	err = waitForPodWithPolling(context.Background(), kubeClient, pod.Name, "default", 1, 0)
+
+	require.NoError(t, err)
+}
+
+func TestLoadPodSpecReturnsErrorWhenFileCannotBeRead(t *testing.T) {
+	path := t.TempDir() + "/missing.yaml"
+	var pod *corev1.Pod
+	var err error
+
+	require.NotPanics(t, func() {
+		pod, err = loadPodSpec(path)
+	})
+
+	require.Nil(t, pod)
+	require.Error(t, err)
+	require.ErrorContains(t, err, path)
+}
+
+func TestLoadPodSpecReturnsErrorWhenKindIsMissing(t *testing.T) {
+	path := t.TempDir() + "/missing-kind.yaml"
+	require.NoError(t, os.WriteFile(path, []byte("metadata: {}\nspec: {}\n"), 0600))
+	var pod *corev1.Pod
+	var err error
+
+	require.NotPanics(t, func() {
+		pod, err = loadPodSpec(path)
+	})
+
+	require.Nil(t, pod)
+	require.Error(t, err)
+	require.ErrorContains(t, err, path)
+	require.ErrorContains(t, err, "missing kind")
+}
+
+func TestLoadPodSpec(t *testing.T) {
+	path := t.TempDir() + "/pod.yaml"
+	manifest := `apiVersion: v1
+kind: Pod
+metadata:
+  name: validation
+spec:
+  containers:
+  - name: validation
+    image: example:latest
+`
+	require.NoError(t, os.WriteFile(path, []byte(manifest), 0600))
+
+	pod, err := loadPodSpec(path)
+
+	require.NoError(t, err)
+	require.Equal(t, "validation", pod.Name)
+	require.Equal(t, "Pod", pod.Kind)
+}
 
 func Test_isValidComponent(t *testing.T) {
 	tests := []struct {

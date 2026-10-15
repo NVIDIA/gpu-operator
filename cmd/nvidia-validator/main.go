@@ -23,7 +23,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -1343,45 +1343,88 @@ func (p *Plugin) runWorkload() error {
 	return nil
 }
 
-// waits for the pod to be created
+// waitForPod waits for the pod to complete successfully, returning early if it fails.
 func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name string, namespace string) error {
-	for range podCreationWaitRetries {
+	return waitForPodWithPolling(ctx, kubeClient, name, namespace, podCreationWaitRetries, podCreationSleepIntervalSeconds*time.Second)
+}
+
+func waitForPodWithPolling(ctx context.Context, kubeClient kubernetes.Interface, name string, namespace string, retries int, pollInterval time.Duration) error {
+	for range retries {
 		// check for the existence of the resource
 		pod, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, name, meta_v1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get pod %s, err %w", name, err)
 		}
-		if pod.Status.Phase != "Succeeded" {
+		switch pod.Status.Phase {
+		case corev1.PodSucceeded:
+			log.Infof("pod %s have run successfully", name)
+			return nil
+		case corev1.PodFailed:
+			return podFailedError(pod)
+		default:
 			log.Infof("pod %s is curently in %s phase", name, pod.Status.Phase)
-			time.Sleep(podCreationSleepIntervalSeconds * time.Second)
-			continue
+			time.Sleep(pollInterval)
 		}
-		log.Infof("pod %s have run successfully", name)
-		// successfully running
-		return nil
 	}
 	return fmt.Errorf("gave up waiting for pod %s to be available", name)
+}
+
+func podFailedError(pod *corev1.Pod) error {
+	details := make([]string, 0, 2)
+	if pod.Status.Reason != "" {
+		details = append(details, pod.Status.Reason)
+	}
+	if pod.Status.Message != "" {
+		details = append(details, pod.Status.Message)
+	}
+	for _, containerStatuses := range [][]corev1.ContainerStatus{pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses} {
+		for _, status := range containerStatuses {
+			terminated := status.State.Terminated
+			if terminated == nil {
+				continue
+			}
+			if terminated.ExitCode == 0 && (terminated.Reason == "" || terminated.Reason == "Completed") && terminated.Message == "" {
+				continue
+			}
+			terminationDetails := []string{fmt.Sprintf("exit code %d", terminated.ExitCode)}
+			if terminated.Reason != "" {
+				terminationDetails = append(terminationDetails, "reason: "+terminated.Reason)
+			}
+			if terminated.Message != "" {
+				terminationDetails = append(terminationDetails, "message: "+terminated.Message)
+			}
+			details = append(details, fmt.Sprintf("container %s terminated (%s)", status.Name, strings.Join(terminationDetails, ", ")))
+		}
+	}
+	if len(details) == 0 {
+		return fmt.Errorf("pod %s failed", pod.Name)
+	}
+	return fmt.Errorf("pod %s failed: %s", pod.Name, strings.Join(details, "; "))
 }
 
 func loadPodSpec(podSpecPath string) (*corev1.Pod, error) {
 	var pod corev1.Pod
 	manifest, err := os.ReadFile(podSpecPath)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to read pod spec %s: %w", podSpecPath, err)
+	}
+	var typeMeta meta_v1.TypeMeta
+	if err := utilyaml.Unmarshal(manifest, &typeMeta); err != nil {
+		return nil, fmt.Errorf("failed to decode pod spec %s: %w", podSpecPath, err)
+	}
+	if typeMeta.Kind == "" {
+		return nil, fmt.Errorf("pod spec %s is missing kind", podSpecPath)
 	}
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
-	reg := regexp.MustCompile(`\b(\w*kind:\w*)\B.*\b`)
-
-	kind := reg.FindString(string(manifest))
-	slice := strings.Split(kind, ":")
-	kind = strings.TrimSpace(slice[1])
-
-	log.Debugf("Decoding for Kind %s in path: %s", kind, podSpecPath)
-	_, _, err = s.Decode(manifest, nil, &pod)
+	_, gvk, err := s.Decode(manifest, nil, &pod)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode pod spec %s: %w", podSpecPath, err)
 	}
+	if gvk == nil || gvk.Kind == "" {
+		return nil, fmt.Errorf("pod spec %s is missing kind", podSpecPath)
+	}
+	log.Debugf("Decoding for Kind %s in path: %s", gvk.Kind, podSpecPath)
 	return &pod, nil
 }
 
