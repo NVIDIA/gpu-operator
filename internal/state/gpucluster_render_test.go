@@ -73,6 +73,52 @@ func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 	return cr
 }
 
+func TestGPUClusterDaemonsetsPriorityClass(t *testing.T) {
+	states := map[string]interface {
+		getManifestObjects(context.Context, *nvidiav1alpha1.GPUCluster, InfoCatalog) ([]*unstructured.Unstructured, error)
+	}{
+		"dcgm":          newTestDCGMState(t),
+		"dcgm-exporter": newTestDCGMExporterState(t, false),
+		"dra-validator": newTestDRAValidationState(t),
+		"dra-driver":    newTestDRAState(t),
+	}
+	tests := map[string]struct {
+		priorityClassName string
+		want              string
+	}{
+		"custom":       {priorityClassName: "custom-gpu-priority", want: "custom-gpu-priority"},
+		"unset":        {priorityClassName: "", want: "system-node-critical"},
+		"yaml-boolean": {priorityClassName: "on", want: "on"},
+		"yaml-null":    {priorityClassName: "null", want: "null"},
+	}
+	for stateName, s := range states {
+		t.Run(stateName, func(t *testing.T) {
+			for name, tc := range tests {
+				t.Run(name, func(t *testing.T) {
+					cr := sampleGPUCluster()
+					cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
+					cr.Spec.DCGMExporter = &nvidiav1.DCGMExporterSpec{Enabled: new(true)}
+					cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+					cr.Spec.Daemonsets.PriorityClassName = tc.priorityClassName
+
+					objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+					require.NoError(t, err)
+					t.Run("daemonset", func(t *testing.T) {
+						ds := findDaemonSet(t, objs)
+						require.Equal(t, tc.want, ds.Spec.Template.Spec.PriorityClassName)
+					})
+					if stateName == "dra-driver" {
+						t.Run("controller", func(t *testing.T) {
+							deployment := findDeployment(t, objs)
+							require.Equal(t, tc.want, deployment.Spec.Template.Spec.PriorityClassName)
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
 // TestGPUClusterRenderGolden renders each GPUCluster operand's manifests end to end and
 // byte-compares the full YAML stream against fixtures in testdata/golden, so unintended
 // template changes surface as diffs (mirroring the NVIDIADriver renderer tests).
