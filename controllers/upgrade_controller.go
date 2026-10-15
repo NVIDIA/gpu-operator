@@ -126,24 +126,14 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	}
 	r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
 
-	var driverLabel map[string]string
-
-	// initialize with common app=nvidia-driver-daemonset label
-	driverLabelKey := DriverLabelKey
-	driverLabelValue := DriverLabelValue
-
-	if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
-		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
-		// based on rhcos version. Hence use DTK label instead
-		driverLabelKey = ocpDriverToolkitIdentificationLabel
-		driverLabelValue = ocpDriverToolkitIdentificationValue
-	}
-
-	driverLabel = map[string]string{driverLabelKey: driverLabelValue}
-	reqLogger.Info("Using label selector", "key", driverLabelKey, "value", driverLabelValue)
+	// Use the component label shared by regular and Driver Toolkit DaemonSets.
+	// The app label is version-specific for Driver Toolkit, and consulting the
+	// ClusterPolicy controller's mutable state here races with its reconciliation.
+	driverLabels := map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}
+	reqLogger.Info("Using label selector", "key", AppComponentLabelKey, "value", DriverAppComponentLabelValue)
 
 	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace,
-		driverLabel)
+		driverLabels)
 	if err != nil {
 		r.Log.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
