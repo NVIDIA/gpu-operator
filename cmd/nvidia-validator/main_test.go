@@ -124,6 +124,36 @@ func TestLoadPodSpecReturnsErrorWhenKindIsMissing(t *testing.T) {
 	require.ErrorContains(t, err, "missing kind")
 }
 
+func TestLoadPodSpecReturnsErrorWhenManifestCannotBeDecoded(t *testing.T) {
+	path := t.TempDir() + "/invalid.yaml"
+	require.NoError(t, os.WriteFile(path, []byte("kind: [\n"), 0600))
+
+	pod, err := loadPodSpec(path)
+
+	require.Nil(t, pod)
+	require.Error(t, err)
+	require.ErrorContains(t, err, path)
+	require.ErrorContains(t, err, "failed to decode pod spec")
+}
+
+func TestLoadPodSpecRejectsConfigMap(t *testing.T) {
+	path := t.TempDir() + "/configmap.yaml"
+	manifest := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: validation
+data:
+  key: value
+`
+	require.NoError(t, os.WriteFile(path, []byte(manifest), 0600))
+
+	pod, err := loadPodSpec(path)
+
+	require.Nil(t, pod)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "must have kind Pod")
+}
+
 func TestLoadPodSpec(t *testing.T) {
 	path := t.TempDir() + "/pod.yaml"
 	manifest := `apiVersion: v1

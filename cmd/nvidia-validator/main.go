@@ -1403,7 +1403,6 @@ func podFailedError(pod *corev1.Pod) error {
 }
 
 func loadPodSpec(podSpecPath string) (*corev1.Pod, error) {
-	var pod corev1.Pod
 	manifest, err := os.ReadFile(podSpecPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pod spec %s: %w", podSpecPath, err)
@@ -1417,15 +1416,19 @@ func loadPodSpec(podSpecPath string) (*corev1.Pod, error) {
 	}
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
-	_, gvk, err := s.Decode(manifest, nil, &pod)
+	decoded, gvk, err := s.Decode(manifest, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode pod spec %s: %w", podSpecPath, err)
 	}
-	if gvk == nil || gvk.Kind == "" {
-		return nil, fmt.Errorf("pod spec %s is missing kind", podSpecPath)
+	if gvk == nil || gvk.Kind != "Pod" {
+		return nil, fmt.Errorf("pod spec %s must have kind Pod", podSpecPath)
 	}
 	log.Debugf("Decoding for Kind %s in path: %s", gvk.Kind, podSpecPath)
-	return &pod, nil
+	pod, ok := decoded.(*corev1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("pod spec %s decoded to %T instead of a Pod", podSpecPath, decoded)
+	}
+	return pod, nil
 }
 
 func (p *Plugin) countGPUResources() (int64, error) {
