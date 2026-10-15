@@ -1173,6 +1173,7 @@ func TestTransformDevicePlugin(t *testing.T) {
 		ds          Daemonset                // Input DaemonSet
 		cpSpec      *gpuv1.ClusterPolicySpec // Input configuration
 		expectedDs  Daemonset                // Expected output DaemonSet
+		expectedErr string
 	}{
 		{
 			description: "transform device plugin",
@@ -1249,6 +1250,49 @@ func TestTransformDevicePlugin(t *testing.T) {
 				},
 			}).WithRuntimeClassName("nvidia"),
 		},
+		{
+			description: "cdi enabled, env overrides device list strategy without a cdi strategy",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-device-plugin",
+					Version:    "v1.0.0",
+					Env: []gpuv1.EnvVar{
+						{Name: DeviceListStrategyEnvName, Value: "envvar"},
+					},
+				},
+			},
+			expectedErr: `DEVICE_LIST_STRATEGY "envvar" must include "cdi-annotations" or "cdi-cri" when CDI is enabled`,
+		},
+		{
+			description: "cdi disabled, env overrides device list strategy without a cdi strategy",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "nvidia-device-plugin"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DevicePlugin: gpuv1.DevicePluginSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "nvidia-device-plugin",
+					Version:    "v1.0.0",
+					Env: []gpuv1.EnvVar{
+						{Name: DeviceListStrategyEnvName, Value: "envvar"},
+					},
+				},
+				CDI: gpuv1.CDIConfigSpec{
+					Enabled: newBoolPtr(false),
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "nvidia-device-plugin",
+				Image:           "nvcr.io/nvidia/cloud-native/nvidia-device-plugin:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "NVIDIA_MIG_MONITOR_DEVICES", Value: "all"},
+					{Name: DeviceListStrategyEnvName, Value: "envvar"},
+				},
+			}).WithRuntimeClassName("nvidia"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1257,8 +1301,56 @@ func TestTransformDevicePlugin(t *testing.T) {
 				runtime: gpuv1.Containerd,
 				logger:  ctrl.Log.WithName("test"),
 			})
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+				return
+			}
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expectedDs, tc.ds)
+		})
+	}
+}
+
+func TestValidateCDIDeviceListStrategy(t *testing.T) {
+	testCases := map[string]struct {
+		env         []corev1.EnvVar
+		expectedErr string
+	}{
+		"default cdi strategies": {
+			env: []corev1.EnvVar{{Name: DeviceListStrategyEnvName, Value: "cdi-annotations,cdi-cri"}},
+		},
+		"single cdi strategy": {
+			env: []corev1.EnvVar{{Name: DeviceListStrategyEnvName, Value: "cdi-cri"}},
+		},
+		"mixed strategies with whitespace": {
+			env: []corev1.EnvVar{{Name: DeviceListStrategyEnvName, Value: "envvar, cdi-annotations"}},
+		},
+		"non-cdi strategy": {
+			env:         []corev1.EnvVar{{Name: DeviceListStrategyEnvName, Value: "envvar"}},
+			expectedErr: `DEVICE_LIST_STRATEGY "envvar" must include "cdi-annotations" or "cdi-cri" when CDI is enabled`,
+		},
+		"empty strategy": {
+			env:         []corev1.EnvVar{{Name: DeviceListStrategyEnvName, Value: ""}},
+			expectedErr: `DEVICE_LIST_STRATEGY "" must include "cdi-annotations" or "cdi-cri" when CDI is enabled`,
+		},
+		"unset strategy": {
+			expectedErr: `DEVICE_LIST_STRATEGY "" must include "cdi-annotations" or "cdi-cri" when CDI is enabled`,
+		},
+		"unknown cdi-prefixed strategy": {
+			env:         []corev1.EnvVar{{Name: DeviceListStrategyEnvName, Value: "cdi-annotation"}},
+			expectedErr: `DEVICE_LIST_STRATEGY "cdi-annotation" must include "cdi-annotations" or "cdi-cri" when CDI is enabled`,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			container := &corev1.Container{Env: tc.env}
+			err := validateCDIDeviceListStrategy(container)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }
