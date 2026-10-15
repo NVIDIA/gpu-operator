@@ -216,6 +216,125 @@ func TestIsDaemonSetReadyReturnsNotReadyWhenDaemonSetMissing(t *testing.T) {
 	require.Equal(t, gpuv1.NotReady, isDaemonSetReady("missing-daemonset", controller))
 }
 
+func TestIsDaemonSetReadyWaitsForObservedGenerationWhenNoPodsAreScheduled(t *testing.T) {
+	const (
+		namespace = "test-namespace"
+		dsName    = "test-daemonset"
+	)
+
+	tests := []struct {
+		name               string
+		observedGeneration int64
+		want               gpuv1.State
+	}{
+		{
+			name:               "not ready until the current generation is observed",
+			observedGeneration: 1,
+			want:               gpuv1.NotReady,
+		},
+		{
+			name:               "ready when the current generation has no scheduled pods",
+			observedGeneration: 2,
+			want:               gpuv1.Ready,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ds := &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       dsName,
+					Namespace:  namespace,
+					Generation: 2,
+				},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     tt.observedGeneration,
+					DesiredNumberScheduled: 0,
+				},
+			}
+
+			k8sClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(ds).Build()
+			controller := ClusterPolicyController{
+				ctx:               context.Background(),
+				client:            k8sClient,
+				operatorNamespace: namespace,
+				logger:            ctrl.Log.WithName("test"),
+			}
+
+			require.Equal(t, tt.want, isDaemonSetReady(dsName, controller))
+		})
+	}
+}
+
+func TestIsDaemonSetReadyWaitsForObservedGenerationWithOnDeleteStrategy(t *testing.T) {
+	const (
+		namespace = "test-namespace"
+		dsName    = "test-daemonset"
+		revHash   = "565dcf5cc9"
+	)
+
+	dsUID := types.UID("test-daemonset-uid")
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       dsName,
+			Namespace:  namespace,
+			UID:        dsUID,
+			Generation: 2,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": dsName}},
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.OnDeleteDaemonSetStrategyType,
+			},
+		},
+		Status: appsv1.DaemonSetStatus{
+			ObservedGeneration:     1,
+			DesiredNumberScheduled: 1,
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app":                             dsName,
+				PodControllerRevisionHashLabelKey: revHash,
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+				Kind:       "DaemonSet",
+				Name:       dsName,
+				UID:        dsUID,
+			}},
+		},
+		Status: corev1.PodStatus{
+			Phase:             corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{{Ready: true}},
+		},
+	}
+	revision := &appsv1.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsName + "-" + revHash,
+			Namespace: namespace,
+			Labels:    map[string]string{"app": dsName},
+		},
+		Revision: 1,
+	}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(ds, pod, revision).
+		Build()
+	controller := ClusterPolicyController{
+		ctx:               context.Background(),
+		client:            k8sClient,
+		operatorNamespace: namespace,
+		logger:            ctrl.Log.WithName("test"),
+	}
+
+	require.Equal(t, gpuv1.NotReady, isDaemonSetReady(dsName, controller))
+}
+
 func TestIsDaemonSetReadyUsesSelectorLabelsForOnDeletePods(t *testing.T) {
 	const (
 		namespace = "test-namespace"
