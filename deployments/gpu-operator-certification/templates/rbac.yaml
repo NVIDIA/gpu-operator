@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "gpu-operator-certification.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator-certification.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "gpu-operator-certification.fullname" . }}
+  labels:
+    {{- include "gpu-operator-certification.labels" . | nindent 4 }}
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete", "deletecollection"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]
+  # Apps resources
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "create", "delete"]
+  # GPU Operator
+  - apiGroups: ["nvidia.com"]
+    resources: ["clusterpolicies"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["nvidia.com"]
+    resources: ["nvidiadrivers"]
+    verbs: ["list", "patch"]
+  # KubeVirt (optional, for virtualization detection)
+  - apiGroups: ["kubevirt.io"]
+    resources: ["kubevirts"]
+    verbs: ["list"]
+  - apiGroups: ["hco.kubevirt.io"]
+    resources: ["hyperconvergeds"]
+    verbs: ["list"]
+  # OpenShift (optional, for platform detection)
+  - apiGroups: ["config.openshift.io"]
+    resources: ["clusterversions", "proxies", "images"]
+    verbs: ["get"]
+  - apiGroups: ["machine.openshift.io"]
+    resources: ["machines"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "gpu-operator-certification.fullname" . }}
+  labels:
+    {{- include "gpu-operator-certification.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "gpu-operator-certification.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gpu-operator-certification.fullname" . }}
+    namespace: {{ .Release.Namespace }}

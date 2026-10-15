@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gpu-operator-certification
+description: Self-certification test suite for NVIDIA GPU Operator
+type: application
+version: 0.1.0
+appVersion: "main-latest"
