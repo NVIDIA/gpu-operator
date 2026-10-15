@@ -4222,7 +4222,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	ctx := n.ctx
 	found := &apiimagev1.ImageStream{}
-	name := "driver-toolkit"
+	name := consts.DriverToolkitImageStreamName
 	namespace := consts.OpenshiftNamespace
 	err := n.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
 	if err != nil {
