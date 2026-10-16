@@ -34,6 +34,10 @@ import (
 	"github.com/NVIDIA/gpu-operator/tests/e2e/helpers"
 )
 
+const (
+	clusterPolicyName = "cluster-policy"
+)
+
 // runLabel marks the namespaces this run created; framework.CreateNamespace sets it too.
 const runLabel = "e2e-run"
 
