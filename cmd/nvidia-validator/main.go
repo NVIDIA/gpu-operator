@@ -745,7 +745,13 @@ func validateHostDriver(silent bool) error {
 	command := "chroot"
 	args := append([]string{"/host", nvidiaSMIPath}, nvidiaSMIArgs()...)
 
-	return runCommand(command, args, silent)
+	if err := runCommand(command, args, silent); err != nil {
+		// nvidia-smi exists on the host, so a driver is most likely installed but
+		// not usable, e.g. after a driver upgrade without a reboot. Say so, rather
+		// than reporting only the exit status.
+		return fmt.Errorf("found '%s' on the host, but running it failed: %w", nvidiaSMIPath, err)
+	}
+	return nil
 }
 
 // With driver-validation-skip-gpu-init, validate with 'nvidia-smi --version',
@@ -794,7 +800,7 @@ func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 			if !withWaitFlag {
 				return fmt.Errorf("error validating driver: %w", err)
 			}
-			log.Warningf("failed to validate the driver, retrying after %d seconds\n", sleepIntervalSecondsFlag)
+			log.Warningf("failed to validate the driver, retrying after %d seconds: %v", sleepIntervalSecondsFlag, err)
 			time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
 			continue
 		}
@@ -809,7 +815,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
 	}
 
-	log.Infof("No pre-installed driver detected on the host: %v", err)
+	log.Infof("No usable pre-installed driver detected on the host: %v", err)
 
 	log.Info("Validating containerized driver installation")
 
