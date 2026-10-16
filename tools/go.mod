@@ -7,7 +7,7 @@ require (
 	github.com/jandelgado/gcov2lcov v1.1.1
 	golang.org/x/tools v0.52.0
 	k8s.io/code-generator v0.37.1
-	sigs.k8s.io/controller-tools v0.22.0
+	sigs.k8s.io/controller-tools v0.23.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
 )
 
