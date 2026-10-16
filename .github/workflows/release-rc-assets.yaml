@@ -121,49 +121,8 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.12"
-
-      - name: Get Golang version
-        run: |
-          GOLANG_VERSION=$(grep "GOLANG_VERSION ?=" versions.mk)
-          echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
-
-      - name: Get regctl version
-        run: |
-          REGCTL_VERSION=$(grep "REGCTL_VERSION ?=" versions.mk)
-          echo "REGCTL_VERSION=${REGCTL_VERSION##REGCTL_VERSION ?= }" >> "${GITHUB_ENV}"
-
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-
-      - name: Install PyYAML
-        run: pip install --quiet pyyaml
-
-      - name: Install regctl
-        uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
-        with:
-          release: ${{ env.REGCTL_VERSION }}
-
-      - name: Install Operator SDK
-        run: |
-          set -euo pipefail
-
-          OPERATOR_SDK_VERSION="$(awk -F': ' '/operators.operatorframework.io.metrics.builder:/ { print $2 }' bundle/metadata/annotations.yaml | sed 's/^operator-sdk-//')"
-          if [[ -z "${OPERATOR_SDK_VERSION}" ]]; then
-            echo "::error::OPERATOR_SDK_VERSION not found in bundle metadata"
-            exit 1
-          fi
-
-          curl -sSLo operator-sdk \
-            "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64"
-          chmod +x operator-sdk
-          sudo mv operator-sdk /usr/local/bin/operator-sdk
-          operator-sdk version
+      - name: Set up OLM bundle tools
+        uses: ./.github/actions/setup-olm-bundle-tools
 
       - name: Login to GitHub Container Registry
         env:
@@ -174,16 +133,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "${GH_TOKEN}" | helm registry login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
-
-      - name: Login to GitHub Container Registry for Docker
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Apply Helm values override
         if: ${{ steps.package-inputs.outputs.helm_values_override != '' }}
@@ -210,32 +159,12 @@ jobs:
             --chart deployments/gpu-operator/Chart.yaml \
             --csv bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
 
-      - name: Validate updated OLM bundle
-        env:
-          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
-          CSV: bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
-        run: |
-          set -euo pipefail
-
-          python3 .github/scripts/validate-olm-release-metadata.py \
-            --release-tag "${RELEASE_TAG}" \
-            --csv "${CSV}"
-
-          operator-sdk bundle validate ./bundle
-          make validate-csv
-
-      - name: Build and push OLM bundle image
-        env:
-          RELEASE_TAG: ${{ steps.validate.outputs.release_tag }}
-          GH_REPOSITORY: ${{ github.repository }}
-          VERSION: ""
-          DEFAULT_CHANNEL: "stable"
-          CHANNELS: "stable"
-          BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS: "--platform=linux/amd64,linux/arm64 --push"
-        run: |
-          REPOSITORY="$(echo "${GH_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          BUNDLE_IMAGE_BASE="ghcr.io/${REPOSITORY}/gpu-operator-bundle"
-          make build-bundle-image DOCKER="docker buildx" BUNDLE_IMAGE="${BUNDLE_IMAGE_BASE}:${RELEASE_TAG}"
+      - name: Validate and push OLM bundle
+        uses: ./.github/actions/validate-and-push-olm-bundle
+        with:
+          release-tag: ${{ steps.validate.outputs.release_tag }}
+          bundle-image-tag: ${{ steps.validate.outputs.release_tag }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package RC assets
         id: package
