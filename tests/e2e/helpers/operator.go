@@ -31,10 +31,9 @@ type OperatorClient struct {
 }
 
 type ChartOptions struct {
-	CleanupOnFail bool
-	ReleaseName   string
-	Timeout       time.Duration
-	Wait          bool
+	ReleaseName string
+	Timeout     time.Duration
+	Wait        bool
 }
 
 func (op *OperatorClient) Install(ctx context.Context, params []string, chartOpts ChartOptions) (string, error) {
@@ -58,10 +57,6 @@ func (op *OperatorClient) Install(ctx context.Context, params []string, chartOpt
 
 	if chartOpts.Timeout > 0 {
 		args = append(args, "--timeout", chartOpts.Timeout.String())
-	}
-
-	if chartOpts.CleanupOnFail {
-		args = append(args, "--cleanup-on-fail")
 	}
 
 	cmd := exec.CommandContext(ctx, "helm", args...)
