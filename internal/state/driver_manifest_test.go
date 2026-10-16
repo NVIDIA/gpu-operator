@@ -22,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-logr/logr/funcr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	configv1 "github.com/openshift/api/config/v1"
@@ -42,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
@@ -523,7 +521,7 @@ func TestGetManifestObjectsMultipleNodePools(t *testing.T) {
 	})
 }
 
-func TestGetManifestObjectsAdditionalConfigsErrorIsLogged(t *testing.T) {
+func TestGetManifestObjectsAdditionalConfigsError(t *testing.T) {
 	scheme := driverTestScheme(t)
 	fakeClient := newDriverFakeClient(scheme, newGPUNode("gpu-node", "driver-a"))
 	driverState := newTestStateDriver(t, fakeClient, scheme)
@@ -531,22 +529,14 @@ func TestGetManifestObjectsAdditionalConfigsErrorIsLogged(t *testing.T) {
 	driverCR := newDriverCR("driver-a")
 	driverCR.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "missing-repo-config"}
 
-	var logs strings.Builder
-	logger := funcr.New(func(_, args string) { logs.WriteString(args + "\n") }, funcr.Options{})
-	ctx := log.IntoContext(context.Background(), logger)
+	objects, err := driverState.getManifestObjects(context.Background(), driverCR,
+		driverInfoCatalog(fakeClusterInfo{}))
 
-	objects, err := driverState.getManifestObjects(ctx, driverCR, driverInfoCatalog(fakeClusterInfo{}))
-	require.NoError(t, err)
-	require.NotEmpty(t, objects)
-	assert.Contains(t, logs.String(), "error rendering addition driver volume")
-	assert.Contains(t, logs.String(), "missing-repo-config")
-
-	// The driver is still deployed, silently without the repo config the user asked for.
-	daemonSet, err := getDaemonsetFromObjects(objects)
-	require.NoError(t, err)
-	for _, volume := range daemonSet.Spec.Template.Spec.Volumes {
-		assert.NotEqual(t, "missing-repo-config", volume.Name, "unresolved repo config must not be mounted")
-	}
+	// Rendering the driver without the repo config the user asked for would
+	// deploy it against the wrong package repository, so the node pool has to
+	// fail instead.
+	require.ErrorContains(t, err, "missing-repo-config")
+	assert.Empty(t, objects)
 }
 
 func TestGetManifestObjectsHandleDefaultImagesError(t *testing.T) {
