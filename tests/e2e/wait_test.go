@@ -22,12 +22,16 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
 	pollInterval = 5 * time.Second
 
 	operandReadyTimeout = 45 * time.Minute
+	podDeletionTimeout  = 45 * time.Minute
+	gpuWorkloadTimeout  = 45 * time.Minute
 	helmInstallTimeout  = 5 * time.Minute
 )
 
@@ -35,4 +39,12 @@ func waitFor(ctx context.Context, timeout time.Duration, description string, che
 	ginkgo.GinkgoHelper()
 	ginkgo.By(description)
 	gomega.Eventually(ctx, check).WithTimeout(timeout).WithPolling(pollInterval).Should(gomega.Succeed())
+}
+
+// waitForNotFound keeps polling while get succeeds or fails with an error other than NotFound.
+func waitForNotFound(ctx context.Context, timeout time.Duration, description string, get func(ctx context.Context) error) {
+	ginkgo.GinkgoHelper()
+	waitFor(ctx, timeout, description, func(g gomega.Gomega) {
+		g.Expect(get(ctx)).To(gomega.MatchError(apierrors.IsNotFound, "a NotFound error"))
+	})
 }

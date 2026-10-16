@@ -94,7 +94,7 @@ func newOperatorInstall(chartValues ...string) *operatorInstall {
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if install.clients.kube != nil {
-			saveLogsOnFailure(ctx, install.clients, tcfg.namespace)
+			saveLogsOnFailure(ctx, install.clients, tcfg.namespace, gpuWorkloadNamespace)
 		}
 	})
 

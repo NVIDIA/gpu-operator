@@ -28,4 +28,27 @@ var _ = ginkgo.Describe(e2eTestPrefix+"-defaults", ginkgo.Label("defaults"), gin
 	ginkgo.It("brings up every operand", func(ctx context.Context) {
 		waitForOperandsReady(ctx, install.clients)
 	})
+
+	ginkgo.It("does not restart operands repeatedly", func(ctx context.Context) {
+		expectNoRepeatedOperandRestarts(ctx, install.clients)
+	})
+
+	ginkgo.It("runs a GPU workload", func(ctx context.Context) {
+		runGPUWorkload(ctx, install.clients)
+	})
+})
+
+var _ = ginkgo.Describe(e2eTestPrefix+"-sandbox-workloads", ginkgo.Label("defaults"), ginkgo.Ordered, func() {
+	install := newOperatorInstall(
+		"sandboxWorkloads.enabled=true",
+		"sandboxWorkloads.defaultWorkload=container",
+	)
+
+	ginkgo.It("brings up every operand for container workloads", func(ctx context.Context) {
+		waitForOperandsReady(ctx, install.clients)
+	})
+
+	ginkgo.It("runs a GPU workload", func(ctx context.Context) {
+		runGPUWorkload(ctx, install.clients)
+	})
 })
