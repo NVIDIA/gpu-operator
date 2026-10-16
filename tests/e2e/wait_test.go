@@ -29,11 +29,12 @@ import (
 const (
 	pollInterval = 5 * time.Second
 
-	operandReadyTimeout  = 45 * time.Minute
-	podDeletionTimeout   = 45 * time.Minute
-	driverUpgradeTimeout = 45 * time.Minute
-	gpuWorkloadTimeout   = 45 * time.Minute
-	helmInstallTimeout   = 5 * time.Minute
+	operandReadyTimeout    = 45 * time.Minute
+	podDeletionTimeout     = 45 * time.Minute
+	driverUpgradeTimeout   = 45 * time.Minute
+	gpuWorkloadTimeout     = 45 * time.Minute
+	operatorRestartTimeout = 100 * time.Second
+	helmInstallTimeout     = 5 * time.Minute
 )
 
 func waitFor(ctx context.Context, timeout time.Duration, description string, check func(g gomega.Gomega)) {
