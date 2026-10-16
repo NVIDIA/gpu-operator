@@ -58,11 +58,11 @@ jobs:
           done <<< "${latest_image_lines}"
 
           # Generate values override file
-          .github/scripts/generate-values-overrides.sh \
-            values-overrides.yaml \
-            "${latest_images[toolkit]}" \
-            "${latest_images[device-plugin]}" \
-            "${latest_images[mig-manager]}"
+          .github/scripts/generate-values-overrides.sh values-overrides.yaml \
+            "toolkit=${latest_images[toolkit]}" \
+            "devicePlugin=${latest_images[device-plugin]}" \
+            "gfd=${latest_images[device-plugin]}" \
+            "migManager=${latest_images[mig-manager]}"
 
       - name: Upload values override file
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
