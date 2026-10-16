@@ -18,11 +18,13 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -36,21 +38,21 @@ func NewNodeClient(client kubernetes.Interface) *NodeClient {
 	}
 }
 
+// LabelNode merge-patches the label, like `kubectl label`, because NFD and GFD update
+// node labels concurrently and a get-then-update would conflict.
 func (h *NodeClient) LabelNode(ctx context.Context, nodeName, key, value string) error {
-	node, err := h.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]string{key: value},
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get node: %w", err)
+		return fmt.Errorf("failed to build the label patch for node %s: %w", nodeName, err)
 	}
 
-	if node.Labels == nil {
-		node.Labels = make(map[string]string)
-	}
-
-	node.Labels[key] = value
-
-	_, err = h.client.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.client.CoreV1().Nodes().Patch(ctx, nodeName, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to update node: %w", err)
+		return fmt.Errorf("failed to label node %s with %s=%s: %w", nodeName, key, value, err)
 	}
 
 	return nil
@@ -106,7 +108,7 @@ func (h *NodeClient) LabelAllNodes(ctx context.Context, key, value string) error
 
 	for _, node := range nodes {
 		if err := h.LabelNode(ctx, node.Name, key, value); err != nil {
-			return fmt.Errorf("failed to label node %s: %w", node.Name, err)
+			return err
 		}
 	}
 
