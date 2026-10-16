@@ -86,7 +86,7 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 			})
 
 			AfterAll(func(ctx context.Context) {
-				err := operatorClient.Uninstall(helmReleaseName)
+				err := operatorClient.Uninstall(ctx, helmReleaseName)
 				if err != nil {
 					Expect(err).NotTo(HaveOccurred())
 				}
