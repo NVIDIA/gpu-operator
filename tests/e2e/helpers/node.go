@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 type NodeClient struct {
@@ -89,6 +91,10 @@ func (h *NodeClient) GetNodesByLabel(ctx context.Context, labelKey, labelValue s
 	}
 
 	return nodeList.Items, nil
+}
+
+func (h *NodeClient) ListGPUNodes(ctx context.Context) ([]corev1.Node, error) {
+	return h.GetNodesByLabel(ctx, consts.GPUPresentLabel, "true")
 }
 
 func (h *NodeClient) ListNodes(ctx context.Context) ([]corev1.Node, error) {

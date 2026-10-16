@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +47,12 @@ func (c *PodClient) GetPodsByLabel(ctx context.Context, namespace string, labelM
 		return nil, err
 	}
 	return podList.Items, nil
+}
+
+func IsPodReady(pod *corev1.Pod) bool {
+	return slices.ContainsFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
+		return condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue
+	})
 }
 
 func (c *PodClient) IsPodReady(ctx context.Context, podName, namespace string) (bool, error) {
@@ -96,6 +103,33 @@ func (c *PodClient) GetPodLogs(ctx context.Context, pod corev1.Pod) (string, err
 	}
 
 	return buffer.String(), nil
+}
+
+func (c *PodClient) Logs(ctx context.Context, pod *corev1.Pod, containerName string, previous bool) (string, error) {
+	logBytes, err := c.k8sClient.Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+		Container: containerName,
+		Previous:  previous,
+	}).DoRaw(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get logs of pod %s/%s (container %q, previous %t): %w", pod.Namespace, pod.Name, containerName, previous, err)
+	}
+	return string(logBytes), nil
+}
+
+func (c *PodClient) List(ctx context.Context, namespace, selector string) ([]corev1.Pod, error) {
+	podList, err := c.k8sClient.Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods %q in namespace %s: %w", selector, namespace, err)
+	}
+	return podList.Items, nil
+}
+
+func (c *PodClient) DeleteCollection(ctx context.Context, namespace, selector string) error {
+	err := c.k8sClient.Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return fmt.Errorf("failed to delete pods %q in namespace %s: %w", selector, namespace, err)
+	}
+	return nil
 }
 
 func (c *PodClient) CreateNamespace(ctx context.Context, namespaceName string, labels map[string]string) (*corev1.Namespace, error) {
