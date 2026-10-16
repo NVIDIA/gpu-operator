@@ -51,21 +51,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Fetch latest images from component repositories
-          echo "::notice::Fetching latest container-toolkit image..."
-          TOOLKIT=$(.github/scripts/get-latest-images.sh toolkit)
-
-          echo "::notice::Fetching latest device-plugin image..."
-          DEVICE_PLUGIN=$(.github/scripts/get-latest-images.sh device-plugin)
-
-          echo "::notice::Fetching latest mig-manager image..."
-          MIG_MANAGER=$(.github/scripts/get-latest-images.sh mig-manager)
+          latest_image_lines=$(.github/scripts/get-latest-images.sh toolkit device-plugin mig-manager)
+          declare -A latest_images
+          while IFS='=' read -r component image; do
+            latest_images[${component}]=${image}
+          done <<< "${latest_image_lines}"
 
           # Generate values override file
           .github/scripts/generate-values-overrides.sh \
             values-overrides.yaml \
-            "${TOOLKIT}" \
-            "${DEVICE_PLUGIN}" \
-            "${MIG_MANAGER}"
+            "${latest_images[toolkit]}" \
+            "${latest_images[device-plugin]}" \
+            "${latest_images[mig-manager]}"
 
       - name: Upload values override file
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
