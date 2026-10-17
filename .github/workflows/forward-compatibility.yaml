@@ -85,6 +85,7 @@ jobs:
       operator_image: ghcr.io/nvidia/gpu-operator
       operator_version: main-latest
       use_values_override: true
+      use_ginkgo: true
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

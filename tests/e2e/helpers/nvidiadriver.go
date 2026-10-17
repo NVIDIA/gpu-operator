@@ -22,27 +22,35 @@ import (
 	"log"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	gpuclientset "github.com/NVIDIA/gpu-operator/api/versioned"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
+const DriverComponentSelector = "app.kubernetes.io/component=nvidia-driver"
+
 type NvidiaDriverClient struct {
-	client     gpuclientset.Interface
-	k8sClient  kubernetes.Interface
-	nodeClient *NodeClient
+	client          gpuclientset.Interface
+	k8sClient       kubernetes.Interface
+	nodeClient      *NodeClient
+	daemonSetClient *DaemonSetClient
 }
 
 func NewNvidiaDriverClient(client gpuclientset.Interface, k8sClient kubernetes.Interface) *NvidiaDriverClient {
 	return &NvidiaDriverClient{
-		client:     client,
-		k8sClient:  k8sClient,
-		nodeClient: NewNodeClient(k8sClient),
+		client:          client,
+		k8sClient:       k8sClient,
+		nodeClient:      NewNodeClient(k8sClient),
+		daemonSetClient: NewDaemonSetClient(k8sClient),
 	}
 }
 
@@ -62,24 +70,92 @@ func (h *NvidiaDriverClient) Delete(ctx context.Context, name string) error {
 	return h.client.NvidiaV1alpha1().NVIDIADrivers().Delete(ctx, name, metav1.DeleteOptions{})
 }
 
+func (h *NvidiaDriverClient) DeleteIfExists(ctx context.Context, name string) error {
+	if err := h.Delete(ctx, name); client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to delete NVIDIADriver %s: %w", name, err)
+	}
+	return nil
+}
+
 func (h *NvidiaDriverClient) List(ctx context.Context) (*nvidiav1alpha1.NVIDIADriverList, error) {
 	return h.client.NvidiaV1alpha1().NVIDIADrivers().List(ctx, metav1.ListOptions{})
 }
 
-func (h *NvidiaDriverClient) UpdateDriverVersion(ctx context.Context, name, version string) error {
-	nvidiaDriver, err := h.Get(ctx, name)
+func (h *NvidiaDriverClient) ListDefaultNames(ctx context.Context) ([]string, error) {
+	driverList, err := h.List(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get NVIDIADriver: %w", err)
+		return nil, fmt.Errorf("failed to list NVIDIADrivers: %w", err)
 	}
 
-	nvidiaDriver.Spec.Version = version
+	var defaultDriverNames []string
+	for _, driver := range driverList.Items {
+		if driver.IsDefault() {
+			defaultDriverNames = append(defaultDriverNames, driver.Name)
+		}
+	}
+	return defaultDriverNames, nil
+}
 
-	_, err = h.Update(ctx, nvidiaDriver)
+func (h *NvidiaDriverClient) Copy(ctx context.Context, sourceName, targetName string, isDefault bool) error {
+	sourceDriver, err := h.Get(ctx, sourceName)
 	if err != nil {
-		return fmt.Errorf("failed to update NVIDIADriver: %w", err)
+		return fmt.Errorf("failed to get NVIDIADriver %s: %w", sourceName, err)
 	}
 
+	targetDriver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: targetName},
+		Spec:       *sourceDriver.Spec.DeepCopy(),
+	}
+	targetDriver.Spec.Default = isDefault
+
+	if _, err := h.Create(ctx, targetDriver); err != nil {
+		return fmt.Errorf("failed to create NVIDIADriver %s from %s: %w", targetName, sourceName, err)
+	}
 	return nil
+}
+
+// Modify applies mutate to the NVIDIADriver and updates it, retrying on conflicts with the
+// operator's concurrent status updates.
+func (h *NvidiaDriverClient) Modify(ctx context.Context, name string, mutate func(*nvidiav1alpha1.NVIDIADriver)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		nvidiaDriver, err := h.Get(ctx, name)
+		if err != nil {
+			return err
+		}
+
+		mutate(nvidiaDriver)
+
+		_, err = h.Update(ctx, nvidiaDriver)
+		return err
+	})
+}
+
+func (h *NvidiaDriverClient) SetDefault(ctx context.Context, name string, isDefault bool) error {
+	return h.Modify(ctx, name, func(nvidiaDriver *nvidiav1alpha1.NVIDIADriver) {
+		nvidiaDriver.Spec.Default = isDefault
+	})
+}
+
+func (h *NvidiaDriverClient) UpdateDriverVersion(ctx context.Context, name, version string) error {
+	return h.Modify(ctx, name, func(nvidiaDriver *nvidiav1alpha1.NVIDIADriver) {
+		nvidiaDriver.Spec.Version = version
+	})
+}
+
+// OwnedDaemonSets returns the driver daemonsets that schedule onto nodes owned by driverName.
+func (h *NvidiaDriverClient) OwnedDaemonSets(ctx context.Context, namespace, driverName string) ([]appsv1.DaemonSet, error) {
+	driverDaemonSets, err := h.daemonSetClient.List(ctx, namespace, DriverComponentSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	var ownedDaemonSets []appsv1.DaemonSet
+	for _, daemonSet := range driverDaemonSets {
+		if daemonSet.Spec.Template.Spec.NodeSelector[consts.NVIDIADriverOwnerLabel] == driverName {
+			ownedDaemonSets = append(ownedDaemonSets, daemonSet)
+		}
+	}
+	return ownedDaemonSets, nil
 }
 
 // WaitForReady waits for the nvidia driver pods to be ready and not terminating.

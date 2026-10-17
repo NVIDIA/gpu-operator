@@ -47,9 +47,9 @@ func (h *ClusterPolicyClient) Update(ctx context.Context, cp *nvidiav1.ClusterPo
 	return h.client.NvidiaV1().ClusterPolicies().Update(ctx, cp, metav1.UpdateOptions{})
 }
 
-// modify applies a mutation function to a ClusterPolicy and persists the changes.
+// Modify applies a mutation function to a ClusterPolicy and persists the changes.
 // It uses RetryOnConflict to handle concurrent modifications by the operator controller.
-func (h *ClusterPolicyClient) modify(ctx context.Context, name string, mutate func(*nvidiav1.ClusterPolicy)) error {
+func (h *ClusterPolicyClient) Modify(ctx context.Context, name string, mutate func(*nvidiav1.ClusterPolicy)) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clusterPolicy, err := h.Get(ctx, name)
 		if err != nil {
@@ -64,61 +64,61 @@ func (h *ClusterPolicyClient) modify(ctx context.Context, name string, mutate fu
 }
 
 func (h *ClusterPolicyClient) UpdateDriverVersion(ctx context.Context, name, version string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.Driver.Version = version
 	})
 }
 
 func (h *ClusterPolicyClient) EnableDCGM(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.DCGM.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableDCGM(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.DCGM.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) EnableDCGMExporter(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.DCGMExporter.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableDCGMExporter(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.DCGMExporter.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) EnableGFD(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.GPUFeatureDiscovery.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableGFD(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.GPUFeatureDiscovery.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) EnableDevicePlugin(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.DevicePlugin.Enabled = new(true)
 	})
 }
 
 func (h *ClusterPolicyClient) DisableDevicePlugin(ctx context.Context, name string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.DevicePlugin.Enabled = new(false)
 	})
 }
 
 func (h *ClusterPolicyClient) SetMIGStrategy(ctx context.Context, name, strategy string) error {
-	return h.modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
+	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.MIG.Strategy = nvidiav1.MIGStrategy(strategy)
 	})
 }
