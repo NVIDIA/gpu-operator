@@ -84,6 +84,7 @@ operator:
   #version: ""
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  replicaCount: 1
   # leaderElection:
   #   renewDeadline: 60s
   env: []

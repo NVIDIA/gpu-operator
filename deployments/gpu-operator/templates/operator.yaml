@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: "gpu-operator"
     nvidia.com/gpu-driver-upgrade-drain.skip: "true"
 spec:
-  replicas: 1
+  replicas: {{ .Values.operator.replicaCount }}
   selector:
     matchLabels:
       app.kubernetes.io/component: "gpu-operator"
