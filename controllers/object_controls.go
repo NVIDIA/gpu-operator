@@ -1295,6 +1295,7 @@ func transformToolkitCtrForCDI(container *corev1.Container, nriPluginEnabled boo
 	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
 	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
 	setContainerEnv(container, CRIOConfigModeEnvName, "config")
+	setContainerEnv(container, NvidiaCtrRuntimeCDIPrefixesEnvName, "cdi.k8s.io/")
 
 	if nriPluginEnabled {
 		setContainerEnv(container, CDIEnableNRIPlugin, "true")
