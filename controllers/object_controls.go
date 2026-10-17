@@ -175,6 +175,9 @@ const (
 	DeviceListStrategyEnvName = "DEVICE_LIST_STRATEGY"
 	// CDIAnnotationPrefixEnvName is the name of the device-plugin envvar for configuring the CDI annotation prefix
 	CDIAnnotationPrefixEnvName = "CDI_ANNOTATION_PREFIX"
+	// NvidiaCtrRuntimeModesCDIAnnotationPrefix is the name of the toolkit
+	// envvar for configuring CDI annotation prefixes with NVIDIA Container Runtime.
+	NvidiaCtrRuntimeModesCDIAnnotationPrefix = "NVIDIA_CONTAINER_RUNTIME_MODES_CDI_ANNOTATION_PREFIXES"
 	// PodControllerRevisionHashLabelKey is the annotation key for pod controller revision hash value
 	PodControllerRevisionHashLabelKey = "controller-revision-hash"
 	// DefaultCCModeEnvName is the name of the envvar for configuring default CC mode on all compatible GPUs on the node
@@ -1295,6 +1298,7 @@ func transformToolkitCtrForCDI(container *corev1.Container, nriPluginEnabled boo
 	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
 	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
 	setContainerEnv(container, CRIOConfigModeEnvName, "config")
+	setContainerEnv(container, NvidiaCtrRuntimeModesCDIAnnotationPrefix, "cdi.k8s.io/")
 
 	if nriPluginEnabled {
 		setContainerEnv(container, CDIEnableNRIPlugin, "true")
