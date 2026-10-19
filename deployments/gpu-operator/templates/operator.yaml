@@ -55,6 +55,9 @@ spec:
         {{- if .renewDeadline }}
         - --leader-lease-renew-deadline={{ .renewDeadline }}
         {{- end }}
+        {{- if .warmup }}
+        - --leader-election-warmup
+        {{- end }}
       {{- end }}
       {{- if .Values.operator.logging.develMode }}
         - --zap-devel

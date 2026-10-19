@@ -85,8 +85,9 @@ operator:
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   replicaCount: 1
-  # leaderElection:
-  #   renewDeadline: 60s
+  leaderElection:
+    # renewDeadline: 60s
+    warmup: false
   env: []
   priorityClassName: system-node-critical
   runtimeClass: nvidia
