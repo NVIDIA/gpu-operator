@@ -116,6 +116,8 @@ operator:
                 values: [""]
   podAntiAffinity:
     enabled: true
+  podDisruptionBudget:
+    enabled: true
   logging:
     # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 'rfc3339nano')
     timeEncoding: epoch
