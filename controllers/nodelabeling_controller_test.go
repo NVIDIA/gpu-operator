@@ -1226,6 +1226,11 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			for nodeName, expectedUpgradeState := range tc.expectedUpgradeState {
 				node := &corev1.Node{}
 				require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: nodeName}, node))
+				if expectedUpgradeState == "" {
+					// an empty-valued label would also read as "", so check the key itself
+					assert.NotContains(t, node.Labels, upgradeStateLabel, "node %q upgrade state label", nodeName)
+					continue
+				}
 				assert.Equal(t, expectedUpgradeState, node.Labels[upgradeStateLabel], "node %q upgrade state", nodeName)
 			}
 		})
