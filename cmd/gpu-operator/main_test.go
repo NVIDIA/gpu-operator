@@ -147,8 +147,20 @@ func gpuContainer(limits, requests corev1.ResourceList) corev1.Container {
 	return corev1.Container{Resources: corev1.ResourceRequirements{Limits: limits, Requests: requests}}
 }
 
+func nativeSidecar(limits, requests corev1.ResourceList) corev1.Container {
+	ctr := gpuContainer(limits, requests)
+	ctr.RestartPolicy = new(corev1.ContainerRestartPolicyAlways)
+	return ctr
+}
+
+func podWithInitContainer(phase corev1.PodPhase, initContainer corev1.Container) corev1.Pod {
+	pod := resourcePod(phase, gpuContainer(corev1.ResourceList{"cpu": {}}, nil))
+	pod.Spec.InitContainers = []corev1.Container{initContainer}
+	return pod
+}
+
 // TestGPUPodSpecFilterResourceList covers the container resource-list branch of
-// gpuPodSpecFilter (nvidia.com/gpu and nvidia.com/mig- in a container's
+// gpuPodSpecFilter (nvidia.com/gpu and nvidia.com/mig- in app/native sidecar
 // limits/requests, plus the Running/Pending phase gate). The sibling
 // TestGPUPodSpecFilterResourceClaims only exercises the DRA/ResourceClaims
 // branch, leaving this branch uncovered.
@@ -194,6 +206,36 @@ func TestGPUPodSpecFilterResourceList(t *testing.T) {
 		{
 			name:       "succeeded pod requesting a gpu -> not a GPU pod (phase gate rejects it)",
 			pod:        resourcePod(corev1.PodSucceeded, gpuContainer(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
+			wantGPUPod: false,
+		},
+		{
+			name:       "running pod with GPU limit only in native sidecar -> GPU pod",
+			pod:        podWithInitContainer(corev1.PodRunning, nativeSidecar(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
+			wantGPUPod: true,
+		},
+		{
+			name:       "pending pod with GPU request only in native sidecar -> GPU pod",
+			pod:        podWithInitContainer(corev1.PodPending, nativeSidecar(nil, corev1.ResourceList{"nvidia.com/gpu": {}})),
+			wantGPUPod: true,
+		},
+		{
+			name:       "running pod with MIG request only in native sidecar -> GPU pod",
+			pod:        podWithInitContainer(corev1.PodRunning, nativeSidecar(nil, corev1.ResourceList{"nvidia.com/mig-1g.5gb": {}})),
+			wantGPUPod: true,
+		},
+		{
+			name:       "running pod with GPU limit only in regular init container -> not a GPU pod",
+			pod:        podWithInitContainer(corev1.PodRunning, gpuContainer(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
+			wantGPUPod: false,
+		},
+		{
+			name:       "running pod with CPU only in native sidecar -> not a GPU pod",
+			pod:        podWithInitContainer(corev1.PodRunning, nativeSidecar(corev1.ResourceList{"cpu": {}}, nil)),
+			wantGPUPod: false,
+		},
+		{
+			name:       "succeeded pod with GPU limit only in native sidecar -> not a GPU pod",
+			pod:        podWithInitContainer(corev1.PodSucceeded, nativeSidecar(corev1.ResourceList{"nvidia.com/gpu": {}}, nil)),
 			wantGPUPod: false,
 		},
 	}
