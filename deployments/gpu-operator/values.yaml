@@ -114,6 +114,8 @@ operator:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
+  podAntiAffinity:
+    enabled: true
   logging:
     # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 'rfc3339nano')
     timeEncoding: epoch

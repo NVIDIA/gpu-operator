@@ -136,15 +136,16 @@ func main() {
 	}
 
 	options := ctrl.Options{
-		Scheme:                  scheme,
-		Metrics:                 metricsOptions,
-		HealthProbeBindAddress:  probeAddr,
-		PprofBindAddress:        pprofAddr,
-		LeaderElection:          enableLeaderElection,
-		LeaderElectionNamespace: leaderElectionNamespace,
-		LeaderElectionID:        "53822513.nvidia.com",
-		WebhookServer:           webhookServer,
-		Cache:                   cacheOptions,
+		Scheme:                        scheme,
+		Metrics:                       metricsOptions,
+		HealthProbeBindAddress:        probeAddr,
+		PprofBindAddress:              pprofAddr,
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionNamespace:       leaderElectionNamespace,
+		LeaderElectionID:              "53822513.nvidia.com",
+		LeaderElectionReleaseOnCancel: true,
+		WebhookServer:                 webhookServer,
+		Cache:                         cacheOptions,
 	}
 
 	if enableLeaderElection && int(renewDeadline) != 0 {

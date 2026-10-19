@@ -112,9 +112,25 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-    {{- with .Values.operator.affinity }}
+    {{- $affinity := .Values.operator.affinity | default dict }}
+    {{- $podAntiAffinity := .Values.operator.podAntiAffinity | default dict }}
+    {{- $addPodAntiAffinity := and $podAntiAffinity.enabled (gt (int .Values.operator.replicaCount) 1) (not (hasKey $affinity "podAntiAffinity")) }}
+    {{- if or $affinity $addPodAntiAffinity }}
       affinity:
+      {{- with $affinity }}
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $addPodAntiAffinity }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: "gpu-operator"
+                  app: "gpu-operator"
+      {{- end }}
     {{- end }}
     {{- with .Values.operator.tolerations }}
       tolerations:
