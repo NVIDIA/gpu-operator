@@ -28,11 +28,12 @@ import (
 
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
 	e2elog "github.com/NVIDIA/gpu-operator/tests/e2e/framework/logs"
+	e2eoperator "github.com/NVIDIA/gpu-operator/tests/e2e/framework/operator"
 
 	"github.com/NVIDIA/gpu-operator/tests/e2e/helpers"
 )
 
-var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
+var _ = Describe(e2eoperator.TestNamePrefix+"-premerge-suite", func() {
 	f := framework.NewFramework("gpu-operator")
 	f.SkipNamespaceCreation = true
 
@@ -47,7 +48,7 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 			)
 
 			BeforeAll(func(ctx context.Context) {
-				if tcfg.helmChart == "" {
+				if e2eoperator.TestContext.HelmChart == "" {
 					Fail("No helm-chart for gpu-operator specified")
 				}
 
@@ -57,24 +58,24 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 					"e2e-run": string(framework.RunID),
 				}
 
-				testNamespace, err = k8sClient.CreateNamespace(ctx, tcfg.namespace, nsLabels)
+				testNamespace, err = k8sClient.CreateNamespace(ctx, e2eoperator.TestContext.OperatorNamespace, nsLabels)
 				if err != nil {
-					Fail(fmt.Sprintf("failed to create gpu operator namespace %s: %v", tcfg.namespace, err))
+					Fail(fmt.Sprintf("failed to create gpu operator namespace %s: %v", e2eoperator.TestContext.OperatorNamespace, err))
 				}
 
 				operatorClient = &helpers.OperatorClient{
-					Chart:      tcfg.helmChart,
+					Chart:      e2eoperator.TestContext.HelmChart,
 					Namespace:  testNamespace.Name,
 					Kubeconfig: framework.TestContext.KubeConfig,
 				}
 
 				values := []string{
-					fmt.Sprintf("operator.repository=%s", tcfg.operatorRepository),
-					fmt.Sprintf("operator.image=%s", tcfg.operatorImage),
-					fmt.Sprintf("operator.version=%s", tcfg.operatorVersion),
-					fmt.Sprintf("validator.repository=%s", tcfg.validatorRepository),
-					fmt.Sprintf("validator.image=%s", tcfg.validatorImage),
-					fmt.Sprintf("validator.version=%s", tcfg.validatorVersion),
+					fmt.Sprintf("operator.repository=%s", e2eoperator.TestContext.OperatorRepository),
+					fmt.Sprintf("operator.image=%s", e2eoperator.TestContext.OperatorImage),
+					fmt.Sprintf("operator.version=%s", e2eoperator.TestContext.OperatorVersion),
+					fmt.Sprintf("validator.repository=%s", e2eoperator.TestContext.ValidatorRepository),
+					fmt.Sprintf("validator.image=%s", e2eoperator.TestContext.ValidatorImage),
+					fmt.Sprintf("validator.version=%s", e2eoperator.TestContext.ValidatorVersion),
 				}
 				helmReleaseName = fmt.Sprintf("gpu-operator-%s", framework.RandomSuffix())
 				helmReleaseName, err = operatorClient.Install(ctx, values, helpers.ChartOptions{

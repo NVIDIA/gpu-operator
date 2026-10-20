@@ -14,8 +14,21 @@
 # limitations under the License.
 **/
 
-package e2e
+package operands
 
-const (
-	e2eTestPrefix = "gpu-operator-e2e"
+import (
+	"github.com/NVIDIA/gpu-operator/tests/e2e/helpers"
 )
+
+var DefaultOperandSelectors = []string{
+	helpers.DriverComponentSelector,
+	AppSelector("nvidia-container-toolkit-daemonset"),
+	AppSelector("nvidia-device-plugin-daemonset"),
+	AppSelector("nvidia-dcgm-exporter"),
+	AppSelector("gpu-feature-discovery"),
+	AppSelector("nvidia-operator-validator"),
+}
+
+func AppSelector(app string) string {
+	return "app=" + app
+}
