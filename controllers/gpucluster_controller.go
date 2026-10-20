@@ -45,6 +45,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/reconcilelog"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
@@ -62,6 +63,9 @@ type GPUClusterReconciler struct {
 	Scheme      *runtime.Scheme
 	ClusterInfo clusterinfo.Interface
 	Namespace   string
+	// OperatorMetrics is shared with the ClusterPolicy controller so both deployment
+	// paths report the same gauges. It may be nil in tests.
+	OperatorMetrics *OperatorMetrics
 
 	stateManager     state.Manager
 	conditionUpdater conditions.Updater
@@ -120,6 +124,8 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to label namespace for admin access: %w", err)
 	}
 
+	r.recordGPUNodeCount(ctx)
+
 	infoCatalog := state.NewInfoCatalog()
 	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)
 
@@ -154,6 +160,27 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// newly-created ClusterPolicy) are detected and reconciled even while ready;
 	// only DaemonSets are watched, and the ready path is otherwise event-driven.
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
+}
+
+// recordGPUNodeCount sets the gpu_nodes_total gauge from the cached Node list, so the
+// GPUCluster path reports the same count as the ClusterPolicy path. A list failure
+// only skips the metric update; it does not fail the reconcile.
+func (r *GPUClusterReconciler) recordGPUNodeCount(ctx context.Context) {
+	if r.OperatorMetrics == nil {
+		return
+	}
+	list := &corev1.NodeList{}
+	if err := r.List(ctx, list); err != nil {
+		log.FromContext(ctx).Error(err, "unable to list nodes for the GPU node count metric")
+		return
+	}
+	count := 0
+	for i := range list.Items {
+		if hasCommonGPULabel(list.Items[i].GetLabels()) {
+			count++
+		}
+	}
+	r.OperatorMetrics.gpuNodesTotal.Set(float64(count))
 }
 
 // gpuClusterOperandNotReadyMessage builds the OperandNotReady condition message, listing
@@ -318,7 +345,7 @@ func (r *GPUClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	r.recorder = mgr.GetEventRecorder("nvidia-gpu-operator")
 
 	c, err := controller.New("gpu-cluster-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              reconcilelog.Wrap(r),
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})

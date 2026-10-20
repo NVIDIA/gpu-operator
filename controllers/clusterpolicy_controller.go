@@ -47,6 +47,7 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/reconcilelog"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 )
 
@@ -453,7 +454,7 @@ func shouldReconcileClusterPolicyOnNodeDeletion(labels map[string]string) bool {
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new controller
-	c, err := controller.New("clusterpolicy-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1,
+	c, err := controller.New("clusterpolicy-controller", mgr, controller.Options{Reconciler: reconcilelog.Wrap(r), MaxConcurrentReconciles: 1,
 		RateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR)})
 	if err != nil {
 		return err

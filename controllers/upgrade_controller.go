@@ -46,6 +46,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/reconcilelog"
 )
 
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
@@ -381,7 +382,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabelsForNVD(ctx context.Conte
 //nolint:dupl
 func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new controller
-	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1,
+	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: reconcilelog.Wrap(r), MaxConcurrentReconciles: 1,
 		RateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR)})
 	if err != nil {
 		return err

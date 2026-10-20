@@ -21,6 +21,8 @@ import (
 	"sort"
 	"testing"
 
+	promcli "github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -136,6 +138,33 @@ func TestGPUClusterReconcileOperandNotReady(t *testing.T) {
 	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
 	require.Equal(t, conditions.OperandNotReady, updater.LastErrorReason)
 	require.Equal(t, "Waiting for operand pods to be ready; states not ready: [state-dra-driver]", updater.LastErrorMessage)
+}
+
+// The GPUCluster path sets the same GPU node gauge as the ClusterPolicy path.
+func TestGPUClusterReconcileRecordsGPUNodeCount(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "config"},
+	}
+	gpuNode := func(name string) *corev1.Node {
+		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{commonGPULabelKey: commonGPULabelValue},
+		}}
+	}
+	cpuNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cpu-0"}}
+	r, _ := newGPUClusterReconciler(t, cfg, gpuNode("gpu-0"), gpuNode("gpu-1"), cpuNode)
+	r.OperatorMetrics = &OperatorMetrics{gpuNodesTotal: promcli.NewGauge(promcli.GaugeOpts{})}
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, float64(2), gaugeValue(t, r.OperatorMetrics.gpuNodesTotal))
+}
+
+func gaugeValue(t *testing.T, g promcli.Gauge) float64 {
+	t.Helper()
+	m := &dto.Metric{}
+	require.NoError(t, g.Write(m))
+	return m.GetGauge().GetValue()
 }
 
 func TestGPUClusterOperandNotReadyMessage(t *testing.T) {
