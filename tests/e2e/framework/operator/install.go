@@ -76,7 +76,7 @@ func NewInstall(chartValues ...string) *Install {
 
 		_, err = framework.CreateNamespace(ctx, TestContext.OperatorNamespace, install.Kube, nil)
 		framework.ExpectNoError(err, "failed to create namespace %s", TestContext.OperatorNamespace)
-		_, err = install.Operator.Install(ctx, append(operatorChartValues(), chartValues...), helpers.ChartOptions{
+		err = install.Operator.Install(ctx, append(operatorChartValues(), chartValues...), helpers.ChartOptions{
 			ReleaseName: install.releaseName,
 			Timeout:     helmTimeout,
 			ValuesFile:  TestContext.ValuesFile,

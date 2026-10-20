@@ -85,28 +85,6 @@ func (h *DaemonSetClient) WaitForReady(ctx context.Context, namespace, name stri
 	})
 }
 
-func (h *DaemonSetClient) IsReady(ctx context.Context, namespace, name string) (bool, error) {
-	daemonSet, err := h.Get(ctx, namespace, name)
-	if err != nil {
-		return false, err
-	}
-
-	return daemonSet.Status.NumberReady == daemonSet.Status.DesiredNumberScheduled && daemonSet.Status.NumberReady > 0, nil
-}
-
-func (h *DaemonSetClient) GetImage(ctx context.Context, namespace, name string) (string, error) {
-	daemonSet, err := h.Get(ctx, namespace, name)
-	if err != nil {
-		return "", fmt.Errorf("failed to get DaemonSet: %w", err)
-	}
-
-	if len(daemonSet.Spec.Template.Spec.Containers) == 0 {
-		return "", fmt.Errorf("DaemonSet has no containers")
-	}
-
-	return daemonSet.Spec.Template.Spec.Containers[0].Image, nil
-}
-
 func (h *DaemonSetClient) CheckNoRestarts(ctx context.Context, namespace, name string) error {
 	daemonSet, err := h.Get(ctx, namespace, name)
 	if err != nil {

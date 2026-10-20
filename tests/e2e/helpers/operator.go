@@ -38,17 +38,17 @@ type ChartOptions struct {
 	Wait        bool
 }
 
-func (op *OperatorClient) Install(ctx context.Context, params []string, chartOpts ChartOptions) (string, error) {
+func (op *OperatorClient) Install(ctx context.Context, params []string, chartOpts ChartOptions) error {
 	args, err := op.helmArgs("install", params, chartOpts)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if _, err := runHelm(ctx, args); err != nil {
-		return "", fmt.Errorf("error installing operator: %w", err)
+		return fmt.Errorf("error installing operator: %w", err)
 	}
 
-	return chartOpts.ReleaseName, nil
+	return nil
 }
 
 func (op *OperatorClient) Upgrade(ctx context.Context, params []string, chartOpts ChartOptions) error {

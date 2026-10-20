@@ -103,18 +103,6 @@ func (h *ClusterPolicyClient) DisableGFD(ctx context.Context, name string) error
 	})
 }
 
-func (h *ClusterPolicyClient) EnableDevicePlugin(ctx context.Context, name string) error {
-	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DevicePlugin.Enabled = new(true)
-	})
-}
-
-func (h *ClusterPolicyClient) DisableDevicePlugin(ctx context.Context, name string) error {
-	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
-		clusterPolicy.Spec.DevicePlugin.Enabled = new(false)
-	})
-}
-
 func (h *ClusterPolicyClient) SetMIGStrategy(ctx context.Context, name, strategy string) error {
 	return h.Modify(ctx, name, func(clusterPolicy *nvidiav1.ClusterPolicy) {
 		clusterPolicy.Spec.MIG.Strategy = nvidiav1.MIGStrategy(strategy)
