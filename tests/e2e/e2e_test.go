@@ -27,26 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 
+	_ "github.com/NVIDIA/gpu-operator/tests/e2e/clusterpolicy"
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
 	e2elog "github.com/NVIDIA/gpu-operator/tests/e2e/framework/logs"
+	e2eoperator "github.com/NVIDIA/gpu-operator/tests/e2e/framework/operator"
 )
-
-type testConfig struct {
-	helmChart           string
-	namespace           string
-	operatorRepository  string
-	operatorImage       string
-	operatorVersion     string
-	validatorRepository string
-	validatorImage      string
-	validatorVersion    string
-}
 
 // runID is a unique identifier of the e2e run.
 // Beware that this ID is not the same for all tests in the e2e run, because each Ginkgo node creates it separately.
 var runID = uuid.NewUUID()
-
-var tcfg = testConfig{}
 
 func createGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	// fetch the current config
@@ -57,21 +46,20 @@ func createGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 }
 
 func TestMain(m *testing.M) {
-	flag.StringVar(&tcfg.helmChart, "helm-chart", "", "Helm chart to use")
-	flag.StringVar(&tcfg.namespace, "namespace", "gpu-operator", "Namespace name to use for the gpu-operator helm deploys")
-	flag.StringVar(&tcfg.operatorRepository, "operator-repository", "", "GPU Operator image repository to use")
-	flag.StringVar(&tcfg.operatorImage, "operator-image", "", "GPU Operator image name to use")
-	flag.StringVar(&tcfg.operatorVersion, "operator-version", "", "GPU Operator image tag to use")
-	flag.StringVar(&tcfg.validatorRepository, "validator-repository", "", "GPU Operator Validator image repository to use")
-	flag.StringVar(&tcfg.validatorImage, "validator-image", "", "GPU Operator Validator image name to use")
-	flag.StringVar(&tcfg.validatorVersion, "validator-version", "", "GPU Operator Validator image tag to use")
-
+	e2eoperator.RegisterFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
 
 	flag.Parse()
+	e2eoperator.AfterReadingAllFlags(&e2eoperator.TestContext)
 
 	os.Exit(m.Run())
 }
+
+var _ = ginkgo.BeforeSuite(func() {
+	if err := e2eoperator.TestContext.Validate(); err != nil {
+		ginkgo.Fail(err.Error())
+	}
+})
 
 func TestE2E(t *testing.T) {
 	e2elog.InitLogs()
