@@ -20,3 +20,5 @@
 .idea/
 *.tmproj
 .vscode/
+# Go unit tests for the chart
+*_test.go
