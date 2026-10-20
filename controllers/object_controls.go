@@ -4814,14 +4814,22 @@ func isDaemonsetSpecChanged(current *appsv1.DaemonSet, new *appsv1.DaemonSet) bo
 	if current == nil && new != nil {
 		return true
 	}
-	if current.Annotations == nil || new.Annotations == nil {
+	if new == nil || new.Annotations == nil {
 		panic("appsv1.DaemonSet.Annotations must be allocated prior to calling isDaemonsetSpecChanged()")
+	}
+
+	// Kubernetes drops an empty annotation map. Operands that persist only
+	// nvidia.com/last-applied-hash lose the map when that key is removed.
+	// A nil map is a missing hash, so record one and update.
+	currentAnnotations := current.Annotations
+	if currentAnnotations == nil {
+		currentAnnotations = map[string]string{}
 	}
 
 	hashStr := utils.GetObjectHash(new)
 	foundHashAnnotation := false
 
-	for annotation, value := range current.Annotations {
+	for annotation, value := range currentAnnotations {
 		if annotation == NvidiaAnnotationHashKey {
 			if value != hashStr {
 				// update annotation to be added to Daemonset as per new spec and indicate spec update is required
