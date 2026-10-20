@@ -78,16 +78,15 @@ var _ = Describe(e2eTestPrefix+"-premerge-suite", func() {
 				}
 				helmReleaseName = fmt.Sprintf("gpu-operator-%s", framework.RandomSuffix())
 				helmReleaseName, err = operatorClient.Install(ctx, values, helpers.ChartOptions{
-					CleanupOnFail: true,
-					ReleaseName:   helmReleaseName,
-					Timeout:       5 * time.Minute,
-					Wait:          true,
+					ReleaseName: helmReleaseName,
+					Timeout:     5 * time.Minute,
+					Wait:        true,
 				})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			AfterAll(func(ctx context.Context) {
-				err := operatorClient.Uninstall(helmReleaseName)
+				err := operatorClient.Uninstall(ctx, helmReleaseName)
 				if err != nil {
 					Expect(err).NotTo(HaveOccurred())
 				}
