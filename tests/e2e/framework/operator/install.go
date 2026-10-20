@@ -124,3 +124,14 @@ func (install *Install) uninstall(ctx context.Context) {
 	}
 	framework.ExpectNoError(errors.Join(cleanupErrs...))
 }
+
+func (install *Install) Upgrade(ctx context.Context, chartValues ...string) {
+	ginkgo.GinkgoHelper()
+
+	err := install.Operator.Upgrade(ctx, append(operatorChartValues(), chartValues...), helpers.ChartOptions{
+		ReleaseName: install.releaseName,
+		Timeout:     helmTimeout,
+		Wait:        true,
+	})
+	framework.ExpectNoError(err, "failed to upgrade release %s", install.releaseName)
+}
