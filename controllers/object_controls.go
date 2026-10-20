@@ -1399,6 +1399,10 @@ func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	// set hostNetwork for toolkit if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.Toolkit.HostNetwork)
 
+	if config.Toolkit.RuntimeClassName != "" {
+		obj.Spec.Template.Spec.RuntimeClassName = ptr.To(config.Toolkit.RuntimeClassName)
+	}
+
 	return nil
 }
 
