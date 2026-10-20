@@ -18,6 +18,10 @@ package clusterpolicy
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -25,17 +29,25 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
 	e2eoperands "github.com/NVIDIA/gpu-operator/tests/e2e/framework/operands"
 	e2eoperator "github.com/NVIDIA/gpu-operator/tests/e2e/framework/operator"
 	e2eworkload "github.com/NVIDIA/gpu-operator/tests/e2e/framework/workload"
+	"github.com/NVIDIA/gpu-operator/tests/e2e/helpers"
 )
 
 const (
-	daemonSetUpdateTimeout = 2 * time.Minute
+	daemonSetUpdateTimeout     = 2 * time.Minute
+	driverMigrationStepTimeout = 5 * time.Minute
+
+	deployOperandsLabel = "nvidia.com/gpu.deploy.operands"
 
 	legacyDriverApp = "nvidia-driver-daemonset"
 
@@ -132,10 +144,109 @@ var _ = e2eoperator.Describe("clusterpolicy", "clusterpolicy", ginkgo.Ordered, g
 			e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
 		})
 	})
+
+	ginkgo.It("recovers after the operator restarts", func(ctx context.Context) {
+		e2eoperator.RestartOperator(ctx, install.Clients)
+	})
+
+	ginkgo.It("removes operands when nodes opt out and restores them when they opt back in", func(ctx context.Context) {
+		originalNodes, err := install.Clients.Nodes.ListNodes(ctx)
+		framework.ExpectNoError(err, "failed to list nodes")
+		ginkgo.DeferCleanup(restoreNodeLabel, install.Clients.Kube, originalNodes, deployOperandsLabel)
+
+		err = install.Clients.Nodes.LabelAllNodes(ctx, deployOperandsLabel, "false")
+		framework.ExpectNoError(err, "failed to label all nodes %s=false", deployOperandsLabel)
+		for _, selector := range slices.Concat(e2eoperands.DefaultOperandSelectors, []string{e2eoperands.AppSelector("nvidia-dcgm")}) {
+			e2eoperands.WaitForPodsDeleted(ctx, install.Clients, selector)
+		}
+
+		err = install.Clients.Nodes.LabelAllNodes(ctx, deployOperandsLabel, "true")
+		framework.ExpectNoError(err, "failed to label all nodes %s=true", deployOperandsLabel)
+		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
+	})
+
+	ginkgo.It("migrates driver management from the ClusterPolicy to NVIDIADriver", func(ctx context.Context) {
+		legacyDriverPodName := firstLegacyDriverPodName(ctx, install.Clients)
+
+		install.Upgrade(ctx,
+			fmt.Sprintf("operator.defaultRuntime=%s", e2eoperator.TestContext.ContainerRuntime),
+			"driver.nvidiaDriverCRD.enabled=true",
+			"driver.nvidiaDriverCRD.deployDefaultCR=true",
+		)
+
+		waitForLegacyDriverDaemonSetDeleted(ctx, install.Clients)
+		waitForPodOrphaned(ctx, install.Clients, legacyDriverPodName)
+		e2eoperator.WaitForSingleDefaultDriver(ctx, install.Clients, consts.DefaultNVIDIADriverName, driverMigrationStepTimeout)
+		e2eoperator.WaitForNodesOwnedByDriver(ctx, install.Clients, consts.DefaultNVIDIADriverName, driverMigrationStepTimeout)
+		e2eoperator.WaitForDriverDaemonSets(ctx, install.Clients, consts.DefaultNVIDIADriverName, driverMigrationStepTimeout)
+		framework.WaitForPodNotFound(ctx, install.Clients.Kube, e2eoperator.TestContext.OperatorNamespace, legacyDriverPodName, driverMigrationStepTimeout)
+		e2eoperands.WaitForPodsReady(ctx, install.Clients, helpers.DriverComponentSelector)
+		e2eoperands.WaitForDriverUpgradeDone(ctx, install.Clients)
+	})
+
+	ginkgo.It("runs a GPU workload after the migration", func(ctx context.Context) {
+		e2eworkload.RunGPUWorkload(ctx, install.Clients)
+	})
 })
 
 func onClusterPolicy(update func(ctx context.Context, clusterPolicyName string) error) func(context.Context) error {
 	return func(ctx context.Context) error {
 		return update(ctx, e2eoperator.ClusterPolicyName)
 	}
+}
+
+func restoreNodeLabel(ctx context.Context, kubeClient kubernetes.Interface, originalNodes []corev1.Node, labelKey string) error {
+	var restoreErrs []error
+	for _, originalNode := range originalNodes {
+		var originalValue any
+		if labelValue, hasLabel := originalNode.Labels[labelKey]; hasLabel {
+			originalValue = labelValue
+		}
+
+		patch, err := json.Marshal(map[string]any{
+			"metadata": map[string]any{
+				"labels": map[string]any{labelKey: originalValue},
+			},
+		})
+		if err != nil {
+			restoreErrs = append(restoreErrs, fmt.Errorf("failed to build the label patch for node %s: %w", originalNode.Name, err))
+			continue
+		}
+
+		_, err = kubeClient.CoreV1().Nodes().Patch(ctx, originalNode.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			restoreErrs = append(restoreErrs, fmt.Errorf("failed to restore label %s on node %s: %w", labelKey, originalNode.Name, err))
+		}
+	}
+
+	return errors.Join(restoreErrs...)
+}
+
+func firstLegacyDriverPodName(ctx context.Context, clients e2eoperator.Clients) string {
+	ginkgo.GinkgoHelper()
+	legacyDriverPods, err := clients.Pods.List(ctx, e2eoperator.TestContext.OperatorNamespace, e2eoperands.AppSelector(legacyDriverApp))
+	framework.ExpectNoError(err, "failed to list the legacy ClusterPolicy driver pods")
+	gomega.Expect(legacyDriverPods).NotTo(gomega.BeEmpty(), "legacy ClusterPolicy driver pod not found")
+	return legacyDriverPods[0].Name
+}
+
+func waitForLegacyDriverDaemonSetDeleted(ctx context.Context, clients e2eoperator.Clients) {
+	ginkgo.GinkgoHelper()
+	framework.WaitFor(ctx, driverMigrationStepTimeout, "waiting for the ClusterPolicy driver daemonset to be deleted", func(g gomega.Gomega) {
+		legacyDriverDaemonSets, err := clients.DaemonSets.List(ctx, e2eoperator.TestContext.OperatorNamespace, e2eoperands.AppSelector(legacyDriverApp))
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(legacyDriverDaemonSets).To(gomega.BeEmpty())
+	})
+}
+
+func waitForPodOrphaned(ctx context.Context, clients e2eoperator.Clients, podName string) {
+	ginkgo.GinkgoHelper()
+	framework.WaitFor(ctx, driverMigrationStepTimeout, fmt.Sprintf("waiting for pod %s to be orphaned", podName), func(g gomega.Gomega) {
+		pod, err := clients.Kube.CoreV1().Pods(e2eoperator.TestContext.OperatorNamespace).Get(ctx, podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(pod.OwnerReferences).To(gomega.BeEmpty())
+	})
 }
