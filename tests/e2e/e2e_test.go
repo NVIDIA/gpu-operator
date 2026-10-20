@@ -31,6 +31,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
 	e2elog "github.com/NVIDIA/gpu-operator/tests/e2e/framework/logs"
 	e2eoperator "github.com/NVIDIA/gpu-operator/tests/e2e/framework/operator"
+	_ "github.com/NVIDIA/gpu-operator/tests/e2e/nvidiadriver"
 )
 
 // runID is a unique identifier of the e2e run.
