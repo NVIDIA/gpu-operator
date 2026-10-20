@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	clusterPolicyName = "cluster-policy"
+	clusterPolicyName         = "cluster-policy"
+	operatorComponentSelector = "app.kubernetes.io/component=gpu-operator"
 )
 
 // runLabel marks the namespaces this run created; framework.CreateNamespace sets it too.
@@ -123,6 +124,17 @@ func (install *operatorInstall) uninstall(ctx context.Context) {
 		framework.ExpectNoError(client.IgnoreNotFound(err), "failed to delete namespace %s", tcfg.namespace)
 	}
 	framework.ExpectNoError(uninstallErr, "failed to uninstall release %s", install.releaseName)
+}
+
+func (install *operatorInstall) upgrade(ctx context.Context, chartValues ...string) {
+	ginkgo.GinkgoHelper()
+
+	err := install.operator.Upgrade(ctx, append(operatorChartValues(), chartValues...), helpers.ChartOptions{
+		ReleaseName: install.releaseName,
+		Timeout:     helmInstallTimeout,
+		Wait:        true,
+	})
+	framework.ExpectNoError(err, "failed to upgrade release %s", install.releaseName)
 }
 
 // saveLogsOnFailure writes the logs of every pod in the given namespaces to a directory under

@@ -19,6 +19,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -27,25 +28,30 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
+	"github.com/NVIDIA/gpu-operator/tests/e2e/helpers"
 )
 
 const (
-	daemonSetUpdateTimeout    = 2 * time.Minute
-	gpuSharingWorkloadTimeout = 5 * time.Minute
+	daemonSetUpdateTimeout     = 2 * time.Minute
+	gpuSharingWorkloadTimeout  = 5 * time.Minute
+	driverMigrationStepTimeout = 5 * time.Minute
 
 	timeSlicingConfigMapName = "plugin-config"
 	timeSlicingConfigKey     = "plugin-config.yaml"
 	timeSlicingReplicas      = 10
 	gpuSharingWorkloadName   = "nvidia-plugin-test"
 
-	gpuProductLabel = "nvidia.com/gpu.product"
-	gpuCountLabel   = "nvidia.com/gpu.count"
+	deployOperandsLabel = "nvidia.com/gpu.deploy.operands"
+	gpuProductLabel     = "nvidia.com/gpu.product"
+	gpuCountLabel       = "nvidia.com/gpu.count"
 
 	legacyDriverApp = "nvidia-driver-daemonset"
 )
@@ -141,6 +147,51 @@ var _ = ginkgo.Describe(e2eTestPrefix+"-defaults", ginkgo.Label("defaults"), gin
 			waitForOperandsReady(ctx, clients)
 		})
 	})
+
+	ginkgo.It("recovers after the operator restarts", func(ctx context.Context) {
+		restartOperator(ctx, install.clients)
+	})
+
+	ginkgo.It("removes operands when nodes opt out and restores them when they opt back in", func(ctx context.Context) {
+		clients := install.clients
+		err := clients.nodes.LabelAllNodes(ctx, deployOperandsLabel, "false")
+		framework.ExpectNoError(err, "failed to label all nodes %s=false", deployOperandsLabel)
+		for _, selector := range slices.Concat(operandSelectors, []string{appSelector("nvidia-dcgm")}) {
+			waitForPodsDeleted(ctx, clients, selector)
+		}
+
+		err = clients.nodes.LabelAllNodes(ctx, deployOperandsLabel, "true")
+		framework.ExpectNoError(err, "failed to label all nodes %s=true", deployOperandsLabel)
+		waitForOperandsReady(ctx, clients)
+	})
+
+	ginkgo.It("migrates driver management from the ClusterPolicy to NVIDIADriver", func(ctx context.Context) {
+		clients := install.clients
+		legacyDriverPodName := firstLegacyDriverPodName(ctx, clients)
+
+		install.upgrade(ctx,
+			fmt.Sprintf("operator.defaultRuntime=%s", tcfg.containerRuntime),
+			"driver.nvidiaDriverCRD.enabled=true",
+			"driver.nvidiaDriverCRD.deployDefaultCR=true",
+		)
+
+		waitForLegacyDriverDaemonSetDeleted(ctx, clients)
+		waitForPodOrphaned(ctx, clients, legacyDriverPodName)
+		waitForSingleDefaultDriver(ctx, clients, consts.DefaultNVIDIADriverName, driverMigrationStepTimeout)
+		waitForNodesOwnedByDriver(ctx, clients, consts.DefaultNVIDIADriverName, driverMigrationStepTimeout)
+		waitForDriverDaemonSets(ctx, clients, consts.DefaultNVIDIADriverName, driverMigrationStepTimeout)
+		waitForNotFound(ctx, driverMigrationStepTimeout, "waiting for the upgrade flow to delete the orphaned legacy driver pod",
+			func(ctx context.Context) error {
+				_, err := clients.kube.CoreV1().Pods(tcfg.namespace).Get(ctx, legacyDriverPodName, metav1.GetOptions{})
+				return err
+			})
+		waitForPodsReady(ctx, clients, helpers.DriverComponentSelector)
+		waitForDriverUpgradeDone(ctx, clients)
+	})
+
+	ginkgo.It("runs a GPU workload after the migration", func(ctx context.Context) {
+		runGPUWorkload(ctx, install.clients)
+	})
 })
 
 var _ = ginkgo.Describe(e2eTestPrefix+"-sandbox-workloads", ginkgo.Label("defaults"), ginkgo.Ordered, func() {
@@ -193,6 +244,36 @@ func waitForOperandPodLabels(ctx context.Context, clients clusterClients, expect
 				}
 			}
 		}
+	})
+}
+
+func firstLegacyDriverPodName(ctx context.Context, clients clusterClients) string {
+	ginkgo.GinkgoHelper()
+	legacyDriverPods, err := clients.pods.List(ctx, tcfg.namespace, appSelector(legacyDriverApp))
+	framework.ExpectNoError(err, "failed to list the legacy ClusterPolicy driver pods")
+	gomega.Expect(legacyDriverPods).NotTo(gomega.BeEmpty(), "legacy ClusterPolicy driver pod not found")
+	return legacyDriverPods[0].Name
+}
+
+func waitForLegacyDriverDaemonSetDeleted(ctx context.Context, clients clusterClients) {
+	ginkgo.GinkgoHelper()
+	waitFor(ctx, driverMigrationStepTimeout, "waiting for the ClusterPolicy driver daemonset to be deleted", func(g gomega.Gomega) {
+		legacyDriverDaemonSets, err := clients.daemonSets.List(ctx, tcfg.namespace, appSelector(legacyDriverApp))
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(legacyDriverDaemonSets).To(gomega.BeEmpty())
+	})
+}
+
+// waitForPodOrphaned also passes once the pod is gone, since the upgrade flow may delete it first.
+func waitForPodOrphaned(ctx context.Context, clients clusterClients, podName string) {
+	ginkgo.GinkgoHelper()
+	waitFor(ctx, driverMigrationStepTimeout, fmt.Sprintf("waiting for pod %s to be orphaned", podName), func(g gomega.Gomega) {
+		pod, err := clients.kube.CoreV1().Pods(tcfg.namespace).Get(ctx, podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(pod.OwnerReferences).To(gomega.BeEmpty())
 	})
 }
 

@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/NVIDIA/gpu-operator/tests/e2e/framework"
@@ -165,6 +166,33 @@ func waitForDaemonSetImage(ctx context.Context, timeout time.Duration, listDaemo
 		for _, daemonSet := range daemonSets {
 			g.Expect(daemonSet.Spec.Template.Spec.Containers[0].Image).To(gomega.ContainSubstring(version), "daemonset %s", daemonSet.Name)
 		}
+	})
+}
+
+func restartOperator(ctx context.Context, clients clusterClients) {
+	ginkgo.GinkgoHelper()
+
+	operatorPods, err := clients.pods.List(ctx, tcfg.namespace, operatorComponentSelector)
+	framework.ExpectNoError(err, "failed to list the operator pods")
+	gomega.Expect(operatorPods).NotTo(gomega.BeEmpty(), "operator pod not found")
+	deletedPodUIDs := make(map[types.UID]bool, len(operatorPods))
+	for _, pod := range operatorPods {
+		deletedPodUIDs[pod.UID] = true
+	}
+
+	err = clients.pods.DeleteCollection(ctx, tcfg.namespace, operatorComponentSelector)
+	framework.ExpectNoError(err, "failed to delete the operator pods")
+
+	waitFor(ctx, operatorRestartTimeout, "waiting for a replacement operator pod to run", func(g gomega.Gomega) {
+		pods, err := clients.pods.List(ctx, tcfg.namespace, operatorComponentSelector)
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		runningReplacementCount := 0
+		for _, pod := range pods {
+			if !deletedPodUIDs[pod.UID] && pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil {
+				runningReplacementCount++
+			}
+		}
+		g.Expect(runningReplacementCount).To(gomega.BeNumerically(">", 0), "no replacement operator pod is running")
 	})
 }
 
