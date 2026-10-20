@@ -93,6 +93,22 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
 
+  e2e-tests-ginkgo:
+    needs: [variables, image-builds]
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    uses: ./.github/workflows/e2e-tests.yaml
+    with:
+      operator_image: ${{ needs.variables.outputs.operator_image }}
+      operator_version: ${{ needs.variables.outputs.operator_version }}
+      use_ginkgo: true
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
+
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [variables, e2e-tests]
