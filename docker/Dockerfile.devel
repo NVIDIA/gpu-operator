@@ -13,6 +13,10 @@
 # limitations under the License.
 ARG GOLANGCI_LINT_VERSION=1.60.3
 
+<<<<<<< HEAD
 FROM golang:1.26.9@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+=======
+FROM golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd
+>>>>>>> b50078562 (chore(deps): update go toolchain to v1.27.3)
 
 RUN curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION}

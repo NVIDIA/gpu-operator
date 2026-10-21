@@ -19,7 +19,11 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= v26.7.2
 
+<<<<<<< HEAD
 GOLANG_VERSION ?= 1.26.9
+=======
+GOLANG_VERSION ?= 1.27.3
+>>>>>>> b50078562 (chore(deps): update go toolchain to v1.27.3)
 
 GOLANGCI_LINT_VERSION ?= v2.12.2
 
