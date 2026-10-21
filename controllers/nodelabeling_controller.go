@@ -26,6 +26,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -45,6 +46,10 @@ import (
 )
 
 const nodeLabelingControllerSingletonName = "cluster"
+
+// nodePatchConflictRequeueDelay gives the informer cache time to observe the newer node
+// versions; requeueing sooner re-reads the stale versions and conflicts again.
+const nodePatchConflictRequeueDelay = 5 * time.Second
 
 // podNodeNameIndexKey indexes pods by spec.nodeName so per-node pod lookups don't
 // scan every pod in the cluster.
@@ -74,6 +79,25 @@ type nodeLabelingController struct {
 	// at least one node because pods holding gpu.nvidia.com claims are still present; the
 	// reconciler requeues until the kubelet-plugin can drain last.
 	draPluginRemovalDeferred bool
+
+	// nodePatchConflicted records that at least one optimistic-lock node patch conflicted.
+	// Unrelated node writes such as kubelet status updates also bump resourceVersion, so
+	// a conflict skips only that node and the reconciler requeues to retry it; the node
+	// predicate ignores those writes and would not retrigger reconciliation.
+	nodePatchConflicted bool
+}
+
+// requeueResult requeues when this pass left node updates for a later pass.
+func (nlc *nodeLabelingController) requeueResult() reconcile.Result {
+	if nlc.nodePatchConflicted {
+		return reconcile.Result{RequeueAfter: nodePatchConflictRequeueDelay}
+	}
+	if nlc.draPluginRemovalDeferred {
+		// Pod deletion events also retrigger reconciliation; the requeue is a backstop so
+		// the kubelet-plugin label falls off even if an event is missed.
+		return reconcile.Result{RequeueAfter: 30 * time.Second}
+	}
+	return reconcile.Result{}
 }
 
 // gpuNodeLabelsUpdateResult reports total node patches and the subset where GPU
@@ -228,7 +252,7 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
 			"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
 		)
-		return reconcile.Result{}, nil
+		return nlc.requeueResult(), nil
 	}
 
 	// Route each GPU node to its NVIDIADriver CR. Skipping this leaves the NVIDIADriver controller owning no nodes, and it
@@ -249,12 +273,7 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, err
 	}
 
-	if nlc.draPluginRemovalDeferred {
-		// Pod deletion events also retrigger reconciliation; the requeue is a backstop so
-		// the kubelet-plugin label falls off even if an event is missed.
-		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-	return reconcile.Result{}, nil
+	return nlc.requeueResult(), nil
 }
 
 // labelGPUNodes reconciles GPU-related labels and reports which node labels were patched.
@@ -283,7 +302,12 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 
 		modified := gpuDiscoveryStateChanged || stateLabelsModified
 		if modified {
-			if err := nlc.client.Patch(ctx, &node, client.MergeFrom(original)); err != nil {
+			if err := nlc.client.Patch(ctx, &node, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
+				if apierrors.IsConflict(err) {
+					nlc.logger.V(consts.LogLevelDebug).Info("Node changed after read, retrying GPU labels on requeue", "NodeName", node.Name)
+					nlc.nodePatchConflicted = true
+					continue
+				}
 				return result, fmt.Errorf("unable to label node %s: %w", node.Name, err)
 			}
 			result.totalPatchedNodeCount++
@@ -623,7 +647,13 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 			node.Labels = map[string]string{}
 		}
 		node.Labels[upgradeStateLabel] = upgrade.UpgradeStateUpgradeRequired
-		if err := nlc.client.Patch(ctx, node, client.MergeFrom(original)); err != nil {
+		if err := nlc.client.Patch(ctx, node, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
+			if apierrors.IsConflict(err) {
+				nlc.logger.V(consts.LogLevelDebug).Info("Node changed after read, retrying upgrade request on requeue",
+					"NodeName", node.Name, "pod", pod.Name)
+				nlc.nodePatchConflicted = true
+				continue
+			}
 			return fmt.Errorf("failed to label node %q for orphaned driver pod %q: %w", node.Name, pod.Name, err)
 		}
 	}
