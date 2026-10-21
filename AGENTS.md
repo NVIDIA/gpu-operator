@@ -55,7 +55,8 @@ so CI and local runs stay consistent.
   the `helm` binary.
 - `make validate-csv` — validates that the CSV file in the OLM bundle directory is properly
   formatted and all image references are valid.
-- `make check-third-party-notices` — checks whether `THIRD_PARTY_NOTICES.md` is up-to-date.
+- `make third-party-notices` — generates the third-party notices document; it is not committed,
+  and the release workflow produces the per-release copy.
 
 Always run `make fmt` and `make unit-test` before considering Go changes complete.
 

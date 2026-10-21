@@ -78,7 +78,7 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${
 # and lifecycle hooks keep working on the non-*-dev* distroless base.
 FROM debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258 AS shell
 RUN apt-get update \
- && apt-get install -y --no-install-recommends busybox-static \
+ && apt-get install -y --no-install-recommends busybox-static=1:1.37.0-6+b9 \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir /busybox \
  && cp /bin/busybox /busybox/busybox \

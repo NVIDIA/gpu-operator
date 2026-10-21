@@ -121,7 +121,6 @@ make validate-helm-values       # verify that images referenced in helm values a
 make validate-csv               # verify that images referenced in the OLM bundle's CSV file are valid
 
 make validate-modules           # verify that go.mod and go.sum are up-to-date
-make check-third-party-notices  # verify that `THIRD_PARTY_NOTICES.md` is up-to-date
 ```
 
 ## <a name="signing"></a>Signing your work
