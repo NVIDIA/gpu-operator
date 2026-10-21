@@ -208,6 +208,16 @@ spec:
                 description: HostNetwork indicates whether the Driver pod uses the
                   host's network namespace.
                 type: boolean
+              hostSubscription:
+                description: HostSubscription controls host subscription mounts independently
+                  of custom repositories.
+                properties:
+                  enabled:
+                    description: |-
+                      Enabled defaults to true when omitted. Set to false for air-gapped hosts
+                      without subscription files, even when custom repositories are configured.
+                    type: boolean
+                type: object
               image:
                 default: nvcr.io/nvidia/driver
                 description: NVIDIA Driver container image name

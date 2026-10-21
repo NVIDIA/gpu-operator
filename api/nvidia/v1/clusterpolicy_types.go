@@ -667,6 +667,10 @@ type DriverSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Repo Configuration For NVIDIA Driver Container"
 	RepoConfig *DriverRepoConfigSpec `json:"repoConfig,omitempty"`
 
+	// HostSubscription controls host subscription mounts independently of custom repositories.
+	// +optional
+	HostSubscription DriverHostSubscriptionSpec `json:"hostSubscription,omitempty"`
+
 	// Optional: Custom certificates configuration for NVIDIA Driver container
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Custom Certificates Configuration For NVIDIA Driver Container"
@@ -1277,6 +1281,20 @@ type NodeStatusExporterSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostNetwork for NVIDIA Node Status Exporter"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	HostNetwork *bool `json:"hostNetwork,omitempty"`
+}
+
+// DriverHostSubscriptionSpec controls host subscription mounts for the NVIDIA driver container.
+// OS and runtime eligibility checks still apply when mounts are enabled.
+type DriverHostSubscriptionSpec struct {
+	// Enabled defaults to true when omitted. Set to false for air-gapped hosts
+	// without subscription files, even when custom repositories are configured.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// IsEnabled preserves automatic host subscription mounts unless explicitly disabled.
+func (h *DriverHostSubscriptionSpec) IsEnabled() bool {
+	return h.Enabled == nil || *h.Enabled
 }
 
 // DriverRepoConfigSpec defines custom repo configuration for NVIDIA Driver container

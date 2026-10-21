@@ -17,6 +17,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,4 +86,31 @@ func TestImagePath(t *testing.T) {
 		assert.Empty(t, path)
 		assert.ErrorContains(t, err, "invalid nil spec")
 	})
+}
+
+func TestDriverHostSubscriptionSpec(t *testing.T) {
+	for name, tc := range map[string]struct {
+		input   string
+		enabled bool
+		omitted bool
+	}{
+		"omitted":  {input: `{}`, enabled: true, omitted: true},
+		"enabled":  {input: `{"enabled":true}`, enabled: true},
+		"disabled": {input: `{"enabled":false}`, enabled: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var spec DriverHostSubscriptionSpec
+			require.NoError(t, json.Unmarshal([]byte(tc.input), &spec))
+			require.Equal(t, tc.enabled, spec.IsEnabled())
+			require.Equal(t, tc.omitted, spec.Enabled == nil)
+			encoded, err := json.Marshal(spec)
+			require.NoError(t, err)
+			require.JSONEq(t, tc.input, string(encoded))
+			copied := spec.DeepCopy()
+			if spec.Enabled != nil {
+				*copied.Enabled = !*copied.Enabled
+				require.Equal(t, tc.enabled, spec.IsEnabled())
+			}
+		})
+	}
 }

@@ -202,6 +202,9 @@ spec:
     {{- if .Values.driver.repoConfig }}
     repoConfig: {{ toYaml .Values.driver.repoConfig | nindent 6 }}
     {{- end }}
+    {{- if .Values.driver.hostSubscription }}
+    hostSubscription: {{ toYaml .Values.driver.hostSubscription | nindent 6 }}
+    {{- end }}
     {{- if .Values.driver.certConfig }}
     certConfig: {{ toYaml .Values.driver.certConfig | nindent 6 }}
     {{- end }}

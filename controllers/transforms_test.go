@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -4769,7 +4770,7 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
+			"custom.repo": "[test-repo]",
 		},
 	}
 	mockClient := fake.NewFakeClient(repoConfigMap)
@@ -4778,20 +4779,14 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 		description                 string
 		osRelease                   string
 		osTag                       string
-		repoConfigEnabled           bool
+		runtime                     string
 		expectSubscriptionMounts    bool
 		expectedSubscriptionHostMap map[string]corev1.HostPathType
 	}{
 		{
-			description:              "rhel with repo config skips host subscription mounts",
+			description:              "rhel/containerd/openshift=",
 			osRelease:                "rhel",
-			osTag:                    "rhel8.10",
-			repoConfigEnabled:        true,
-			expectSubscriptionMounts: false,
-		},
-		{
-			description:              "rhel without repo config mounts host subscription paths",
-			osRelease:                "rhel",
+			runtime:                  "containerd",
 			osTag:                    "rhel8.10",
 			expectSubscriptionMounts: true,
 			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
@@ -4800,45 +4795,104 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 				"/etc/rhsm":                    corev1.HostPathDirectory,
 			},
 		},
+		{
+			description:              "rhel/crio/openshift=",
+			osRelease:                "rhel",
+			runtime:                  "crio",
+			osTag:                    "rhel8.10",
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "ubuntu/containerd/openshift=",
+			osRelease:                "ubuntu",
+			runtime:                  "containerd",
+			osTag:                    "ubuntu22.04",
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "sles/containerd/openshift=",
+			osRelease:                "sles",
+			runtime:                  "containerd",
+			osTag:                    "sles15.6",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/zypp/credentials.d": corev1.HostPathDirectory,
+				"/etc/SUSEConnect":        corev1.HostPathFileOrCreate,
+			},
+		},
+		{
+			description:              "sl-micro/containerd/openshift=",
+			osRelease:                "sl-micro",
+			runtime:                  "containerd",
+			osTag:                    "sl-micro6.1",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/zypp/credentials.d": corev1.HostPathDirectory,
+				"/etc/SUSEConnect":        corev1.HostPathFileOrCreate,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
-				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
-			cpSpec := &gpuv1.ClusterPolicySpec{
-				Driver: gpuv1.DriverSpec{
-					Repository:      "nvcr.io/nvidia",
-					Image:           "driver",
-					ImagePullPolicy: "IfNotPresent",
-					Version:         "580.126.16",
-					Manager: gpuv1.DriverManagerSpec{
-						Repository:      "nvcr.io/nvidia/cloud-native",
-						Image:           "k8s-driver-manager",
-						ImagePullPolicy: "IfNotPresent",
-						Version:         "v0.8.0",
-					},
-				},
-			}
-			if tc.repoConfigEnabled {
-				cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{ConfigMapName: "test-repo-config"}
-			}
+		for mode, enabled := range map[string]*bool{"omitted": nil, "enabled": new(true), "disabled": new(false)} {
+			for _, repoEnabled := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/repo=%t", tc.description, mode, repoEnabled), func(t *testing.T) {
+					ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+						WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+					cpSpec := &gpuv1.ClusterPolicySpec{
+						Driver: gpuv1.DriverSpec{
+							Repository:      "nvcr.io/nvidia",
+							Image:           "driver",
+							ImagePullPolicy: "IfNotPresent",
+							Version:         "580.126.16",
+							Manager: gpuv1.DriverManagerSpec{
+								Repository:      "nvcr.io/nvidia/cloud-native",
+								Image:           "k8s-driver-manager",
+								ImagePullPolicy: "IfNotPresent",
+								Version:         "v0.8.0",
+							},
+						},
+					}
+					if repoEnabled {
+						cpSpec.Driver.RepoConfig = &gpuv1.DriverRepoConfigSpec{ConfigMapName: "test-repo-config"}
+					}
 
-			err := TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
-				client:            mockClient,
-				runtime:           gpuv1.Containerd,
-				operatorNamespace: "test-ns",
-				logger:            ctrl.Log.WithName("test"),
-				gpuNodeOSRelease:  tc.osRelease,
-				gpuNodeOSTag:      tc.osTag,
-			})
-			require.NoError(t, err)
+					cpSpec.Driver.HostSubscription.Enabled = enabled
 
-			driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
-			require.NotNil(t, driverContainer)
-			assertSubscriptionHostPathVolumesForTransform(t, ds.Spec.Template.Spec.Volumes, tc.expectedSubscriptionHostMap)
-			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMountForTransform(driverContainer.VolumeMounts))
-		})
+					err := TransformDriver(ds.DaemonSet, cpSpec, ClusterPolicyController{
+						client:            mockClient,
+						runtime:           gpuv1.Runtime(tc.runtime),
+						operatorNamespace: "test-ns",
+						logger:            ctrl.Log.WithName("test"),
+						gpuNodeOSRelease:  tc.osRelease,
+						gpuNodeOSTag:      tc.osTag,
+					})
+					require.NoError(t, err)
+
+					driverContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+					require.NotNil(t, driverContainer)
+					expectedPaths := tc.expectedSubscriptionHostMap
+					expectMounts := tc.expectSubscriptionMounts
+					if enabled != nil && !*enabled {
+						expectedPaths = nil
+						expectMounts = false
+					}
+					assertSubscriptionHostPathVolumesForTransform(t, ds.Spec.Template.Spec.Volumes, expectedPaths)
+					repoMounted := false
+					for _, mount := range driverContainer.VolumeMounts {
+						if strings.HasPrefix(mount.Name, "subscription-config-") {
+							require.True(t, mount.ReadOnly)
+						}
+						if mount.SubPath == "custom.repo" {
+							repoMounted = true
+						}
+					}
+					assert.Equal(t, repoEnabled, repoMounted)
+
+					assert.Equal(t, expectMounts, hasSubscriptionVolumeMountForTransform(driverContainer.VolumeMounts))
+				})
+			}
+		}
 	}
 }
 

@@ -239,6 +239,10 @@ driver:
   # Private mirror repository configuration
   repoConfig:
     configMapName: ""
+  # Mount host subscription files on eligible OS/runtime combinations, including with repoConfig.
+  # Set to false for air-gapped hosts without subscription files.
+  hostSubscription:
+    enabled: true
   # custom ssl key/certificate configuration
   certConfig:
     name: ""

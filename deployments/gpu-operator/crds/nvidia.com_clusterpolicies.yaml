@@ -1041,6 +1041,16 @@ spec:
                     description: HostNetwork indicates whether the Driver pod uses
                       the host's network namespace.
                     type: boolean
+                  hostSubscription:
+                    description: HostSubscription controls host subscription mounts
+                      independently of custom repositories.
+                    properties:
+                      enabled:
+                        description: |-
+                          Enabled defaults to true when omitted. Set to false for air-gapped hosts
+                          without subscription files, even when custom repositories are configured.
+                        type: boolean
+                    type: object
                   image:
                     description: NVIDIA Driver image name
                     pattern: '[a-zA-Z0-9\-]+'

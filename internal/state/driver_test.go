@@ -19,6 +19,7 @@ package state
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -628,26 +629,23 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 			Namespace: "test-ns",
 		},
 		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
+			"custom.repo": "[test-repo]",
 		},
 	}
 
 	testCases := []struct {
 		description                 string
 		osRelease                   string
-		repoConfigEnabled           bool
+		runtime                     string
+		openshift                   string
 		expectSubscriptionMounts    bool
 		expectedSubscriptionHostMap map[string]corev1.HostPathType
 	}{
 		{
-			description:              "rhel with repo config skips host subscription mounts",
+			description:              "rhel/containerd/openshift=",
 			osRelease:                "rhel",
-			repoConfigEnabled:        true,
-			expectSubscriptionMounts: false,
-		},
-		{
-			description:              "rhel without repo config mounts host subscription paths",
-			osRelease:                "rhel",
+			runtime:                  "containerd",
+			openshift:                "",
 			expectSubscriptionMounts: true,
 			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
 				"/etc/pki/entitlement":         corev1.HostPathDirectory,
@@ -655,32 +653,98 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 				"/etc/rhsm":                    corev1.HostPathDirectory,
 			},
 		},
+		{
+			description:              "rhel/crio/openshift=",
+			osRelease:                "rhel",
+			runtime:                  "crio",
+			openshift:                "",
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "rhel/containerd/openshift=4.18",
+			osRelease:                "rhel",
+			runtime:                  "containerd",
+			openshift:                "4.18",
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "ubuntu/containerd/openshift=",
+			osRelease:                "ubuntu",
+			runtime:                  "containerd",
+			openshift:                "",
+			expectSubscriptionMounts: false,
+		},
+		{
+			description:              "sles/containerd/openshift=",
+			osRelease:                "sles",
+			runtime:                  "containerd",
+			openshift:                "",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/zypp/credentials.d": corev1.HostPathDirectory,
+				"/etc/SUSEConnect":        corev1.HostPathFileOrCreate,
+			},
+		},
+		{
+			description:              "sl-micro/containerd/openshift=",
+			osRelease:                "sl-micro",
+			runtime:                  "containerd",
+			openshift:                "",
+			expectSubscriptionMounts: true,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/zypp/credentials.d": corev1.HostPathDirectory,
+				"/etc/SUSEConnect":        corev1.HostPathFileOrCreate,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			stateDriver := &stateDriver{
-				stateSkel: stateSkel{
-					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap).Build(),
-					namespace: "test-ns",
-				},
-			}
-			driver := &nvidiav1alpha1.NVIDIADriver{}
-			if tc.repoConfigEnabled {
-				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
-			}
+		for mode, enabled := range map[string]*bool{"omitted": nil, "enabled": new(true), "disabled": new(false)} {
+			for _, repoEnabled := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/repo=%t", tc.description, mode, repoEnabled), func(t *testing.T) {
+					stateDriver := &stateDriver{
+						stateSkel: stateSkel{
+							client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap).Build(),
+							namespace: "test-ns",
+						},
+					}
+					driver := &nvidiav1alpha1.NVIDIADriver{}
+					if repoEnabled {
+						driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
+					}
 
-			configs, err := stateDriver.getDriverAdditionalConfigs(
-				context.Background(),
-				driver,
-				testClusterInfo{runtime: consts.Containerd},
-				nodePool{osRelease: tc.osRelease, osVersion: tc.osRelease},
-			)
-			require.NoError(t, err)
+					driver.Spec.HostSubscription.Enabled = enabled
 
-			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
-			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
-		})
+					configs, err := stateDriver.getDriverAdditionalConfigs(
+						context.Background(),
+						driver,
+						testClusterInfo{runtime: tc.runtime, openshiftVersion: tc.openshift},
+						nodePool{osRelease: tc.osRelease, osVersion: tc.osRelease},
+					)
+					require.NoError(t, err)
+
+					expectedPaths := tc.expectedSubscriptionHostMap
+					expectMounts := tc.expectSubscriptionMounts
+					if enabled != nil && !*enabled {
+						expectedPaths = nil
+						expectMounts = false
+					}
+					assertSubscriptionHostPathVolumes(t, configs.Volumes, expectedPaths)
+					repoMounted := false
+					for _, mount := range configs.VolumeMounts {
+						if strings.HasPrefix(mount.Name, "subscription-config-") {
+							require.True(t, mount.ReadOnly)
+						}
+						if mount.SubPath == "custom.repo" {
+							repoMounted = true
+						}
+					}
+					assert.Equal(t, repoEnabled, repoMounted)
+
+					assert.Equal(t, expectMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
+				})
+			}
+		}
 	}
 }
 
