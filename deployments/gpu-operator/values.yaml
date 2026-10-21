@@ -656,6 +656,7 @@ node-feature-discovery:
   gc:
     enable: true
     replicaCount: 1
+    tolerations: []
     serviceAccount:
       name: node-feature-discovery
       create: false
