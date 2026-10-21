@@ -148,7 +148,7 @@ func TestGPUClusterReconcileRecordsGPUNodeCount(t *testing.T) {
 	gpuNode := func(name string) *corev1.Node {
 		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
-			Labels: map[string]string{commonGPULabelKey: commonGPULabelValue},
+			Labels: map[string]string{"nvidia.com/gpu.present": "true"},
 		}}
 	}
 	cpuNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cpu-0"}}
@@ -158,6 +158,28 @@ func TestGPUClusterReconcileRecordsGPUNodeCount(t *testing.T) {
 	gccReconcile(t, r, cfg.Name)
 
 	require.Equal(t, float64(2), gaugeValue(t, r.OperatorMetrics.gpuNodesTotal))
+}
+
+// The gauge is updated even when a conflicting ClusterPolicy stops the reconcile
+// before any state is synced.
+func TestGPUClusterReconcileRecordsGPUNodeCountWithConflict(t *testing.T) {
+	cfg := &nvidiav1alpha1.GPUCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "config"},
+	}
+	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+	gpuNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:   "gpu-0",
+		Labels: map[string]string{"nvidia.com/gpu.present": "true"},
+	}}
+	r, _ := newGPUClusterReconciler(t, cfg, cp, gpuNode)
+	r.OperatorMetrics = &OperatorMetrics{gpuNodesTotal: promcli.NewGauge(promcli.GaugeOpts{})}
+	updater := &FakeConditionUpdater{}
+	r.conditionUpdater = updater
+
+	gccReconcile(t, r, cfg.Name)
+
+	require.Equal(t, conditions.PrerequisiteNotMet, updater.LastErrorReason)
+	require.Equal(t, float64(1), gaugeValue(t, r.OperatorMetrics.gpuNodesTotal))
 }
 
 func gaugeValue(t *testing.T, g promcli.Gauge) float64 {

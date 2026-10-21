@@ -98,7 +98,7 @@ type ClusterPolicyReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("Reconciling ClusterPolicy", req.NamespacedName)
+	r.Log.Info("Reconciling ClusterPolicy", "name", req.NamespacedName)
 
 	// Fetch the ClusterPolicy instance
 	instance := &gpuv1.ClusterPolicy{}

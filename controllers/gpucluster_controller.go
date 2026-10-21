@@ -97,6 +97,10 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("error getting GPUCluster object: %w", err)
 	}
 
+	// Count before the prerequisite check, so the gauge keeps tracking the fleet while
+	// a conflicting ClusterPolicy blocks this GPUCluster.
+	r.recordGPUNodeCount(ctx)
+
 	if !instance.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, instance)
 	}
@@ -123,8 +127,6 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.ensureAdminAccessLabel(ctx); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to label namespace for admin access: %w", err)
 	}
-
-	r.recordGPUNodeCount(ctx)
 
 	infoCatalog := state.NewInfoCatalog()
 	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)

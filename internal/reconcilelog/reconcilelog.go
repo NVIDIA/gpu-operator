@@ -41,21 +41,30 @@ func Wrap(r reconcile.Reconciler) reconcile.Reconciler {
 	return &reconcileLogger{inner: r}
 }
 
-func (l *reconcileLogger) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (l *reconcileLogger) Reconcile(ctx context.Context, req reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	res, err := l.inner.Reconcile(ctx, req)
-
-	outcome := "success"
-	switch {
-	case err != nil:
-		outcome = "error"
-	case res.RequeueAfter > 0 || res.Requeue: //nolint:staticcheck // Requeue is still set by callers
-		outcome = "requeue"
-	}
-	log.FromContext(ctx).Info("Reconcile finished",
-		"start", start.UTC().Format(time.RFC3339Nano),
-		"durationSeconds", time.Since(start).Seconds(),
-		"outcome", outcome,
-	)
-	return res, err
+	// Log from a defer so a panic in the inner reconciler still produces a finished
+	// line. controller-runtime recovers the panic above this wrapper, so it is
+	// re-raised unchanged.
+	defer func() {
+		p := recover()
+		outcome := "success"
+		switch {
+		case p != nil:
+			outcome = "panic"
+		case err != nil:
+			outcome = "error"
+		case res.RequeueAfter > 0 || res.Requeue: //nolint:staticcheck // Requeue is still set by callers
+			outcome = "requeue"
+		}
+		log.FromContext(ctx).Info("Reconcile finished",
+			"start", start.UTC().Format(time.RFC3339Nano),
+			"durationSeconds", time.Since(start).Seconds(),
+			"outcome", outcome,
+		)
+		if p != nil {
+			panic(p)
+		}
+	}()
+	return l.inner.Reconcile(ctx, req)
 }

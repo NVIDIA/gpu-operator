@@ -19,6 +19,8 @@ package reconcilelog
 import (
 	"context"
 	"errors"
+	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -37,6 +39,37 @@ func (f fakeReconciler) Reconcile(context.Context, reconcile.Request) (reconcile
 	return f.res, f.err
 }
 
+type panicReconciler struct{}
+
+func (panicReconciler) Reconcile(context.Context, reconcile.Request) (reconcile.Result, error) {
+	panic("boom")
+}
+
+// captureLog returns a context whose logger appends each line's key/value text to *lines.
+func captureLog(t *testing.T, lines *[]string) context.Context {
+	t.Helper()
+	logger := funcr.New(func(_, args string) { *lines = append(*lines, args) }, funcr.Options{})
+	return log.IntoContext(t.Context(), logger)
+}
+
+// requireFinishedLine checks that line is a well-formed "Reconcile finished" line.
+func requireFinishedLine(t *testing.T, line, outcome string) {
+	t.Helper()
+	require.Contains(t, line, `"msg"="Reconcile finished"`)
+	require.Contains(t, line, `"outcome"="`+outcome+`"`)
+
+	start := regexp.MustCompile(`"start"="([^"]+)"`).FindStringSubmatch(line)
+	require.Len(t, start, 2, line)
+	_, err := time.Parse(time.RFC3339Nano, start[1])
+	require.NoError(t, err)
+
+	dur := regexp.MustCompile(`"durationSeconds"=([^ ]+)`).FindStringSubmatch(line)
+	require.Len(t, dur, 2, line)
+	seconds, err := strconv.ParseFloat(dur[1], 64)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, seconds, 0.0)
+}
+
 func TestWrap(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -50,18 +83,27 @@ func TestWrap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var lines []string
-			logger := funcr.New(func(prefix, args string) { lines = append(lines, args) }, funcr.Options{})
-			ctx := log.IntoContext(t.Context(), logger)
+			ctx := captureLog(t, &lines)
 
 			res, err := Wrap(tt.inner).Reconcile(ctx, reconcile.Request{})
 
 			require.Equal(t, tt.inner.res, res)
 			require.Equal(t, tt.inner.err, err)
 			require.Len(t, lines, 1)
-			require.Contains(t, lines[0], `"msg"="Reconcile finished"`)
-			require.Contains(t, lines[0], `"outcome"="`+tt.outcome+`"`)
-			require.Contains(t, lines[0], `"start"=`)
-			require.Contains(t, lines[0], `"durationSeconds"=`)
+			requireFinishedLine(t, lines[0], tt.outcome)
 		})
 	}
+}
+
+// A panic in the inner reconciler is logged as finished and then re-raised, so
+// controller-runtime's own recovery still sees it.
+func TestWrapPanic(t *testing.T) {
+	var lines []string
+	ctx := captureLog(t, &lines)
+
+	require.PanicsWithValue(t, "boom", func() {
+		_, _ = Wrap(panicReconciler{}).Reconcile(ctx, reconcile.Request{})
+	})
+	require.Len(t, lines, 1)
+	requireFinishedLine(t, lines[0], "panic")
 }
