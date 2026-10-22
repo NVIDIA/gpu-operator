@@ -684,16 +684,10 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 }
 
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
-// container has completed and is in Ready state.
+// container has completed and is in Ready state. This is a single attempt: waitForDriver owns
+// the retries so that it can keep re-probing the host driver while the container is not ready.
 func assertDriverContainerReady(silent bool) error {
-	command := shell
-	args := []string{"-c", fmt.Sprintf("stat %s", driverContainerStatusFilePath)}
-
-	if withWaitFlag {
-		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
-	}
-
-	return runCommand(command, args, silent)
+	return runCommand(shell, []string{"-c", fmt.Sprintf("stat %s", driverContainerStatusFilePath)}, silent)
 }
 
 // isDriverManagedByOperator determines if the NVIDIA driver is managed by the GPU Operator.
@@ -767,29 +761,30 @@ func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 
 	driverRoot := driver.Root(driverInstallDirCtrPathFlag)
 
+	validateDriver := func(silent bool) error {
+		driverLibraryPath, err := driverRoot.GetDriverLibraryPath()
+		if err != nil {
+			return fmt.Errorf("failed to locate driver libraries: %w", err)
+		}
+
+		nvidiaSMIPath, err := driverRoot.GetNvidiaSMIPath()
+		if err != nil {
+			return fmt.Errorf("failed to locate nvidia-smi: %w", err)
+		}
+		cmd := exec.Command(nvidiaSMIPath, nvidiaSMIArgs()...)
+		// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
+		cmd.Env = utils.SetEnvVar(os.Environ(), "LD_PRELOAD", utils.PrependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
+		if !silent {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
+		return cmd.Run()
+	}
+
 	log.Info("Attempting to validate a driver container installation")
-
-	driverLibraryPath, err := driverRoot.GetDriverLibraryPath()
-	if err != nil {
-		return fmt.Errorf("failed to locate driver libraries: %w", err)
-	}
-
-	nvidiaSMIPath, err := driverRoot.GetNvidiaSMIPath()
-	if err != nil {
-		return fmt.Errorf("failed to locate nvidia-smi: %w", err)
-	}
-
-	cmd := exec.Command(nvidiaSMIPath, nvidiaSMIArgs()...)
-	// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
-	cmd.Env = utils.SetEnvVar(os.Environ(), "LD_PRELOAD", utils.PrependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
-	if !silent {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-	if err := cmd.Run(); err != nil {
+	if err := validateDriver(silent); err != nil {
 		return fmt.Errorf("error validating driver: %w", err)
 	}
-
 	return nil
 }
 

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
@@ -425,5 +426,46 @@ func Test_waitForDriver(t *testing.T) {
 			require.Equal(t, tc.expectedHost, hostDriver)
 			require.Equal(t, tc.expectedHostCalls, *hostCalls)
 		})
+	}
+}
+
+// Regression: with the driver DaemonSet present in the cluster but not running on this node, the
+// driver container readiness file never appears. The readiness check must not block on it, or the
+// host driver is never re-probed.
+func Test_waitForDriver_driverManagedByOperatorWithLateHostDriver(t *testing.T) {
+	_, err := os.Stat(driverContainerStatusFilePath)
+	require.True(t, os.IsNotExist(err), "test requires %s to be absent", driverContainerStatusFilePath)
+
+	origWait, origInterval := withWaitFlag, sleepIntervalSecondsFlag
+	withWaitFlag, sleepIntervalSecondsFlag = true, 0
+	t.Cleanup(func() { withWaitFlag, sleepIntervalSecondsFlag = origWait, origInterval })
+
+	hostCalls := 0
+	probeHost := func() error {
+		hostCalls++
+		if hostCalls <= 2 {
+			return errors.New("host driver not loaded yet")
+		}
+		return nil
+	}
+
+	type result struct {
+		hostDriver bool
+		err        error
+	}
+	done := make(chan result, 1)
+	go func() {
+		hostDriver, err := waitForDriver(withWaitFlag, sleepIntervalSecondsFlag,
+			func() error { return validateDriverContainer(true, true) }, probeHost)
+		done <- result{hostDriver, err}
+	}()
+
+	select {
+	case r := <-done:
+		require.NoError(t, r.err)
+		require.True(t, r.hostDriver)
+		require.Equal(t, 3, hostCalls)
+	case <-time.After(10 * time.Second):
+		t.Fatal("waitForDriver blocked on the driver container readiness check and never re-probed the host")
 	}
 }
