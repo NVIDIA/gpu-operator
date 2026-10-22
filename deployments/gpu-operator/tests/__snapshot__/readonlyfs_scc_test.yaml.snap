@@ -1,0 +1,50 @@
+should match snapshot on openshift:
+  1: |
+    allowHostDirVolumePlugin: false
+    allowHostIPC: false
+    allowHostNetwork: false
+    allowHostPID: false
+    allowHostPorts: false
+    allowPrivilegeEscalation: true
+    allowPrivilegedContainer: false
+    allowedCapabilities: []
+    apiVersion: security.openshift.io/v1
+    defaultAddCapabilities: []
+    fsGroup:
+      type: MustRunAs
+    groups:
+      - system:authenticated
+    kind: SecurityContextConstraints
+    metadata:
+      annotations:
+        kubernetes.io/description: restricted denies access to all host features and requires pods to be run with a UID, read-only root filesystem and SELinux context that are allocated to the namespace.  This SCC is more restrictive than the default restrictive SCC and it is used by default for authenticated users and operators and operands.
+      labels:
+        app.kubernetes.io/component: gpu-operator
+        app.kubernetes.io/instance: gpu-operator
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gpu-operator
+        app.kubernetes.io/version: main-latest
+        helm.sh/chart: gpu-operator-v1.0.0-devel
+      name: restricted-readonly
+    priority: 0
+    readOnlyRootFilesystem: true
+    requiredDropCapabilities:
+      - KILL
+      - MKNOD
+      - SETUID
+      - SETGID
+    runAsUser:
+      type: MustRunAsRange
+    seLinuxContext:
+      type: MustRunAs
+    supplementalGroups:
+      type: RunAsAny
+    users:
+      - system:serviceaccount:gpu-operator:gpu-operator
+    volumes:
+      - configMap
+      - downwardAPI
+      - emptyDir
+      - persistentVolumeClaim
+      - projected
+      - secret
