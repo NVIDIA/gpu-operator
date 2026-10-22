@@ -38,7 +38,9 @@ func dcgmEnabled(cr *nvidiav1alpha1.GPUCluster) bool {
 
 // gpuClusterDaemonSetSource watches DaemonSets and enqueues the owning
 // GPUCluster. Every operand state returns the same source; the manager
-// deduplicates them by key.
+// deduplicates them by key. The predicate drops status updates that do not
+// change the readiness result, so one pod becoming ready on one node does not
+// enqueue a full pass.
 func gpuClusterDaemonSetSource(mgr ctrlManager) map[string]SyncingSource {
 	return map[string]SyncingSource{
 		"DaemonSet": source.Kind(
@@ -46,6 +48,7 @@ func gpuClusterDaemonSetSource(mgr ctrlManager) map[string]SyncingSource {
 			&appsv1.DaemonSet{},
 			handler.TypedEnqueueRequestForOwner[*appsv1.DaemonSet](mgr.GetScheme(), mgr.GetRESTMapper(),
 				&nvidiav1alpha1.GPUCluster{}, handler.OnlyControllerOwner()),
+			DaemonSetWatchPredicate(),
 		),
 	}
 }
