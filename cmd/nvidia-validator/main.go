@@ -1735,7 +1735,7 @@ func (v *VGPUManager) validate() error {
 func (v *VGPUManager) runValidation(silent bool) (hostDriver bool, err error) {
 	// invoke validation command
 	command := "chroot"
-	args := []string{"/run/nvidia/driver", "nvidia-smi"}
+	args := []string{driverInstallDirCtrPathFlag, "nvidia-smi"}
 
 	// check if driver is pre-installed on the host and use host path for validation
 	if nvidiaSMIPath, err := resolveHostNvidiaSMI("/host"); err == nil {

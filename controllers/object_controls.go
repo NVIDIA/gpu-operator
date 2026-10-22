@@ -903,34 +903,43 @@ func transformHostDevCharVolume(obj *appsv1.DaemonSet, hostRoot string) {
 	}
 }
 
-// apply necessary transforms if a custom driver install directory is configured
+// Mount the parent so replacing the driver root does not leave consumers on the old filesystem.
 func transformForDriverInstallDir(obj *appsv1.DaemonSet, driverInstallDir string) {
 	if driverInstallDir == "" || driverInstallDir == DefaultDriverInstallDir {
 		return
 	}
 
-	containsDriverInstallDirVolume := false
-	podSpec := obj.Spec.Template.Spec
-	for _, volume := range podSpec.Volumes {
-		if volume.Name == "driver-install-dir" {
-			volume.HostPath.Path = driverInstallDir
-			containsDriverInstallDirVolume = true
-			break
+	driverInstallDir = path.Clean(driverInstallDir)
+	driverParent := path.Dir(driverInstallDir)
+	driverRootCtrPath := path.Join("/driver-root", path.Base(driverInstallDir))
+	podSpec := &obj.Spec.Template.Spec
+	driverVolumes := make(map[string]bool)
+	for i := range podSpec.Volumes {
+		volume := &podSpec.Volumes[i]
+		if (volume.Name == "driver-install-dir" || volume.Name == DriverInstallPathVolName) && volume.HostPath != nil {
+			volume.HostPath.Path = driverParent
+			driverVolumes[volume.Name] = true
 		}
 	}
 
-	if !containsDriverInstallDirVolume {
+	if len(driverVolumes) == 0 {
 		return
 	}
 
-	if ctr := findContainerByName(podSpec.InitContainers, "driver-validation"); ctr != nil {
-		setContainerEnv(ctr, DriverInstallDirEnvName, driverInstallDir)
-		setContainerEnv(ctr, DriverInstallDirCtrPathEnvName, driverInstallDir)
-		for i, volumeMount := range ctr.VolumeMounts {
-			if volumeMount.Name == "driver-install-dir" {
-				ctr.VolumeMounts[i].MountPath = driverInstallDir
+	for i := range podSpec.InitContainers {
+		ctr := &podSpec.InitContainers[i]
+		for j := range ctr.VolumeMounts {
+			if driverVolumes[ctr.VolumeMounts[j].Name] {
+				ctr.VolumeMounts[j].MountPath = "/driver-root"
+				setContainerEnv(ctr, DriverInstallDirEnvName, driverInstallDir)
+				setContainerEnv(ctr, DriverInstallDirCtrPathEnvName, driverRootCtrPath)
 			}
 		}
+	}
+
+	// Unlike the other management containers, vGPU device manager does not source driver-ready.
+	if ctr := findContainerByName(podSpec.Containers, "nvidia-vgpu-device-manager"); ctr != nil {
+		setContainerEnv(ctr, "DRIVER_ROOT_CTR_PATH", driverRootCtrPath)
 	}
 }
 
