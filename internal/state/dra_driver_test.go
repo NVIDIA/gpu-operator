@@ -336,6 +336,8 @@ func TestDRADriverHealthcheckPortCollision(t *testing.T) {
 		computeDomainsEnabled bool
 		gpus                  *nvidiav1alpha1.DRADriverHealthcheckSpec
 		computeDomains        *nvidiav1alpha1.DRADriverHealthcheckSpec
+		gpusEnv               []nvidiav1.EnvVar
+		computeDomainsEnv     []nvidiav1.EnvVar
 		// wantErr lists substrings the error must contain: the two colliding
 		// listeners and the resolved port. Empty means the spec is accepted.
 		wantErr []string
@@ -408,6 +410,42 @@ func TestDRADriverHealthcheckPortCollision(t *testing.T) {
 		"computeDomains healthcheck on 8080 is fine with computeDomains disabled": {
 			computeDomains: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
 		},
+		// An empty METRICS_PATH makes the plugin skip its metrics listener, so the
+		// port is free for the health service.
+		"gpus healthcheck on 8080 with gpus metrics disabled": {
+			gpus:    &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
+			gpusEnv: []nvidiav1.EnvVar{{Name: "METRICS_PATH", Value: ""}},
+		},
+		"computeDomains healthcheck on 8081 with compute-domains metrics disabled": {
+			computeDomainsEnabled: true,
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8081))},
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "METRICS_PATH", Value: ""}},
+		},
+		// Disabling one container's metrics endpoint leaves the other one bound.
+		"gpus metrics disabled does not free the compute-domains metrics port": {
+			computeDomainsEnabled: true,
+			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8081))},
+			gpusEnv:               []nvidiav1.EnvVar{{Name: "METRICS_PATH", Value: ""}},
+			wantErr: []string{
+				"the compute-domains container metrics endpoint",
+				"spec.draDriver.gpus.kubeletPlugin.healthcheck.port",
+				"both resolve to 8081",
+			},
+		},
+		// The kubelet keeps the last value for a duplicated name, so a later entry
+		// turns the metrics endpoint back on.
+		"later METRICS_PATH entry re-enables gpus metrics": {
+			gpus: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
+			gpusEnv: []nvidiav1.EnvVar{
+				{Name: "METRICS_PATH", Value: ""},
+				{Name: "METRICS_PATH", Value: "/metrics"},
+			},
+			wantErr: []string{
+				"the gpus container metrics endpoint",
+				"spec.draDriver.gpus.kubeletPlugin.healthcheck.port",
+				"both resolve to 8080",
+			},
+		},
 		"different ports": {
 			computeDomainsEnabled: true,
 			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
@@ -439,6 +477,8 @@ func TestDRADriverHealthcheckPortCollision(t *testing.T) {
 			cr.Spec.DRADriver.ComputeDomains.Enabled = new(tc.computeDomainsEnabled)
 			cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck = tc.gpus
 			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck = tc.computeDomains
+			cr.Spec.DRADriver.GPUs.KubeletPlugin.Env = tc.gpusEnv
+			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Env = tc.computeDomainsEnv
 
 			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 			if len(tc.wantErr) > 0 {
