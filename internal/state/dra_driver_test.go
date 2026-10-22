@@ -432,6 +432,63 @@ func TestDRADriverHealthcheckPortCollision(t *testing.T) {
 				"both resolve to 8081",
 			},
 		},
+		// HTTP_ENDPOINT moves the metrics listener; the check follows it.
+		"gpus metrics moved, healthcheck on the freed 8080": {
+			gpus:    &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":9090"}},
+		},
+		"gpus metrics moved onto the gpus healthcheck port": {
+			gpus:    &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(9090))},
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":9090"}},
+			wantErr: []string{
+				`the gpus container metrics endpoint (HTTP_ENDPOINT ":9090")`,
+				"spec.draDriver.gpus.kubeletPlugin.healthcheck.port",
+				"both resolve to 9090",
+			},
+		},
+		// The health service listens on every address, so a host-specific metrics
+		// endpoint on the same port still fails to bind.
+		"gpus metrics on a specific host, same port as the computeDomains healthcheck": {
+			computeDomainsEnabled: true,
+			gpusEnv:               []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: "127.0.0.1:51515"}},
+			wantErr: []string{
+				`the gpus container metrics endpoint (HTTP_ENDPOINT "127.0.0.1:51515")`,
+				"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port",
+				"both resolve to 51515",
+			},
+		},
+		"computeDomains metrics moved onto the gpus metrics port": {
+			computeDomainsEnabled: true,
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":8080"}},
+			wantErr: []string{
+				"the gpus container metrics endpoint",
+				"the compute-domains container metrics endpoint",
+				"both resolve to 8080",
+			},
+		},
+		// The plugin starts no metrics server for an empty HTTP_ENDPOINT.
+		"gpus HTTP_ENDPOINT empty frees 8080": {
+			gpus:    &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(8080))},
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ""}},
+		},
+		// Port 0 asks the kernel for a free port, so it cannot collide.
+		"gpus metrics on port 0": {
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":0"}},
+		},
+		// The plugin would fail to listen on these; reject them with the field named.
+		"gpus HTTP_ENDPOINT without a port": {
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: "9090"}},
+			wantErr: []string{"spec.draDriver.gpus.kubeletPlugin.env", `HTTP_ENDPOINT "9090" is not a host:port address`},
+		},
+		"computeDomains HTTP_ENDPOINT with a named port": {
+			computeDomainsEnabled: true,
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":http"}},
+			wantErr:               []string{"spec.draDriver.computeDomains.kubeletPlugin.env", `HTTP_ENDPOINT ":http" must use a numeric port`},
+		},
+		// The second container is not rendered, so its env cannot collide or fail.
+		"computeDomains HTTP_ENDPOINT ignored when disabled": {
+			computeDomainsEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: "garbage"}},
+		},
 		// The kubelet keeps the last value for a duplicated name, so a later entry
 		// turns the metrics endpoint back on.
 		"later METRICS_PATH entry re-enables gpus metrics": {
@@ -506,9 +563,10 @@ func TestDRADriverKubeletPluginReservedEnv(t *testing.T) {
 			gpusEnv: []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51515"}},
 			wantErr: []string{"spec.draDriver.gpus.kubeletPlugin.env", "HEALTHCHECK_PORT"},
 		},
+		// Moving the metrics listener works with released operators; the port
+		// check covers where it lands, so the name itself is not reserved.
 		"gpus overrides HTTP_ENDPOINT": {
 			gpusEnv: []nvidiav1.EnvVar{{Name: "HTTP_ENDPOINT", Value: ":9090"}},
-			wantErr: []string{"spec.draDriver.gpus.kubeletPlugin.env", "HTTP_ENDPOINT"},
 		},
 		"computeDomains overrides HEALTHCHECK_PORT": {
 			computeDomainsEnabled: true,

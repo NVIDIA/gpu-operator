@@ -19,6 +19,8 @@ package state
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,20 +45,21 @@ const (
 	defaultGPUsHealthcheckPort           = int32(51516)
 	defaultComputeDomainsHealthcheckPort = int32(51515)
 
-	// Metrics ports of the kubelet-plugin containers, mirroring the hardcoded
+	// Metrics endpoints of the kubelet-plugin containers, mirroring the
 	// HTTP_ENDPOINT values in manifests/state-dra-driver/0500_daemonset.yaml.
-	gpusMetricsPort           = int32(8080)
-	computeDomainsMetricsPort = int32(8081)
+	gpusMetricsEndpoint           = ":8080"
+	computeDomainsMetricsEndpoint = ":8081"
 	// defaultMetricsPath mirrors the METRICS_PATH value the template renders for
 	// both kubelet-plugin containers.
 	defaultMetricsPath = "/metrics"
 )
 
-// reservedKubeletPluginEnv lists the environment variables the kubelet-plugin
-// template owns. A later entry with the same name in kubeletPlugin.env would win
-// inside the container and move a listener behind the back of the port
-// validation, so they are rejected.
-var reservedKubeletPluginEnv = []string{"HEALTHCHECK_PORT", "HTTP_ENDPOINT"}
+// reservedKubeletPluginEnv lists the environment variables kubeletPlugin.env must
+// not set. The probes take the health service port from the healthcheck.port
+// field, so a HEALTHCHECK_PORT override would move the service away from its
+// probes. HTTP_ENDPOINT is not reserved: moving the metrics listener works, and
+// validateKubeletPluginPorts checks the port it resolves to.
+var reservedKubeletPluginEnv = []string{"HEALTHCHECK_PORT"}
 
 // resolveHealthcheckPort returns the spec-provided health service port, or the
 // container's default when unset; -1 (disabled) omits the probes at render time.
@@ -83,32 +86,67 @@ func effectiveEnvValue(env []nvidiav1.EnvVar, name, defaultValue string) string 
 	return value
 }
 
+// metricsPort returns the TCP port a kubelet-plugin container's metrics server will
+// bind and the HTTP_ENDPOINT it resolves from. The port is 0 when no server binds:
+// the plugin starts it only when both HTTP_ENDPOINT and METRICS_PATH are non-empty.
+// Only the port is kept; the health service listens on every address, so a metrics
+// endpoint on a specific host still collides with it.
+func metricsPort(env []nvidiav1.EnvVar, defaultEndpoint string) (int32, string, error) {
+	endpoint := effectiveEnvValue(env, "HTTP_ENDPOINT", defaultEndpoint)
+	if endpoint == "" || effectiveEnvValue(env, "METRICS_PATH", defaultMetricsPath) == "" {
+		return 0, endpoint, nil
+	}
+	_, p, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		return 0, endpoint, fmt.Errorf("HTTP_ENDPOINT %q is not a host:port address: %w", endpoint, err)
+	}
+	port, err := strconv.ParseUint(p, 10, 16)
+	if err != nil {
+		return 0, endpoint, fmt.Errorf("HTTP_ENDPOINT %q must use a numeric port", endpoint)
+	}
+	return int32(port), endpoint, nil
+}
+
 // validateKubeletPluginPorts rejects a GPUCluster whose kubelet-plugin containers
 // would bind the same TCP port twice. Every listener in the pod, health services and
 // metrics endpoints alike, shares one network namespace, so the second bind fails
 // with EADDRINUSE and that container crash-loops; between containers, which one
 // loses is a startup race. The check runs on resolved health ports so a user who
-// sets only one port to the other container's default is caught too. A health port
-// <= 0 means the service is disabled, so it never binds; likewise the plugin skips
-// its metrics listener when METRICS_PATH is empty.
+// sets only one port to the other container's default is caught too, and on the
+// metrics port each container's env resolves to. A port <= 0 never binds: a
+// disabled health service, a disabled metrics server, or port 0, which the kernel
+// replaces with a free one.
 func validateKubeletPluginPorts(computeDomainsEnabled bool, gpusPort, computeDomainsPort int32,
 	gpusEnv, computeDomainsEnv []nvidiav1.EnvVar) error {
+	type container struct {
+		name            string
+		field           string
+		env             []nvidiav1.EnvVar
+		defaultEndpoint string
+		healthPort      int32
+	}
+	containers := []container{
+		{"gpus", "spec.draDriver.gpus", gpusEnv, gpusMetricsEndpoint, gpusPort},
+	}
+	if computeDomainsEnabled {
+		containers = append(containers, container{"compute-domains", "spec.draDriver.computeDomains",
+			computeDomainsEnv, computeDomainsMetricsEndpoint, computeDomainsPort})
+	}
+
 	type listener struct {
 		name string
 		port int32
 	}
 	var listeners []listener
-	if effectiveEnvValue(gpusEnv, "METRICS_PATH", defaultMetricsPath) != "" {
-		listeners = append(listeners, listener{"the gpus container metrics endpoint", gpusMetricsPort})
-	}
-	listeners = append(listeners, listener{"spec.draDriver.gpus.kubeletPlugin.healthcheck.port", gpusPort})
-	if computeDomainsEnabled {
-		if effectiveEnvValue(computeDomainsEnv, "METRICS_PATH", defaultMetricsPath) != "" {
-			listeners = append(listeners,
-				listener{"the compute-domains container metrics endpoint", computeDomainsMetricsPort})
+	for _, c := range containers {
+		port, endpoint, err := metricsPort(c.env, c.defaultEndpoint)
+		if err != nil {
+			return fmt.Errorf("%s.kubeletPlugin.env: %w", c.field, err)
 		}
 		listeners = append(listeners,
-			listener{"spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port", computeDomainsPort})
+			listener{fmt.Sprintf("the %s container metrics endpoint (HTTP_ENDPOINT %q)", c.name, endpoint), port},
+			listener{c.field + ".kubeletPlugin.healthcheck.port", c.healthPort},
+		)
 	}
 
 	owner := map[int32]string{}
@@ -124,8 +162,8 @@ func validateKubeletPluginPorts(computeDomainsEnabled bool, gpusPort, computeDom
 	return nil
 }
 
-// validateKubeletPluginEnv rejects a GPUCluster whose kubeletPlugin.env would
-// override a listener address the template renders. The gpus container is always
+// validateKubeletPluginEnv rejects a GPUCluster whose kubeletPlugin.env sets a
+// reserved variable (see reservedKubeletPluginEnv). The gpus container is always
 // rendered; the compute-domains container only when enabled, so its env is only
 // checked then.
 func validateKubeletPluginEnv(computeDomainsEnabled bool, gpusEnv, computeDomainsEnv []nvidiav1.EnvVar) error {
