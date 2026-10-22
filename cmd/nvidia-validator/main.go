@@ -23,7 +23,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/wait"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -1363,26 +1363,39 @@ func waitForPod(ctx context.Context, kubeClient kubernetes.Interface, name strin
 	return fmt.Errorf("gave up waiting for pod %s to be available", name)
 }
 
+// loadPodSpec loads a validator workload pod spec from podSpecPath.
+// Validator workloads run the validation in the first init container, so the
+// spec must have at least one init container and one container.
 func loadPodSpec(podSpecPath string) (*corev1.Pod, error) {
-	var pod corev1.Pod
 	manifest, err := os.ReadFile(podSpecPath)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to read pod spec %s: %w", podSpecPath, err)
+	}
+	var typeMeta meta_v1.TypeMeta
+	if err := k8syaml.Unmarshal(manifest, &typeMeta); err != nil {
+		return nil, fmt.Errorf("failed to decode pod spec from %s: %w", podSpecPath, err)
+	}
+	if typeMeta.Kind == "" {
+		return nil, fmt.Errorf("pod spec %s is missing kind", podSpecPath)
 	}
 	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme, json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
-	reg := regexp.MustCompile(`\b(\w*kind:\w*)\B.*\b`)
-
-	kind := reg.FindString(string(manifest))
-	slice := strings.Split(kind, ":")
-	kind = strings.TrimSpace(slice[1])
-
-	log.Debugf("Decoding for Kind %s in path: %s", kind, podSpecPath)
-	_, _, err = s.Decode(manifest, nil, &pod)
+	decoded, gvk, err := s.Decode(manifest, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode pod spec from %s: %w", podSpecPath, err)
 	}
-	return &pod, nil
+	if gvk == nil || gvk.Kind != "Pod" {
+		return nil, fmt.Errorf("pod spec %s must have kind Pod", podSpecPath)
+	}
+	log.Debugf("Decoding for Kind %s in path: %s", gvk.Kind, podSpecPath)
+	pod, ok := decoded.(*corev1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("pod spec %s decoded to %T instead of a Pod", podSpecPath, decoded)
+	}
+	if len(pod.Spec.InitContainers) == 0 || len(pod.Spec.Containers) == 0 {
+		return nil, fmt.Errorf("pod spec %s must have at least one init container and one container", podSpecPath)
+	}
+	return pod, nil
 }
 
 func (p *Plugin) countGPUResources() (int64, error) {
