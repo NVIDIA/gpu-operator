@@ -18,13 +18,162 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestLoadPodSpec(t *testing.T) {
+	tests := map[string]struct {
+		missingFile bool
+		manifest    string
+		// wantErr is the loadPodSpec message with %s for the manifest path; a wrapped cause may follow after ": ".
+		wantErr   string
+		wantErrIs error
+		wantPod   *corev1.Pod
+	}{
+		"file cannot be read": {
+			missingFile: true,
+			wantErr:     "failed to read pod spec %s",
+			wantErrIs:   fs.ErrNotExist,
+		},
+		"file is empty": {
+			manifest: "",
+			wantErr:  "pod spec %s is missing kind",
+		},
+		"kind is missing": {
+			manifest: "metadata: {}\nspec: {}\n",
+			wantErr:  "pod spec %s is missing kind",
+		},
+		"manifest is not valid YAML": {
+			manifest: "kind: [\n",
+			wantErr:  "failed to decode pod spec from %s",
+		},
+		"apiVersion is missing": {
+			manifest: "kind: Pod\nmetadata:\n  name: validation\n",
+			wantErr:  "failed to decode pod spec from %s",
+		},
+		"Pod in unregistered group version": {
+			manifest: "apiVersion: apps/v1\nkind: Pod\nmetadata:\n  name: validation\n",
+			wantErr:  "failed to decode pod spec from %s",
+		},
+		"kind has wrong case": {
+			manifest: "apiVersion: v1\nkind: pod\nmetadata:\n  name: validation\n",
+			wantErr:  "failed to decode pod spec from %s",
+		},
+		"kind is not Pod": {
+			manifest: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: validation
+data:
+  key: value
+`,
+			wantErr: "pod spec %s must have kind Pod",
+		},
+		"init containers are missing": {
+			manifest: `apiVersion: v1
+kind: Pod
+metadata:
+  name: validation
+spec:
+  containers:
+  - name: validation
+    image: example:latest
+`,
+			wantErr: "pod spec %s must have at least one init container and one container",
+		},
+		"containers are missing": {
+			manifest: `apiVersion: v1
+kind: Pod
+metadata:
+  name: validation
+spec:
+  initContainers:
+  - name: init-validation
+    image: example:latest
+`,
+			wantErr: "pod spec %s must have at least one init container and one container",
+		},
+		"valid pod": {
+			manifest: `apiVersion: v1
+kind: Pod
+metadata:
+  name: validation
+  namespace: gpu-operator
+  labels:
+    app: validation
+spec:
+  restartPolicy: OnFailure
+  initContainers:
+  - name: init-validation
+    image: example:latest
+    command: ["sh", "-c", "true"]
+  containers:
+  - name: validation
+    image: example:latest
+`,
+			wantPod: &corev1.Pod{
+				TypeMeta: meta_v1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "validation",
+					Namespace: "gpu-operator",
+					Labels:    map[string]string{"app": "validation"},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyOnFailure,
+					InitContainers: []corev1.Container{{
+						Name:    "init-validation",
+						Image:   "example:latest",
+						Command: []string{"sh", "-c", "true"},
+					}},
+					Containers: []corev1.Container{{
+						Name:  "validation",
+						Image: "example:latest",
+					}},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "pod.yaml")
+			if !tc.missingFile {
+				require.NoError(t, os.WriteFile(path, []byte(tc.manifest), 0600))
+			}
+
+			var pod *corev1.Pod
+			var err error
+			require.NotPanics(t, func() {
+				pod, err = loadPodSpec(path)
+			})
+
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				require.Equal(t, tc.wantPod, pod)
+				return
+			}
+			require.Nil(t, pod)
+			require.Error(t, err)
+			wantErr := fmt.Sprintf(tc.wantErr, path)
+			require.Truef(t, err.Error() == wantErr || strings.HasPrefix(err.Error(), wantErr+": "),
+				"error %q does not match %q", err, wantErr)
+			if tc.wantErrIs != nil {
+				require.ErrorIs(t, err, tc.wantErrIs)
+			}
+		})
+	}
+}
 
 func Test_isValidComponent(t *testing.T) {
 	tests := []struct {
