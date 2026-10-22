@@ -1650,6 +1650,15 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
+	// user-provided env is applied after the CDI defaults and can silently override them, so validate
+	// the effective strategy here instead of waiting to encounter the failure at the pod workload creation stages.
+	// NOTE: device list strategy provided via configMaps are out of scope.
+	if config.CDI.IsEnabled() {
+		if err := validateCDIDeviceListStrategy(devicePluginMainContainer); err != nil {
+			return err
+		}
+	}
+
 	// set hostNetwork for device-plugin if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.DevicePlugin.HostNetwork)
 
@@ -4036,6 +4045,10 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 		n.logger.Error(err, "could not get daemonset", "name", name)
 		return gpuv1.NotReady
 	}
+	if ds.Status.ObservedGeneration < ds.Generation {
+		n.logger.V(2).Info("daemonset controller has not observed latest generation", "name", name)
+		return gpuv1.NotReady
+	}
 
 	if ds.Status.DesiredNumberScheduled == 0 {
 		n.logger.V(2).Info("Daemonset has desired pods of 0", "name", name)
@@ -5374,4 +5387,18 @@ func clearRuntimeClasses(n ClusterPolicyController, runtimeClasses []nodev1.Runt
 		}
 	}
 	return nil
+}
+
+// validateCDIDeviceListStrategy ensures the device-plugin's effective DEVICE_LIST_STRATEGY env var value
+// includes a CDI strategy.
+func validateCDIDeviceListStrategy(container *corev1.Container) error {
+	value := getContainerEnv(container, DeviceListStrategyEnvName)
+	for strategy := range strings.SplitSeq(value, ",") {
+		switch strings.TrimSpace(strategy) {
+		case "cdi-annotations", "cdi-cri":
+			return nil
+		}
+	}
+	return fmt.Errorf("%s %q must include \"cdi-annotations\" or \"cdi-cri\" when CDI is enabled",
+		DeviceListStrategyEnvName, value)
 }
