@@ -1,0 +1,174 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Run with `make test-prometheus-rules`. It extracts spec from the OpenShift
+# PrometheusRule asset into rules.yaml and runs promtool against this file.
+rule_files:
+- rules.yaml
+evaluation_interval: 30s
+
+tests:
+# dcgm-exporter 4.8.x series: old names, percent, MiB and MHz.
+- name: exporter 4.8.x series
+  interval: 30s
+  input_series:
+  - series: 'DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '80+0x4'
+  - series: 'DCGM_FI_DEV_FB_USED{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '1024+0x4'
+  - series: 'DCGM_FI_DEV_FB_TOTAL{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '81920+0x4'
+  - series: 'DCGM_FI_DEV_POWER_USAGE{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '350+0x4'
+  - series: 'DCGM_FI_DEV_GPU_TEMP{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '65+0x4'
+  - series: 'DCGM_FI_DEV_SM_CLOCK{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '1410+0x4'
+  - series: 'DCGM_FI_DEV_MEM_CLOCK{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '1593+0x4'
+  promql_expr_test:
+  - expr: accelerator_gpu_utilization
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_gpu_utilization{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 80
+  - expr: accelerator_memory_used_bytes
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_used_bytes{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 1073741824
+  - expr: accelerator_memory_total_bytes
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_total_bytes{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 85899345920
+  - expr: accelerator_power_usage_watts
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_power_usage_watts{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 350
+  - expr: accelerator_temperature_celsius
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_temperature_celsius{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 65
+  - expr: accelerator_sm_clock_hertz
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_sm_clock_hertz{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 1.41e9
+  - expr: accelerator_memory_clock_hertz
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_clock_hertz{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 1.593e9
+
+# dcgm-exporter 4.9.0 series: new names, ratio, bytes and hertz.
+- name: exporter 4.9.0 series
+  interval: 30s
+  input_series:
+  - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '0.8+0x4'
+  - series: 'DCGM_FI_DEV_FB_USED_BYTES{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '1073741824+0x4'
+  - series: 'DCGM_FI_DEV_FB_CAPACITY_BYTES{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '85899345920+0x4'
+  - series: 'DCGM_FI_DEV_BOARD_POWER_WATTS{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '350+0x4'
+  - series: 'DCGM_FI_DEV_GPU_TEMP_CELSIUS{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '65+0x4'
+  - series: 'DCGM_FI_DEV_SM_CLOCK_HERTZ{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '1.41e9+0x4'
+  - series: 'DCGM_FI_DEV_MEMORY_CLOCK_HERTZ{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '1.593e9+0x4'
+  promql_expr_test:
+  - expr: accelerator_gpu_utilization
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_gpu_utilization{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 80
+  - expr: accelerator_memory_used_bytes
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_used_bytes{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 1073741824
+  - expr: accelerator_memory_total_bytes
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_total_bytes{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 85899345920
+  - expr: accelerator_power_usage_watts
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_power_usage_watts{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 350
+  - expr: accelerator_temperature_celsius
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_temperature_celsius{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 65
+  - expr: accelerator_sm_clock_hertz
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_sm_clock_hertz{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 1.41e9
+  - expr: accelerator_memory_clock_hertz
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_clock_hertz{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 1.593e9
+
+# Rolling upgrade: one node still runs 4.8.x and one runs 4.9.0. Both report
+# utilization as a percent and each GPU is recorded once.
+- name: mixed fleet during a rolling upgrade
+  interval: 30s
+  input_series:
+  - series: 'DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-a",Hostname="old"}'
+    values: '50+0x4'
+  - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{gpu="0",UUID="GPU-b",Hostname="new"}'
+    values: '0.25+0x4'
+  - series: 'DCGM_FI_DEV_FB_USED{gpu="0",UUID="GPU-a",Hostname="old"}'
+    values: '2048+0x4'
+  - series: 'DCGM_FI_DEV_FB_USED_BYTES{gpu="0",UUID="GPU-b",Hostname="new"}'
+    values: '3221225472+0x4'
+  promql_expr_test:
+  - expr: sort(accelerator_gpu_utilization)
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_gpu_utilization{gpu="0",UUID="GPU-b",Hostname="new",vendor="nvidia"}'
+      value: 25
+    - labels: 'accelerator_gpu_utilization{gpu="0",UUID="GPU-a",Hostname="old",vendor="nvidia"}'
+      value: 50
+  - expr: sort(accelerator_memory_used_bytes)
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_memory_used_bytes{gpu="0",UUID="GPU-a",Hostname="old",vendor="nvidia"}'
+      value: 2147483648
+    - labels: 'accelerator_memory_used_bytes{gpu="0",UUID="GPU-b",Hostname="new",vendor="nvidia"}'
+      value: 3221225472
+
+# A GPU that reports both generations is recorded from the 4.9.0 name only.
+- name: both generations for one GPU prefer the 4.9.0 name
+  interval: 30s
+  input_series:
+  - series: 'DCGM_FI_DEV_GPU_UTIL_RATIO{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '0.8+0x4'
+  - series: 'DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-a",Hostname="n1"}'
+    values: '10+0x4'
+  promql_expr_test:
+  - expr: accelerator_gpu_utilization
+    eval_time: 1m
+    exp_samples:
+    - labels: 'accelerator_gpu_utilization{gpu="0",UUID="GPU-a",Hostname="n1",vendor="nvidia"}'
+      value: 80

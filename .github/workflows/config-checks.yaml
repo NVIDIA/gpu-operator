@@ -35,6 +35,33 @@ jobs:
         id: install
       - run: helm lint deployments/gpu-operator/
 
+  prometheus-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROMETHEUS_VERSION: 3.5.0
+      PROMETHEUS_SHA256: e811827af26d822afb09a4f28314f61b618b12cff5369835a67f674d8b46f39a
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+      - name: Install promtool
+        run: |
+          set -euo pipefail
+          archive="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
+          curl -sSfLO "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${archive}"
+          echo "${PROMETHEUS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "${archive}" --strip-components=1 -C "${RUNNER_TEMP}" "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+      - run: make test-prometheus-rules
+
   validate-csv:
     runs-on: ubuntu-latest
     timeout-minutes: 15

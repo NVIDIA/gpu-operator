@@ -215,6 +215,19 @@ goimports:
 lint:
 	golangci-lint run ./...
 
+# Check and unit-test the OpenShift PrometheusRule asset. Requires promtool in PATH.
+# promtool reads the plain rule-group form, so the asset's spec is extracted first.
+PROMETHEUS_RULE_ASSET := assets/state-dcgm-exporter/1000_prometheus_rule_openshift.yaml
+PROMETHEUS_RULE_TESTS := tests/prometheus/dcgm-exporter-rules_test.yaml
+test-prometheus-rules:
+	@command -v promtool >/dev/null || { echo "ERROR: promtool is not installed"; exit 1; }
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && \
+		python3 -c 'import sys, yaml; yaml.safe_dump(yaml.safe_load(open(sys.argv[1]))["spec"], open(sys.argv[2], "w"))' \
+			$(PROMETHEUS_RULE_ASSET) "$$tmp/rules.yaml" && \
+		cp $(PROMETHEUS_RULE_TESTS) "$$tmp/rules_test.yaml" && \
+		promtool check rules "$$tmp/rules.yaml" && \
+		promtool test rules "$$tmp/rules_test.yaml"
+
 BUILD_FLAGS = -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)"
 build:
 	go build $(BUILD_FLAGS) ./...
