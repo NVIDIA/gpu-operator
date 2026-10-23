@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
@@ -344,4 +345,193 @@ func TestCountNvidiaDevices(t *testing.T) {
 			require.Equal(t, tc.expected, countNvidiaDevices(tc.output))
 		})
 	}
+}
+
+func TestIsTargetUnderPrefix(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		target string
+		prefix string
+		want   bool
+	}{
+		"exact match": {
+			target: "/run/nvidia/driver/dev",
+			prefix: "/run/nvidia/driver/dev",
+			want:   true,
+		},
+		"child path": {
+			target: "/run/nvidia/driver/dev/nvidia0",
+			prefix: "/run/nvidia/driver/dev",
+			want:   true,
+		},
+		"prefix is a sibling name": {
+			target: "/run/nvidia/driver/dev-extra/nvidia0",
+			prefix: "/run/nvidia/driver/dev",
+			want:   false,
+		},
+		"unrelated path": {
+			target: "/elsewhere/nvidia0",
+			prefix: "/run/nvidia/driver/dev",
+			want:   false,
+		},
+		"empty prefix": {
+			target: "/run/nvidia/driver/dev/nvidia0",
+			prefix: "",
+			want:   false,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, isTargetUnderPrefix(tc.target, tc.prefix))
+		})
+	}
+}
+
+func TestIsNvidiaDeviceName(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]bool{
+		"nvidia0":          true,
+		"nvidiactl":        true,
+		"nvidia-modeset":   true,
+		"nvidia-uvm":       true,
+		"nvidia-uvm-tools": true,
+		"null":             false,
+		"infiniband":       false,
+	}
+	for name, want := range testCases {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, want, isNvidiaDeviceName(name))
+		})
+	}
+}
+
+func TestHostDevNvidiaSymlinkerSync(t *testing.T) {
+	t.Parallel()
+
+	sourceDev := t.TempDir()
+	hostDev := t.TempDir()
+	hostTargetPrefix := "/run/nvidia/driver/dev"
+
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidia0"), []byte("gpu"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidiactl"), []byte("ctl"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidia-modeset"), []byte("modeset"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "null"), []byte("not-nvidia"), 0600))
+	require.NoError(t, os.Mkdir(filepath.Join(sourceDev, "nvidia-caps"), 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidia-caps", "nvidia-cap1"), []byte("cap"), 0600))
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       hostDev,
+		sourceDevDir:     sourceDev,
+		hostTargetPrefix: hostTargetPrefix,
+	}
+	require.NoError(t, s.Sync())
+
+	assertHostDevSymlink(t, hostDev, "nvidia0", filepath.Join(hostTargetPrefix, "nvidia0"))
+	assertHostDevSymlink(t, hostDev, "nvidiactl", filepath.Join(hostTargetPrefix, "nvidiactl"))
+	assertHostDevSymlink(t, hostDev, "nvidia-modeset", filepath.Join(hostTargetPrefix, "nvidia-modeset"))
+	assertHostDevSymlink(t, hostDev, filepath.Join("nvidia-caps", "nvidia-cap1"), filepath.Join(hostTargetPrefix, "nvidia-caps", "nvidia-cap1"))
+	require.NoFileExists(t, filepath.Join(hostDev, "null"))
+
+	require.NoError(t, s.Sync())
+	assertHostDevSymlink(t, hostDev, "nvidia0", filepath.Join(hostTargetPrefix, "nvidia0"))
+}
+
+func TestHostDevNvidiaSymlinkerDoesNotClobberDeviceNodes(t *testing.T) {
+	t.Parallel()
+
+	sourceDev := t.TempDir()
+	hostDev := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidia0"), []byte("gpu"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(hostDev, "nvidia0"), []byte("existing"), 0600))
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       hostDev,
+		sourceDevDir:     sourceDev,
+		hostTargetPrefix: "/run/nvidia/driver/dev",
+	}
+	require.NoError(t, s.Sync())
+
+	info, err := os.Lstat(filepath.Join(hostDev, "nvidia0"))
+	require.NoError(t, err)
+	require.Zero(t, info.Mode()&os.ModeSymlink)
+	data, err := os.ReadFile(filepath.Join(hostDev, "nvidia0"))
+	require.NoError(t, err)
+	require.Equal(t, "existing", string(data))
+}
+
+func TestHostDevNvidiaSymlinkerReplacesStaleDriverSymlink(t *testing.T) {
+	t.Parallel()
+
+	sourceDev := t.TempDir()
+	hostDev := t.TempDir()
+	hostTargetPrefix := "/run/nvidia/driver/dev"
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidia0"), []byte("gpu"), 0600))
+	require.NoError(t, os.Symlink(filepath.Join(hostTargetPrefix, "old-nvidia0"), filepath.Join(hostDev, "nvidia0")))
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       hostDev,
+		sourceDevDir:     sourceDev,
+		hostTargetPrefix: hostTargetPrefix,
+	}
+	require.NoError(t, s.Sync())
+	assertHostDevSymlink(t, hostDev, "nvidia0", filepath.Join(hostTargetPrefix, "nvidia0"))
+}
+
+func TestHostDevNvidiaSymlinkerLeavesUnrelatedSymlink(t *testing.T) {
+	t.Parallel()
+
+	sourceDev := t.TempDir()
+	hostDev := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "nvidia0"), []byte("gpu"), 0600))
+	require.NoError(t, os.Symlink("/elsewhere/nvidia0", filepath.Join(hostDev, "nvidia0")))
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       hostDev,
+		sourceDevDir:     sourceDev,
+		hostTargetPrefix: "/run/nvidia/driver/dev",
+	}
+	require.NoError(t, s.Sync())
+	assertHostDevSymlink(t, hostDev, "nvidia0", "/elsewhere/nvidia0")
+}
+
+func TestHostDevNvidiaSymlinkerSyncNoNvidiaDevices(t *testing.T) {
+	t.Parallel()
+
+	sourceDev := t.TempDir()
+	hostDev := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDev, "null"), []byte("not-nvidia"), 0600))
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       hostDev,
+		sourceDevDir:     sourceDev,
+		hostTargetPrefix: "/run/nvidia/driver/dev",
+	}
+	require.NoError(t, s.Sync())
+	require.NoFileExists(t, filepath.Join(hostDev, "null"))
+}
+
+func TestHostDevNvidiaSymlinkerSyncMissingSource(t *testing.T) {
+	t.Parallel()
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       t.TempDir(),
+		sourceDevDir:     filepath.Join(t.TempDir(), "missing"),
+		hostTargetPrefix: "/run/nvidia/driver/dev",
+	}
+	err := s.Sync()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
+}
+
+func assertHostDevSymlink(t *testing.T, hostDev, rel, wantTarget string) {
+	t.Helper()
+	link := filepath.Join(hostDev, rel)
+	info, err := os.Lstat(link)
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&os.ModeSymlink)
+	got, err := os.Readlink(link)
+	require.NoError(t, err)
+	require.Equal(t, wantTarget, got)
 }

@@ -766,7 +766,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		return err
 	}
 
-	// transform the host-root and host-dev-char volumes if a custom host root is configured with the operator
+	// transform the host-root, host-dev, and host-dev-char volumes if a custom host root is configured with the operator
 	transformForHostRoot(obj, n.singleton.Spec.HostPaths.RootFS)
 
 	// transform the driver-root volume if a custom driver install dir is configured with the operator
@@ -869,6 +869,7 @@ func transformForHostRoot(obj *appsv1.DaemonSet, hostRoot string) {
 
 	transformHostRootVolume(obj, hostRoot)
 	transformHostDevCharVolume(obj, hostRoot)
+	transformHostDevVolume(obj, hostRoot)
 }
 
 func transformHostRootVolume(obj *appsv1.DaemonSet, hostRoot string) {
@@ -898,6 +899,15 @@ func transformHostDevCharVolume(obj *appsv1.DaemonSet, hostRoot string) {
 	for _, volume := range obj.Spec.Template.Spec.Volumes {
 		if volume.Name == "host-dev-char" {
 			volume.HostPath.Path = filepath.Join(hostRoot, "/dev/char")
+			break
+		}
+	}
+}
+
+func transformHostDevVolume(obj *appsv1.DaemonSet, hostRoot string) {
+	for _, volume := range obj.Spec.Template.Spec.Volumes {
+		if volume.Name == "host-dev" && volume.HostPath != nil {
+			volume.HostPath.Path = filepath.Join(hostRoot, "dev")
 			break
 		}
 	}

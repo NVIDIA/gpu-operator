@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -153,6 +154,10 @@ const (
 	defaultMetricsPort = 0
 	// hostDevCharPath indicates the path in the container where the host '/dev/char' directory is mounted to
 	hostDevCharPath = "/host-dev-char"
+	// hostDevPath is the path in the container where the host '/dev' directory is mounted.
+	hostDevPath = "/host-dev"
+	// nvidiaCapsDirName is the directory under /dev that holds NVIDIA capability device nodes.
+	nvidiaCapsDirName = "nvidia-caps"
 	// nvidiaModuleRefcntPath is the path to check if the nvidia kernel module is loaded
 	nvidiaModuleRefcntPath = "/sys/module/nvidia/refcnt"
 	// defaultDriverInstallDir indicates the default path on the host where the driver container installation is made available
@@ -904,6 +909,11 @@ func (d *Driver) validate() error {
 		return fmt.Errorf("%w\n\n%s", err, msg)
 	}
 
+	err = createHostDevNvidiaSymlinks(driverInfo)
+	if err != nil {
+		return fmt.Errorf("failed to create /dev/nvidia* host symlinks for driver-container device nodes: %w", err)
+	}
+
 	return d.createStatusFile(driverInfo)
 }
 
@@ -984,6 +994,154 @@ func createDevCharSymlinks(driverInfo driverInfo, disableDevCharSymlinkCreation 
 	}
 
 	return nil
+}
+
+// hostDevNvidiaSymlinker creates /dev/nvidia* symlinks on the host that point at
+// device nodes provided by a containerized NVIDIA driver.
+//
+// With Kubernetes user namespaces (spec.hostUsers: false), runc bind-mounts
+// OCI linux.devices from the host path that matches the container path. The
+// GPU Operator driver container exposes nodes under /run/nvidia/driver/dev,
+// not /dev, so workloads fail unless /dev/nvidia* exists on the host.
+type hostDevNvidiaSymlinker struct {
+	hostDevDir       string
+	sourceDevDir     string
+	hostTargetPrefix string
+}
+
+func createHostDevNvidiaSymlinks(driverInfo driverInfo) error {
+	if _, err := os.Stat(hostDevPath); err != nil {
+		if os.IsNotExist(err) {
+			log.Info("host /dev is not mounted at /host-dev; skipping /dev/nvidia* symlink creation")
+			return nil
+		}
+		return fmt.Errorf("failed to stat %s: %w", hostDevPath, err)
+	}
+
+	if driverInfo.isHostDriver || driverInfo.devRoot == driverInfo.hostRoot || driverInfo.devRoot == "/" {
+		log.Info("NVIDIA device nodes are host-local; skipping /dev/nvidia* symlink creation")
+		return nil
+	}
+
+	s := hostDevNvidiaSymlinker{
+		hostDevDir:       hostDevPath,
+		sourceDevDir:     filepath.Join(driverInstallDirCtrPathFlag, "dev"),
+		hostTargetPrefix: filepath.Join(driverInstallDirFlag, "dev"),
+	}
+
+	log.Info("creating /dev/nvidia* symlinks on the host that point at driver-container device nodes")
+	return s.Sync()
+}
+
+func (s hostDevNvidiaSymlinker) Sync() error {
+	rels, err := nvidiaDeviceRelPaths(s.sourceDevDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("driver device directory %s not found", s.sourceDevDir)
+		}
+		return err
+	}
+	if len(rels) == 0 {
+		log.Warningf("no NVIDIA device nodes found in %s; skipping host /dev/nvidia* symlink creation", s.sourceDevDir)
+		return nil
+	}
+
+	var errs []error
+	for _, rel := range rels {
+		link := filepath.Join(s.hostDevDir, rel)
+		target := filepath.Join(s.hostTargetPrefix, rel)
+		if err := ensureNvidiaDevSymlink(link, target, s.hostTargetPrefix); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", rel, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func nvidiaDeviceRelPaths(devDir string) ([]string, error) {
+	entries, err := os.ReadDir(devDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var rels []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() {
+			if name != nvidiaCapsDirName {
+				continue
+			}
+			caps, err := os.ReadDir(filepath.Join(devDir, name))
+			if err != nil {
+				return nil, err
+			}
+			for _, cap := range caps {
+				if cap.IsDir() {
+					continue
+				}
+				rels = append(rels, filepath.Join(nvidiaCapsDirName, cap.Name()))
+			}
+			continue
+		}
+		if isNvidiaDeviceName(name) {
+			rels = append(rels, name)
+		}
+	}
+	return rels, nil
+}
+
+func isNvidiaDeviceName(name string) bool {
+	return strings.HasPrefix(name, "nvidia")
+}
+
+func ensureNvidiaDevSymlink(link, target, hostTargetPrefix string) error {
+	info, err := os.Lstat(link)
+	if err == nil {
+		if info.Mode()&os.ModeSymlink == 0 {
+			log.Infof("skipping %s: already exists and is not a symlink", link)
+			return nil
+		}
+		current, err := os.Readlink(link)
+		if err != nil {
+			return fmt.Errorf("failed to read symlink %s: %w", link, err)
+		}
+		if current == target {
+			return nil
+		}
+		if !isTargetUnderPrefix(current, hostTargetPrefix) {
+			log.Warningf("skipping %s: already a symlink to %s", link, current)
+			return nil
+		}
+		if err := os.Remove(link); err != nil {
+			return fmt.Errorf("failed to replace stale symlink %s: %w", link, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(link), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", link, err)
+	}
+
+	log.Infof("creating link %s => %s", link, target)
+	if err := os.Symlink(target, link); err != nil {
+		if os.IsExist(err) {
+			current, rerr := os.Readlink(link)
+			if rerr == nil && current == target {
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to create symlink %s: %w", link, err)
+	}
+	return nil
+}
+
+func isTargetUnderPrefix(target, prefix string) bool {
+	if prefix == "" {
+		return false
+	}
+	cleanTarget := filepath.Clean(target)
+	cleanPrefix := filepath.Clean(prefix)
+	return cleanTarget == cleanPrefix || strings.HasPrefix(cleanTarget, cleanPrefix+string(os.PathSeparator))
 }
 
 func createStatusFile(statusFile string) error {

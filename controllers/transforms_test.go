@@ -250,6 +250,7 @@ func TestFindContainerByName(t *testing.T) {
 func TestTransformForHostRoot(t *testing.T) {
 	hostRootVolumeName := "host-root"
 	hostDevCharVolumeName := "host-dev-char"
+	hostDevVolumeName := "host-dev"
 	testCases := []struct {
 		description    string
 		hostRoot       string
@@ -301,6 +302,14 @@ func TestTransformForHostRoot(t *testing.T) {
 				WithHostPathVolume(hostDevCharVolumeName, "/", nil),
 			expectedOutput: NewDaemonset().
 				WithHostPathVolume(hostDevCharVolumeName, "/custom-root/dev/char", nil),
+		},
+		{
+			description: "custom host root with host-dev volume",
+			hostRoot:    "/custom-root",
+			input: NewDaemonset().
+				WithHostPathVolume(hostDevVolumeName, "/dev", nil),
+			expectedOutput: NewDaemonset().
+				WithHostPathVolume(hostDevVolumeName, "/custom-root/dev", nil),
 		},
 	}
 

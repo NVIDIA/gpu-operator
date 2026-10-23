@@ -56,6 +56,8 @@ spec:
               mountPropagation: Bidirectional
             - name: host-dev-char
               mountPath: /host-dev-char
+            - name: host-dev
+              mountPath: /host-dev
         - name: toolkit-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']
@@ -152,3 +154,6 @@ spec:
         - name: host-dev-char
           hostPath:
             path: /dev/char
+        - name: host-dev
+          hostPath:
+            path: /dev
