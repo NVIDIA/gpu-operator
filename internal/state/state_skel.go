@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -442,7 +443,84 @@ func (s *stateSkel) mergeObjects(updated, current *unstructured.Unstructured) er
 	if gvk.Group == "" && gvk.Kind == "ServiceAccount" {
 		return s.mergeServiceAccount(updated, current)
 	}
+	if gvk.Group == "" && gvk.Kind == "Service" {
+		return s.mergeService(updated, current)
+	}
 	return nil
+}
+
+// mergeService preserves fields allocated by the API server. Clearing these fields in a full
+// update is rejected because their values are immutable or must remain allocated.
+func (s *stateSkel) mergeService(updated, current *unstructured.Unstructured) error {
+	updatedService := &corev1.Service{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(updated.Object, updatedService); err != nil {
+		return fmt.Errorf("failed to convert updated Service: %w", err)
+	}
+	currentService := &corev1.Service{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(current.Object, currentService); err != nil {
+		return fmt.Errorf("failed to convert current Service: %w", err)
+	}
+
+	if updatedService.Spec.ClusterIP == "" && len(updatedService.Spec.ClusterIPs) == 0 {
+		updatedService.Spec.ClusterIP = currentService.Spec.ClusterIP
+		updatedService.Spec.ClusterIPs = currentService.Spec.ClusterIPs
+	}
+	if len(updatedService.Spec.IPFamilies) == 0 {
+		updatedService.Spec.IPFamilies = currentService.Spec.IPFamilies
+	}
+	if updatedService.Spec.IPFamilyPolicy == nil {
+		updatedService.Spec.IPFamilyPolicy = currentService.Spec.IPFamilyPolicy
+	}
+
+	if serviceAllocatesNodePorts(updatedService) {
+		for i := range updatedService.Spec.Ports {
+			if updatedService.Spec.Ports[i].NodePort != 0 {
+				continue
+			}
+			if currentPort := findMatchingServicePort(updatedService.Spec.Ports[i], currentService.Spec.Ports); currentPort != nil {
+				updatedService.Spec.Ports[i].NodePort = currentPort.NodePort
+			}
+		}
+	}
+	if updatedService.Spec.Type == corev1.ServiceTypeLoadBalancer &&
+		updatedService.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal &&
+		updatedService.Spec.HealthCheckNodePort == 0 {
+		updatedService.Spec.HealthCheckNodePort = currentService.Spec.HealthCheckNodePort
+	}
+
+	merged, err := runtime.DefaultUnstructuredConverter.ToUnstructured(updatedService)
+	if err != nil {
+		return fmt.Errorf("failed to convert merged Service: %w", err)
+	}
+	updated.Object = merged
+	return nil
+}
+
+func serviceAllocatesNodePorts(service *corev1.Service) bool {
+	if service.Spec.Type == corev1.ServiceTypeNodePort {
+		return true
+	}
+	return service.Spec.Type == corev1.ServiceTypeLoadBalancer &&
+		(service.Spec.AllocateLoadBalancerNodePorts == nil || *service.Spec.AllocateLoadBalancerNodePorts)
+}
+
+func findMatchingServicePort(updated corev1.ServicePort, current []corev1.ServicePort) *corev1.ServicePort {
+	for i := range current {
+		if updated.Name != "" && updated.Name == current[i].Name {
+			return &current[i]
+		}
+		if updated.Name == "" && current[i].Name == "" && servicePortProtocol(updated) == servicePortProtocol(current[i]) {
+			return &current[i]
+		}
+	}
+	return nil
+}
+
+func servicePortProtocol(port corev1.ServicePort) corev1.Protocol {
+	if port.Protocol == "" {
+		return corev1.ProtocolTCP
+	}
+	return port.Protocol
 }
 
 // For Service Account, keep secrets if exists
