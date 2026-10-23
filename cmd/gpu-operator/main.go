@@ -239,10 +239,11 @@ func main() {
 	}
 
 	if err = (&controllers.GPUClusterReconciler{
-		Namespace:   operatorNamespace,
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		ClusterInfo: clusterInfo,
+		Namespace:       operatorNamespace,
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		ClusterInfo:     clusterInfo,
+		OperatorMetrics: operatorMetrics,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GPUCluster")
 		os.Exit(1)

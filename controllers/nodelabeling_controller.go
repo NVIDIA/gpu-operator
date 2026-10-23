@@ -42,6 +42,7 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	nvidiadriverutil "github.com/NVIDIA/gpu-operator/internal/nvidiadriver"
+	"github.com/NVIDIA/gpu-operator/internal/reconcilelog"
 )
 
 const nodeLabelingControllerSingletonName = "cluster"
@@ -691,7 +692,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	}
 
 	c, err := controller.New("node-labeling-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              reconcilelog.Wrap(r),
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})
