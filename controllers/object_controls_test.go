@@ -52,6 +52,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -202,6 +203,63 @@ func TestIsDaemonSetRollingUpdateComplete(t *testing.T) {
 			require.Equal(t, tt.want, isDaemonSetRollingUpdateComplete(&tt.ds))
 		})
 	}
+}
+
+func TestIsDaemonsetSpecChanged(t *testing.T) {
+	daemonSet := func() *appsv1.DaemonSet {
+		return &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "nvidia-gpu-feature-discovery",
+				Namespace: "gpu-operator",
+			},
+		}
+	}
+
+	t.Run("nil live annotations request an update and record the hash", func(t *testing.T) {
+		current := daemonSet()
+		desired := daemonSet()
+		desired.Annotations = map[string]string{}
+		wantHash := utils.GetObjectHash(desired)
+
+		require.True(t, isDaemonsetSpecChanged(current, desired))
+		require.Equal(t, wantHash, desired.Annotations[NvidiaAnnotationHashKey])
+	})
+
+	t.Run("empty annotation map without a hash requests an update", func(t *testing.T) {
+		current := daemonSet()
+		current.Annotations = map[string]string{}
+		desired := daemonSet()
+		desired.Annotations = map[string]string{}
+		wantHash := utils.GetObjectHash(desired)
+
+		require.True(t, isDaemonsetSpecChanged(current, desired))
+		require.Equal(t, wantHash, desired.Annotations[NvidiaAnnotationHashKey])
+	})
+
+	t.Run("matching hash skips the update", func(t *testing.T) {
+		desired := daemonSet()
+		desired.Annotations = map[string]string{}
+		hash := utils.GetObjectHash(desired)
+		current := desired.DeepCopy()
+		current.Annotations[NvidiaAnnotationHashKey] = hash
+		next := desired.DeepCopy()
+
+		require.False(t, isDaemonsetSpecChanged(current, next))
+		_, found := next.Annotations[NvidiaAnnotationHashKey]
+		require.False(t, found)
+	})
+
+	t.Run("stale hash requests an update", func(t *testing.T) {
+		desired := daemonSet()
+		desired.Annotations = map[string]string{}
+		wantHash := utils.GetObjectHash(desired)
+		current := desired.DeepCopy()
+		current.Annotations[NvidiaAnnotationHashKey] = "stale"
+		next := desired.DeepCopy()
+
+		require.True(t, isDaemonsetSpecChanged(current, next))
+		require.Equal(t, wantHash, next.Annotations[NvidiaAnnotationHashKey])
+	})
 }
 
 func TestIsDaemonSetReadyReturnsNotReadyWhenDaemonSetMissing(t *testing.T) {
