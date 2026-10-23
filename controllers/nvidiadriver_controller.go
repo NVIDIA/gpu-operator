@@ -186,10 +186,13 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		key := client.ObjectKey{Namespace: r.Namespace, Name: secretName}
 		if err := r.Get(ctx, key, &corev1.Secret{}); err != nil {
 			logger.Error(err, "failed to get secret")
+			instance.Status.State = nvidiav1alpha1.NotReady
 			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 				logger.Error(condErr, "failed to set condition")
 			}
-			return reconcile.Result{}, nil
+			// Nothing in SetupWithManager watches Secrets, so creating the
+			// secret afterwards raises no event of its own. Come back for it.
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 	}
 

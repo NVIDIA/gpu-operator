@@ -594,6 +594,47 @@ func TestReconcileMultipleDefaultDriversSetsNotReadyState(t *testing.T) {
 	}
 }
 
+func TestReconcileMissingSecretEnvSetsNotReadyState(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env-secret"},
+		Status:     nvidiav1alpha1.NVIDIADriverStatus{State: nvidiav1alpha1.Ready},
+	}
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(true)},
+		},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp, driver).Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client:                client,
+		Scheme:                scheme,
+		Namespace:             "gpu-operator",
+		conditionUpdater:      updater,
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+	}
+
+	res, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+	require.Equal(t, conditions.ReconcileFailed, updater.LastErrorReason)
+	require.Contains(t, updater.LastErrorMessage, "driver-env-secret")
+	// Nothing watches Secrets, so without a requeue the driver stays stuck
+	// after the secret is created.
+	require.NotZero(t, res.RequeueAfter)
+}
+
 func TestUpdateCrStatusPreservesNotReadyStateWhenSettingErrorCondition(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
