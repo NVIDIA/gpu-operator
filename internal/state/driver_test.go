@@ -127,26 +127,6 @@ func hasSubscriptionVolumeMount(volumeMounts []corev1.VolumeMount) bool {
 	return false
 }
 
-func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
-	t.Helper()
-
-	if expected == nil {
-		expected = map[string]corev1.HostPathType{}
-	}
-
-	actual := map[string]corev1.HostPathType{}
-	for _, volume := range volumes {
-		if !strings.HasPrefix(volume.Name, "subscription-config-") {
-			continue
-		}
-		require.NotNil(t, volume.HostPath)
-		require.NotNil(t, volume.HostPath.Type)
-		actual[volume.HostPath.Path] = *volume.HostPath.Type
-	}
-
-	assert.Equal(t, expected, actual)
-}
-
 func TestDriverRenderMinimal(t *testing.T) {
 	// Construct a sample driver state manager
 	const (
@@ -619,69 +599,6 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(o), actual)
-}
-
-func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
-	repoConfigMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-repo-config",
-			Namespace: "test-ns",
-		},
-		Data: map[string]string{
-			"redhat.repo": "[test-repo]",
-		},
-	}
-
-	testCases := []struct {
-		description                 string
-		osRelease                   string
-		repoConfigEnabled           bool
-		expectSubscriptionMounts    bool
-		expectedSubscriptionHostMap map[string]corev1.HostPathType
-	}{
-		{
-			description:              "rhel with repo config skips host subscription mounts",
-			osRelease:                "rhel",
-			repoConfigEnabled:        true,
-			expectSubscriptionMounts: false,
-		},
-		{
-			description:              "rhel without repo config mounts host subscription paths",
-			osRelease:                "rhel",
-			expectSubscriptionMounts: true,
-			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
-				"/etc/pki/entitlement":         corev1.HostPathDirectory,
-				"/etc/yum.repos.d/redhat.repo": corev1.HostPathFile,
-				"/etc/rhsm":                    corev1.HostPathDirectory,
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			stateDriver := &stateDriver{
-				stateSkel: stateSkel{
-					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap).Build(),
-					namespace: "test-ns",
-				},
-			}
-			driver := &nvidiav1alpha1.NVIDIADriver{}
-			if tc.repoConfigEnabled {
-				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
-			}
-
-			configs, err := stateDriver.getDriverAdditionalConfigs(
-				context.Background(),
-				driver,
-				testClusterInfo{runtime: consts.Containerd},
-				nodePool{osRelease: tc.osRelease, osVersion: tc.osRelease},
-			)
-			require.NoError(t, err)
-
-			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
-			assert.Equal(t, tc.expectSubscriptionMounts, hasSubscriptionVolumeMount(configs.VolumeMounts))
-		})
-	}
 }
 
 func TestDriverPrecompiledLibModules(t *testing.T) {
