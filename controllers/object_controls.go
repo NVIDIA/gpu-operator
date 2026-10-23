@@ -2380,7 +2380,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	}
 
 	if validatorErr != nil {
-		n.logger.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+		return fmt.Errorf("errors transforming the validator containers: %w", validatorErr)
 	}
 
 	// set hostNetwork for validator if specified
@@ -2412,7 +2412,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	}
 
 	if validatorErr != nil {
-		n.logger.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+		return fmt.Errorf("errors transforming the validator containers: %w", validatorErr)
 	}
 
 	// set hostNetwork for sandbox-validator if specified
@@ -4019,7 +4019,7 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 	list := &appsv1.DeploymentList{}
 	err := n.client.List(n.ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get DeploymentList", err)
+		n.logger.Error(err, "Could not get DeploymentList")
 	}
 	n.logger.V(1).Info("Deployment", "NumberOfDeployment", len(list.Items))
 	if len(list.Items) == 0 {
@@ -4075,7 +4075,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	list := &corev1.PodList{}
 	err = n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get PodList", err)
+		n.logger.Error(err, "Could not get PodList")
 		return gpuv1.NotReady
 	}
 	n.logger.V(2).Info("Pod", "NumberOfPods", len(list.Items))
@@ -4866,7 +4866,7 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	list := &corev1.PodList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get PodList", err)
+		n.logger.Error(err, "Could not get PodList")
 	}
 	n.logger.V(1).Info("Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
@@ -5271,7 +5271,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	list := &nodev1.RuntimeClassList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get Kata RuntimeClassList", err)
+		n.logger.Error(err, "Could not get Kata RuntimeClassList")
 		return gpuv1.NotReady, fmt.Errorf("error getting kata RuntimeClassList: %v", err)
 	}
 	n.logger.V(1).Info("Kata RuntimeClasses", "Number", len(list.Items))
