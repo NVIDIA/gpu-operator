@@ -71,19 +71,27 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: ptr.To(corev1.HostPathFile),
+				Type: new(corev1.HostPathFileOrCreate),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
+			},
+		},
+		// FileOrCreate does not create parents. A separate directory volume
+		// lets kubelet create the repo directory and retry file setup if needed.
+		"/run/secrets/yum.repos.d": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/yum.repos.d",
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 	},
@@ -91,19 +99,19 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: ptr.To(corev1.HostPathFile),
+				Type: new(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -111,13 +119,13 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: ptr.To(corev1.HostPathFileOrCreate),
+				Type: new(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -125,13 +133,13 @@ var SubscriptionPathMap = map[string]MountPathToVolumeSource{
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: ptr.To(corev1.HostPathFileOrCreate),
+				Type: new(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -184,19 +192,10 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 
 		// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 		if (pool.osRelease == "rhel" && openshiftVersion == "" && runtime != consts.CRIO) || pool.osRelease == "sles" || pool.osRelease == "sl-micro" {
-			pathToVolumeSource := MountPathToVolumeSource{}
-			// Custom repo ConfigMap supplies yum repos in offline/air-gapped installs. Skip
-			// mounting host RHSM paths (/etc/pki/entitlement, redhat.repo, /etc/rhsm): they may
-			// be missing or not directories on minimal nodes, and are not needed when packages
-			// come only from the mounted repo ConfigMap.
-			if cr.Spec.IsRepoConfigEnabled() && pool.osRelease == "rhel" {
-				logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", pool.osVersion)
-			} else {
-				logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
-				pathToVolumeSource, err = getSubscriptionPathsToVolumeSources(pool.osRelease)
-				if err != nil {
-					return nil, fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %w", err)
-				}
+			logger.Info("Mounting subscriptions into the driver container", "OS", pool.osVersion)
+			pathToVolumeSource, err := getSubscriptionPathsToVolumeSources(pool.osRelease)
+			if err != nil {
+				return nil, fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %w", err)
 			}
 
 			// sort host path volumes to ensure ordering is preserved when adding to pod spec
@@ -214,7 +213,12 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 					MountPath: mountPath,
 					ReadOnly:  true,
 				}
-				additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volMountSubscription)
+				if mountPath == "/run/secrets/yum.repos.d" {
+					// Keep the parent directory out of the driver containers.
+					additionalCfgs.DriverManagerVolumeMounts = append(additionalCfgs.DriverManagerVolumeMounts, volMountSubscription)
+				} else {
+					additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volMountSubscription)
+				}
 
 				subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
 				additionalCfgs.Volumes = append(additionalCfgs.Volumes, subscriptionVol)
