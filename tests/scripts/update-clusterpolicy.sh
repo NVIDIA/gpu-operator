@@ -138,8 +138,15 @@ test_gpu_sharing() {
 
     shared_product_name="${GPU_PRODUCT_NAME}-SHARED"
 
-    # set the operator validator image version in the plugin test spec
-    sed -i "s/image: nvcr.io\/nvidia\/cloud-native\/gpu-operator-validator:v1.10.1/image: ${OPERATOR_IMAGE//\//\\/}:${OPERATOR_VERSION}/g" ${TEST_DIR}/plugin-test.yaml
+    # The test pod runs vectorAdd from whatever validator image the operator deployed, which differs from
+    # OPERATOR_IMAGE for charts that ship a separate gpu-operator-validator image.
+    validator_image=$(kubectl get daemonset nvidia-operator-validator -n "${TEST_NAMESPACE}" --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="nvidia-operator-validator")].image}')
+    if [[ -z "${validator_image}" ]]; then
+        echo "cannot read the validator image from daemonset/nvidia-operator-validator"
+        exit 1
+    fi
+    sed -i "s|image: nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.10.1|image: ${validator_image}|g" "${TEST_DIR}/plugin-test.yaml"
     
     # set the name of GPU product in plugin test spec
     sed -i "s/nvidia.com\/gpu.product: Tesla-T4-SHARED/nvidia.com\/gpu.product: ${shared_product_name}/g" ${TEST_DIR}/plugin-test.yaml
@@ -150,7 +157,7 @@ test_gpu_sharing() {
     kubectl wait --for=condition=available --timeout=300s deployment/nvidia-plugin-test -n $TEST_NAMESPACE
     if [ $? -ne 0 ]; then
         echo "cannot run parallel pods with GPU sharing enabled"
-        kubectl get pods -l app=nvidia-plugin-test -n $TEST_NAMESPACE
+        kubectl get pods -l app=nvidia-plugin-test -n "${TEST_NAMESPACE}" --request-timeout="${KUBECTL_REQUEST_TIMEOUT}" || true
         exit 1
     fi
 
@@ -243,14 +250,22 @@ test_custom_labels_override() {
   for operand in $operands
   do
     echo "checking $operand labels"
-    for pod in $(kubectl get pods -n "$TEST_NAMESPACE" -l app="$operand" --output=jsonpath={.items..metadata.name})
+    if ! operand_pods=$(kubectl get pods -n "$TEST_NAMESPACE" -l app="$operand" --output=jsonpath={.items..metadata.name} --request-timeout="${KUBECTL_REQUEST_TIMEOUT}"); then
+      echo "cannot list $operand pods to verify the overridden labels"
+      exit 1
+    fi
+    if [ -z "$operand_pods" ]; then
+      echo "no $operand pods found when verifying the overridden labels"
+      exit 1
+    fi
+    for pod in $operand_pods
     do
-      cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.cloudprovider})
+      cp_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath='{.metadata.labels.cloudprovider}' --request-timeout="${KUBECTL_REQUEST_TIMEOUT}")
       if [ "$cp_label_value" != "aws" ]; then
           echo "Custom Label cloudprovider is incorrect when clusterpolicy labels are overridden - $pod"
           exit 1
       fi
-      platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath={.metadata.labels.platform})
+      platform_label_value=$(kubectl get pod -n "$TEST_NAMESPACE" "$pod" --output jsonpath='{.metadata.labels.platform}' --request-timeout="${KUBECTL_REQUEST_TIMEOUT}")
       if [ "$platform_label_value" != "kubernetes" ]; then
           echo "Custom Label platform is incorrect when clusterpolicy labels are overridden - $pod"
           exit 1

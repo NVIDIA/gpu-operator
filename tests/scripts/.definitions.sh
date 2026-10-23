@@ -14,12 +14,18 @@ TERRAFORM="terraform -chdir=${TERRAFORM_DIR}"
 
 # Set default values if not defined
 : ${HELM:="helm"}
+: "${KUBECTL_REQUEST_TIMEOUT:="15s"}"
+: "${KUBECTL_LOG_TIMEOUT:="120s"}"
 : ${LOG_DIR:="/tmp/logs"}
 : ${PROJECT:="$(basename "${PROJECT_DIR}")"}
 : ${TEST_NAMESPACE:="test-operator"}
 : ${TARGET_DRIVER_VERSION:="580.178.04"}
 
 : ${OPERATOR_IMAGE:="nvcr.io/nvidia/gpu-operator"}
+
+# true installs HELM_CHART with the images it already names, for callers that bake and verify the chart
+# themselves; OPERATOR_IMAGE and OPERATOR_VERSION then only describe the operator and are not applied.
+: "${CHART_IMAGES_ONLY:="false"}"
 
 : ${CONTAINER_RUNTIME:="docker"}
 
