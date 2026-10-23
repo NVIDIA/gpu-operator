@@ -1666,6 +1666,34 @@ func TestTransformDCGMExporter(t *testing.T) {
 			}).WithContainer(corev1.Container{Name: "dummy"}).WithPullSecret("pull-secret").WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
 		},
 		{
+			description: "transform dcgm exporter with dcgm running on the host set only through dcgmExporter env",
+			ds: NewDaemonset().
+				WithContainer(corev1.Container{Name: "dcgm-exporter"}).
+				WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				DCGM: gpuv1.DCGMSpec{
+					Enabled: newBoolPtr(false),
+				},
+				DCGMExporter: gpuv1.DCGMExporterSpec{
+					Repository:      "nvcr.io/nvidia/cloud-native",
+					Image:           "dcgm-exporter",
+					Version:         "v1.0.0",
+					ImagePullPolicy: "IfNotPresent",
+					Env: []gpuv1.EnvVar{
+						{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+					},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dcgm-exporter",
+				Image:           "nvcr.io/nvidia/cloud-native/dcgm-exporter:v1.0.0",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: "DCGM_REMOTE_HOSTENGINE_INFO", Value: "localhost:5555"},
+				},
+			}).WithContainer(corev1.Container{Name: "dummy"}).WithRuntimeClassName("nvidia").WithHostNetwork(true).WithDNSPolicy(corev1.DNSClusterFirstWithHostNet),
+		},
+		{
 			description: "transform dcgm exporter with HPC job mapping enabled",
 			ds: NewDaemonset().
 				WithContainer(corev1.Container{Name: "dcgm-exporter"}).

@@ -1864,14 +1864,6 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 	// check if DCGM hostengine is enabled as a separate Pod and setup env accordingly
 	if config.DCGM.IsEnabled() {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName, fmt.Sprintf("nvidia-dcgm:%d", DCGMDefaultPort))
-	} else {
-		// case for DCGM running on the host itself(DGX BaseOS)
-		remoteEngine := getContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName)
-		if remoteEngine != "" && strings.HasPrefix(remoteEngine, "localhost") {
-			// enable hostNetwork for communication with external DCGM using localhost
-			obj.Spec.Template.Spec.HostNetwork = true
-			obj.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
-		}
 	}
 	// set hostNetwork if specified for DCGM Exporter (if it is already enabled above,
 	// do not touch the value)
@@ -1971,6 +1963,17 @@ func TransformDCGMExporter(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 
 	for _, env := range config.DCGMExporter.Env {
 		setContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), env.Name, env.Value)
+	}
+
+	// case for DCGM running on the host itself(DGX BaseOS). Checked after the user env is applied,
+	// because that is where DCGM_REMOTE_HOSTENGINE_INFO is set.
+	if !config.DCGM.IsEnabled() {
+		remoteEngine := getContainerEnv(&(obj.Spec.Template.Spec.Containers[0]), DCGMRemoteEngineEnvName)
+		if strings.HasPrefix(remoteEngine, "localhost") {
+			// enable hostNetwork for communication with external DCGM using localhost
+			obj.Spec.Template.Spec.HostNetwork = true
+			obj.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+		}
 	}
 
 	return nil
