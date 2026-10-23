@@ -684,16 +684,10 @@ func runCommandWithWait(command string, args []string, sleepSeconds int, silent 
 }
 
 // For driver container installs, check existence of .driver-ctr-ready to confirm running driver
-// container has completed and is in Ready state.
+// container has completed and is in Ready state. This is a single attempt: waitForDriver owns
+// the retries so that it can keep re-probing the host driver while the container is not ready.
 func assertDriverContainerReady(silent bool) error {
-	command := shell
-	args := []string{"-c", fmt.Sprintf("stat %s", driverContainerStatusFilePath)}
-
-	if withWaitFlag {
-		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
-	}
-
-	return runCommand(command, args, silent)
+	return runCommand(shell, []string{"-c", fmt.Sprintf("stat %s", driverContainerStatusFilePath)}, silent)
 }
 
 // isDriverManagedByOperator determines if the NVIDIA driver is managed by the GPU Operator.
@@ -787,18 +781,32 @@ func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 		return cmd.Run()
 	}
 
+	log.Info("Attempting to validate a driver container installation")
+	if err := validateDriver(silent); err != nil {
+		return fmt.Errorf("error validating driver: %w", err)
+	}
+	return nil
+}
+
+// waitForDriver waits for a usable driver installation, retrying the driver container and
+// re-probing the host until one of them succeeds. It reports whether the driver was found on
+// the host rather than in the driver container.
+func waitForDriver(wait bool, intervalSeconds int, probeContainer, probeHost func() error) (bool, error) {
 	for {
-		log.Info("Attempting to validate a driver container installation")
-		err := validateDriver(silent)
-		if err != nil {
-			if !withWaitFlag {
-				return fmt.Errorf("error validating driver: %w", err)
-			}
-			log.Warningf("failed to validate the driver, retrying after %d seconds\n", sleepIntervalSecondsFlag)
-			time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
-			continue
+		err := probeContainer()
+		if err == nil {
+			return false, nil
 		}
-		return nil
+		if !wait {
+			return false, err
+		}
+
+		log.Warningf("failed to validate the driver, retrying after %d seconds\n", intervalSeconds)
+		time.Sleep(time.Duration(intervalSeconds) * time.Second)
+
+		if err := probeHost(); err == nil {
+			return true, nil
+		}
 	}
 }
 
@@ -818,9 +826,19 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 		return driverInfo{}, fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
 	}
 
-	err = validateDriverContainer(silent, driverManagedByOperator)
+	hostDriver, err := waitForDriver(
+		withWaitFlag,
+		sleepIntervalSecondsFlag,
+		func() error { return validateDriverContainer(silent, driverManagedByOperator) },
+		func() error { return validateHostDriver(true) },
+	)
 	if err != nil {
 		return driverInfo{}, err
+	}
+
+	if hostDriver {
+		log.Info("Detected a pre-installed driver on the host")
+		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
 	}
 
 	if driverManagedByOperator {
