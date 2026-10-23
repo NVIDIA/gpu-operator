@@ -127,6 +127,26 @@ func hasSubscriptionVolumeMount(volumeMounts []corev1.VolumeMount) bool {
 	return false
 }
 
+func assertSubscriptionHostPathVolumes(t *testing.T, volumes []corev1.Volume, expected map[string]corev1.HostPathType) {
+	t.Helper()
+
+	if expected == nil {
+		expected = map[string]corev1.HostPathType{}
+	}
+
+	actual := map[string]corev1.HostPathType{}
+	for _, volume := range volumes {
+		if !strings.HasPrefix(volume.Name, "subscription-config-") {
+			continue
+		}
+		require.NotNil(t, volume.HostPath)
+		require.NotNil(t, volume.HostPath.Type)
+		actual[volume.HostPath.Path] = *volume.HostPath.Type
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
 func TestDriverRenderMinimal(t *testing.T) {
 	// Construct a sample driver state manager
 	const (
@@ -599,6 +619,158 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(o), actual)
+}
+
+func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
+	repoConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-repo-config",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"custom.repo": "[test-repo]",
+		},
+	}
+
+	rhelHostPaths := map[string]corev1.HostPathType{
+		"/etc/pki/entitlement":         corev1.HostPathDirectoryOrCreate,
+		"/etc/yum.repos.d/redhat.repo": corev1.HostPathFileOrCreate,
+		"/etc/rhsm":                    corev1.HostPathDirectoryOrCreate,
+		"/etc/yum.repos.d":             corev1.HostPathDirectoryOrCreate,
+	}
+	rhelDriverMounts := []corev1.VolumeMount{
+		{Name: "subscription-config-0", MountPath: "/run/secrets/etc-pki-entitlement", ReadOnly: true},
+		{Name: "subscription-config-1", MountPath: "/run/secrets/redhat.repo", ReadOnly: true},
+		{Name: "subscription-config-2", MountPath: "/run/secrets/rhsm", ReadOnly: true},
+	}
+	suseDriverMounts := []corev1.VolumeMount{
+		{Name: "subscription-config-0", MountPath: "/etc/SUSEConnect", ReadOnly: true},
+		{Name: "subscription-config-1", MountPath: "/etc/zypp/credentials.d", ReadOnly: true},
+	}
+	testCases := map[string]struct {
+		osRelease                   string
+		runtime                     string
+		openshift                   string
+		repoConfigEnabled           bool
+		expectedSubscriptionHostMap map[string]corev1.HostPathType
+		expectedSubscriptionMounts  []corev1.VolumeMount
+	}{
+		"rhel with custom repositories retains subscription mounts": {
+			osRelease: "rhel", runtime: "containerd",
+			repoConfigEnabled: true, expectedSubscriptionHostMap: rhelHostPaths, expectedSubscriptionMounts: rhelDriverMounts,
+		},
+		"rhel without custom repositories mounts subscription paths": {
+			osRelease: "rhel", runtime: "containerd",
+			expectedSubscriptionHostMap: rhelHostPaths, expectedSubscriptionMounts: rhelDriverMounts,
+		},
+		"rhel with docker mounts subscription paths": {
+			osRelease: "rhel", runtime: "docker",
+			repoConfigEnabled: true, expectedSubscriptionHostMap: rhelHostPaths, expectedSubscriptionMounts: rhelDriverMounts,
+		},
+		"rhel with crio skips subscription mounts": {
+			osRelease: "rhel", runtime: "crio", repoConfigEnabled: true,
+		},
+		"ubuntu skips subscription mounts": {
+			osRelease: "ubuntu", runtime: "containerd", repoConfigEnabled: true,
+		},
+		"sles creates missing subscription paths": {
+			osRelease: "sles", runtime: "containerd", repoConfigEnabled: true,
+			expectedSubscriptionMounts: suseDriverMounts,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/zypp/credentials.d": corev1.HostPathDirectoryOrCreate,
+				"/etc/SUSEConnect":        corev1.HostPathFileOrCreate,
+			},
+		},
+		"sl-micro creates missing subscription paths": {
+			osRelease: "sl-micro", runtime: "containerd", repoConfigEnabled: true,
+			expectedSubscriptionMounts: suseDriverMounts,
+			expectedSubscriptionHostMap: map[string]corev1.HostPathType{
+				"/etc/zypp/credentials.d": corev1.HostPathDirectoryOrCreate,
+				"/etc/SUSEConnect":        corev1.HostPathFileOrCreate,
+			},
+		},
+		"openshift skips explicit rhel subscription mounts": {
+			osRelease: "rhel", runtime: "containerd", openshift: "4.18", repoConfigEnabled: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			stateDriver := &stateDriver{
+				stateSkel: stateSkel{
+					client:    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(repoConfigMap).Build(),
+					namespace: "test-ns",
+				},
+			}
+			driver := &nvidiav1alpha1.NVIDIADriver{}
+			if tc.repoConfigEnabled {
+				driver.Spec.RepoConfig = &nvidiav1alpha1.DriverRepoConfigSpec{Name: "test-repo-config"}
+			}
+
+			configs, err := stateDriver.getDriverAdditionalConfigs(
+				context.Background(),
+				driver,
+				testClusterInfo{runtime: tc.runtime, openshiftVersion: tc.openshift},
+				nodePool{osRelease: tc.osRelease, osVersion: tc.osRelease},
+			)
+			require.NoError(t, err)
+
+			assertSubscriptionHostPathVolumes(t, configs.Volumes, tc.expectedSubscriptionHostMap)
+			expectedAdditionalMounts := append([]corev1.VolumeMount{}, tc.expectedSubscriptionMounts...)
+			if tc.repoConfigEnabled {
+				repoPaths := map[string]string{
+					"rhel":     "/etc/yum.repos.d/custom.repo",
+					"ubuntu":   "/etc/apt/sources.list.d/custom.repo",
+					"sles":     "/etc/zypp/repos.d/custom.repo",
+					"sl-micro": "/etc/zypp/repos.d/custom.repo",
+				}
+				expectedAdditionalMounts = append(expectedAdditionalMounts, corev1.VolumeMount{
+					Name: "test-repo-config", MountPath: repoPaths[tc.osRelease],
+					SubPath: "custom.repo", ReadOnly: true,
+				})
+			}
+			assert.ElementsMatch(t, expectedAdditionalMounts, configs.VolumeMounts)
+			expectedManagerMounts := []corev1.VolumeMount{}
+			if tc.osRelease == "rhel" && len(tc.expectedSubscriptionMounts) > 0 {
+				expectedManagerMounts = append(expectedManagerMounts, corev1.VolumeMount{
+					Name: "subscription-config-3", MountPath: "/run/secrets/yum.repos.d", ReadOnly: true,
+				})
+			}
+
+			assert.ElementsMatch(t, expectedManagerMounts, configs.DriverManagerVolumeMounts)
+
+			renderData := getMinimalDriverRenderData()
+			renderData.AdditionalConfigs = configs
+			objects := renderDriverObjects(t, scheme.Scheme, renderData)
+			ds, err := getDaemonsetFromObjects(objects)
+			require.NoError(t, err)
+			renderedDriver := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+			require.NotNil(t, renderedDriver)
+			for _, mount := range expectedAdditionalMounts {
+				assert.Contains(t, renderedDriver.VolumeMounts, mount)
+			}
+			var renderedSubscriptionMounts []corev1.VolumeMount
+			for _, mount := range renderedDriver.VolumeMounts {
+				if strings.HasPrefix(mount.Name, "subscription-config-") {
+					renderedSubscriptionMounts = append(renderedSubscriptionMounts, mount)
+				}
+			}
+			assert.ElementsMatch(t, tc.expectedSubscriptionMounts, renderedSubscriptionMounts)
+
+			manager := findContainerByName(ds.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
+			require.NotNil(t, manager)
+			for _, mount := range expectedManagerMounts {
+				assert.Contains(t, manager.VolumeMounts, mount)
+			}
+			for _, container := range ds.Spec.Template.Spec.Containers {
+				for _, mount := range container.VolumeMounts {
+					assert.NotEqual(t, "/run/secrets/yum.repos.d", mount.MountPath)
+				}
+			}
+
+			assert.Equal(t, len(tc.expectedSubscriptionHostMap) > 0, hasSubscriptionVolumeMount(configs.VolumeMounts))
+		})
+	}
 }
 
 func TestDriverPrecompiledLibModules(t *testing.T) {
