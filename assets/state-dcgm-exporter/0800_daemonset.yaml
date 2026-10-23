@@ -47,7 +47,7 @@ spec:
         - name: DCGM_EXPORTER_KUBERNETES
           value: "true"
         - name: DCGM_EXPORTER_COLLECTORS
-          value: "/etc/dcgm-exporter/dcp-metrics-included.csv"
+          value: "/etc/dcgm-exporter/default-counters.csv"
         - name: NODE_NAME
           valueFrom:
             fieldRef:
@@ -55,6 +55,15 @@ spec:
         ports:
         - name: "metrics"
           containerPort: 9400
+        # A large metric file on a node with many GPUs can take about a minute
+        # before /health answers. The startup probe allows up to 5 minutes;
+        # the liveness and readiness probes start after it succeeds.
+        startupProbe:
+          httpGet:
+            port: 9400
+            path: /health
+          periodSeconds: 5
+          failureThreshold: 60
         livenessProbe:
           httpGet:
             port: 9400

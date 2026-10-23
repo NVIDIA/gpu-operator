@@ -39,7 +39,7 @@ const (
 	// hostengine Service (manifests/state-dcgm/0600_service.yaml).
 	dcgmRemoteHostEngine = "nvidia-dcgm-dra:5555"
 
-	dcgmExporterDefaultCollectors     = "/etc/dcgm-exporter/dcp-metrics-included.csv"
+	dcgmExporterDefaultCollectors     = "/etc/dcgm-exporter/default-counters.csv"
 	dcgmExporterCustomCollectors      = "/etc/dcgm-exporter/dcgm-metrics.csv"
 	dcgmExporterDefaultKubeletRootDir = "/var/lib/kubelet"
 	dcgmExporterDefaultJobMappingDir  = "/var/lib/dcgm-exporter/job-mapping"

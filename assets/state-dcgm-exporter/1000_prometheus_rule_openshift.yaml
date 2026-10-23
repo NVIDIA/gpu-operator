@@ -6,41 +6,50 @@ metadata:
   labels:
     app: nvidia-dcgm-exporter
 spec:
+  # TODO: the `or <old name * scale>` fallbacks cover dcgm-exporter 4.8.x metric
+  # names: a rolling upgrade (old and new exporters run side by side), a pinned
+  # dcgmExporter.version, and custom metrics ConfigMaps that still list old
+  # names. Remove them once 4.8.x metric names are no longer common, that is,
+  # no supported operator release ships a pre-4.9.0 exporter and the operator
+  # docs require DCGM 4.7 names in custom metrics CSVs.
+  #
+  # The recorded values are: percent for utilization, bytes for memory, hertz
+  # for clocks. The 4.8.x series report MiB and MHz, so the fallbacks scale them.
   groups:
   - name: dcgm.accelerator.metrics
     interval: 30s
     rules:
     - record: accelerator_gpu_utilization
-      expr: DCGM_FI_DEV_GPU_UTIL
+      expr: (DCGM_FI_DEV_GPU_UTIL_RATIO * 100) or DCGM_FI_DEV_GPU_UTIL
       labels:
         vendor: "nvidia"
 
     - record: accelerator_memory_used_bytes
-      expr: DCGM_FI_DEV_MEM_COPY_UTIL
+      expr: DCGM_FI_DEV_FB_USED_BYTES or (DCGM_FI_DEV_FB_USED * 1048576)
       labels:
         vendor: "nvidia"
 
     - record: accelerator_memory_total_bytes
-      expr: DCGM_FI_DEV_FB_TOTAL
+      expr: DCGM_FI_DEV_FB_CAPACITY_BYTES or (DCGM_FI_DEV_FB_TOTAL * 1048576)
       labels:
         vendor: "nvidia"
 
     - record: accelerator_power_usage_watts
-      expr: DCGM_FI_DEV_POWER_USAGE
+      expr: DCGM_FI_DEV_BOARD_POWER_WATTS or DCGM_FI_DEV_POWER_USAGE
       labels:
         vendor: "nvidia"
 
     - record: accelerator_temperature_celsius
-      expr: DCGM_FI_DEV_GPU_TEMP
+      expr: DCGM_FI_DEV_GPU_TEMP_CELSIUS or DCGM_FI_DEV_GPU_TEMP
       labels:
         vendor: "nvidia"
 
     - record: accelerator_sm_clock_hertz
-      expr: DCGM_FI_DEV_SM_CLOCK
+      expr: DCGM_FI_DEV_SM_CLOCK_HERTZ or (DCGM_FI_DEV_SM_CLOCK * 1000000)
       labels:
         vendor: "nvidia"
 
     - record: accelerator_memory_clock_hertz
-      expr: DCGM_FI_DEV_MEM_CLOCK
+      expr: DCGM_FI_DEV_MEMORY_CLOCK_HERTZ or (DCGM_FI_DEV_MEM_CLOCK * 1000000)
       labels:
         vendor: "nvidia"
