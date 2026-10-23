@@ -1171,6 +1171,18 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			expectedUpgradeState: map[string]string{"node-1": ""},
 		},
 		{
+			name: "NVIDIADriver with autoUpgrade disabled → not labeled",
+			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: nvidiav1alpha1.NVIDIADriverSpec{
+					UpgradePolicy: &nvidiav1alpha1.DriverUpgradePolicySpec{AutoUpgrade: false},
+				},
+			}},
+			nodes:                []*corev1.Node{ownedNode("node-1", "")},
+			pods:                 []*corev1.Pod{orphanedPod("pod-1", "node-1")},
+			expectedUpgradeState: map[string]string{"node-1": ""},
+		},
+		{
 			name: "NVIDIADriver with deletion timestamp → node treated as unowned, not labeled",
 			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1214,6 +1226,11 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			for nodeName, expectedUpgradeState := range tc.expectedUpgradeState {
 				node := &corev1.Node{}
 				require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: nodeName}, node))
+				if expectedUpgradeState == "" {
+					// an empty-valued label would also read as "", so check the key itself
+					assert.NotContains(t, node.Labels, upgradeStateLabel, "node %q upgrade state label", nodeName)
+					continue
+				}
 				assert.Equal(t, expectedUpgradeState, node.Labels[upgradeStateLabel], "node %q upgrade state", nodeName)
 			}
 		})

@@ -630,7 +630,9 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 	return nil
 }
 
-// nodeOwnedByNVIDIADriver returns true when the node has an owner label matching a live NVIDIADriver.
+// nodeOwnedByNVIDIADriver returns true when the node has an owner label matching a live NVIDIADriver
+// with auto-upgrade enabled. Nodes of NVIDIADrivers with auto-upgrade disabled are skipped because the
+// upgrade controller strips their upgrade state label, which would otherwise be re-added on every reconcile.
 func nodeOwnedByNVIDIADriver(node *corev1.Node, nvidiaDrivers []nvidiav1alpha1.NVIDIADriver) bool {
 	if node.Labels == nil || node.Labels[consts.NVIDIADriverOwnerLabel] == "" {
 		return false
@@ -640,7 +642,7 @@ func nodeOwnedByNVIDIADriver(node *corev1.Node, nvidiaDrivers []nvidiav1alpha1.N
 			continue
 		}
 		if node.Labels[consts.NVIDIADriverOwnerLabel] == nvidiaDriver.Name {
-			return true
+			return nvidiaDriver.Spec.GetUpgradePolicyWithDefaults().AutoUpgrade
 		}
 	}
 	return false
