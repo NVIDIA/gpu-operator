@@ -16,8 +16,8 @@ name: Forward Compatibility
 
 on:
   schedule:
-    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
-  workflow_dispatch:  # Manual trigger
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,12 +25,26 @@ concurrency:
 
 permissions: {}
 
+env:
+  MAIN_BUILD_MAX_AGE_DAYS: 1
+
 jobs:
-  fetch-latest-images:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  variables:
     permissions:
       contents: read
+    uses: ./.github/workflows/variables.yaml
+
+  find-main-chart:
+    needs: [variables]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      chart_reference: ${{ steps.main-chart.outputs.chart_reference }}
+      chart_version: ${{ steps.main-chart.outputs.chart_version }}
+      operator_version: ${{ steps.main-chart.outputs.operator_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -46,45 +60,38 @@ jobs:
         with:
           release: ${{ env.REGCTL_VERSION }}
 
-      - name: Get latest component images and generate values override file
+      - name: Login to GitHub Container Registry
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "${GH_TOKEN}" | regctl registry login ghcr.io -u "${GITHUB_ACTOR}" --pass-stdin
+
+      - name: Find the chart of the newest complete main build
+        id: main-chart
+        env:
+          OPERATOR_IMAGE_BASE: ${{ needs.variables.outputs.operator_image_base }}
         run: |
-          # Fetch latest images from component repositories
-          echo "::notice::Fetching latest container-toolkit image..."
-          TOOLKIT=$(.github/scripts/get-latest-images.sh toolkit)
+          set -euo pipefail
 
-          echo "::notice::Fetching latest device-plugin image..."
-          DEVICE_PLUGIN=$(.github/scripts/get-latest-images.sh device-plugin)
+          main_build_repository="${OPERATOR_IMAGE_BASE}/main-builds"
+          chart_repository="${OPERATOR_IMAGE_BASE}/charts/gpu-operator"
 
-          echo "::notice::Fetching latest mig-manager image..."
-          MIG_MANAGER=$(.github/scripts/get-latest-images.sh mig-manager)
-
-          # Generate values override file
-          .github/scripts/generate-values-overrides.sh \
-            values-overrides.yaml \
-            "${TOOLKIT}" \
-            "${DEVICE_PLUGIN}" \
-            "${MIG_MANAGER}"
-
-      - name: Upload values override file
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: values-overrides
-          path: values-overrides.yaml
-          retention-days: 30
+          {
+            .github/scripts/get-latest-main-build.sh "${main_build_repository}" "${chart_repository}" "${MAIN_BUILD_MAX_AGE_DAYS}"
+            echo "chart_reference=oci://${chart_repository}"
+          } >> "${GITHUB_OUTPUT}"
 
   run-e2e-tests:
-    needs: [fetch-latest-images]
+    needs: [variables, find-main-chart]
     permissions:
       contents: read
       id-token: write
       packages: write
     uses: ./.github/workflows/e2e-tests.yaml
     with:
-      operator_image: ghcr.io/nvidia/gpu-operator
-      operator_version: main-latest
-      use_values_override: true
+      operator_image: ${{ needs.variables.outputs.operator_image_base }}
+      operator_version: ${{ needs.find-main-chart.outputs.operator_version }}
+      chart_reference: ${{ needs.find-main-chart.outputs.chart_reference }}
+      chart_version: ${{ needs.find-main-chart.outputs.chart_version }}
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -96,11 +103,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
-    needs: [fetch-latest-images, run-e2e-tests]
-    if: ${{ always() && (needs.fetch-latest-images.result == 'failure' || needs.run-e2e-tests.result == 'failure') }}
+    needs: [variables, find-main-chart, run-e2e-tests]
+    if: ${{ always() && (needs.variables.result == 'failure' || needs.find-main-chart.result == 'failure' || needs.run-e2e-tests.result == 'failure') }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
+      - name: Describe the tested chart
+        id: tested-chart
+        env:
+          CHART_REFERENCE: ${{ needs.find-main-chart.outputs.chart_reference }}
+          CHART_VERSION: ${{ needs.find-main-chart.outputs.chart_version }}
+        run: |
+          if [[ -n "${CHART_VERSION}" ]]; then
+            echo "description=\`${CHART_REFERENCE} --version ${CHART_VERSION}\` (run \`helm show values\` on it to see the component images)" >> "${GITHUB_OUTPUT}"
+          else
+            echo "description=No complete main build from the last ${MAIN_BUILD_MAX_AGE_DAYS} day(s) (none recorded, its chart changed since, or the registry could not be read); see the run log" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Send Slack alert notification
         if: ${{ env.SLACK_BOT_TOKEN != '' }}
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
@@ -110,5 +129,5 @@ jobs:
           payload: |
             {
               "channel": "${{ secrets.SLACK_CHANNEL_ID }}",
-              "text": ":x: *Forward Compatibility Test Failed for GPU Operator*\n\n*Workflow:* ${{ github.workflow }}\n*Repository:* ${{ github.repository }}\n*Trigger:* ${{ github.event_name }}\n\n*Tested Components:*\nDownload `values-overrides` artifact to see tested component versions\n\n*Details:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Run>\n\n${{ secrets.SLACK_MENTION_LIST }}"
+              "text": ":x: *Forward Compatibility Test Failed for GPU Operator*\n\n*Workflow:* ${{ github.workflow }}\n*Repository:* ${{ github.repository }}\n*Trigger:* ${{ github.event_name }}\n\n*Tested Chart:* ${{ steps.tested-chart.outputs.description }}\n\n*Details:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Run>\n\n${{ secrets.SLACK_MENTION_LIST }}"
             }

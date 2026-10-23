@@ -25,5 +25,7 @@ GOLANGCI_LINT_VERSION ?= v2.14.0
 
 REGCTL_VERSION ?= v0.11.5
 
+OPERATOR_SDK_VERSION ?= v1.4.0
+
 GIT_COMMIT ?= $(shell git describe --match="" --dirty --long --always 2> /dev/null || echo "")
 GIT_COMMIT_SHA_FULL ?= $(shell git describe --match="" --dirty --long --always --abbrev=40 2> /dev/null || echo "")
