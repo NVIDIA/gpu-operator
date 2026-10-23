@@ -17,7 +17,9 @@
 package e2e
 
 import (
+	"cmp"
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 
@@ -33,6 +35,8 @@ import (
 
 type testConfig struct {
 	helmChart           string
+	helmChartVersion    string
+	valuesFile          string
 	namespace           string
 	operatorRepository  string
 	operatorImage       string
@@ -40,6 +44,9 @@ type testConfig struct {
 	validatorRepository string
 	validatorImage      string
 	validatorVersion    string
+	containerRuntime    string
+	targetDriverVersion string
+	logDir              string
 }
 
 // runID is a unique identifier of the e2e run.
@@ -58,20 +65,41 @@ func createGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 
 func TestMain(m *testing.M) {
 	flag.StringVar(&tcfg.helmChart, "helm-chart", "", "Helm chart to use")
+	flag.StringVar(&tcfg.helmChartVersion, "helm-chart-version", "", "Helm chart version to use, required when helm-chart is an OCI reference without a tag")
+	flag.StringVar(&tcfg.valuesFile, "values-file", "", "Helm values file to apply before the operator and validator image settings")
 	flag.StringVar(&tcfg.namespace, "namespace", "gpu-operator", "Namespace name to use for the gpu-operator helm deploys")
 	flag.StringVar(&tcfg.operatorRepository, "operator-repository", "", "GPU Operator image repository to use")
 	flag.StringVar(&tcfg.operatorImage, "operator-image", "", "GPU Operator image name to use")
 	flag.StringVar(&tcfg.operatorVersion, "operator-version", "", "GPU Operator image tag to use")
-	flag.StringVar(&tcfg.validatorRepository, "validator-repository", "", "GPU Operator Validator image repository to use")
-	flag.StringVar(&tcfg.validatorImage, "validator-image", "", "GPU Operator Validator image name to use")
-	flag.StringVar(&tcfg.validatorVersion, "validator-version", "", "GPU Operator Validator image tag to use")
+	flag.StringVar(&tcfg.validatorRepository, "validator-repository", "", "GPU Operator Validator image repository to use, defaults to -operator-repository")
+	flag.StringVar(&tcfg.validatorImage, "validator-image", "", "GPU Operator Validator image name to use, defaults to -operator-image")
+	flag.StringVar(&tcfg.validatorVersion, "validator-version", "", "GPU Operator Validator image tag to use, defaults to -operator-version")
+	flag.StringVar(&tcfg.containerRuntime, "container-runtime", "containerd", "Container runtime of the cluster nodes, set as operator.defaultRuntime when migrating to NVIDIADriver")
+	flag.StringVar(&tcfg.targetDriverVersion, "target-driver-version", "", "Driver version to upgrade to in the driver update specs")
+	flag.StringVar(&tcfg.logDir, "log-dir", "", "Directory to write pod logs to when a spec fails")
 
 	framework.RegisterClusterFlags(flag.CommandLine)
 
 	flag.Parse()
 
+	tcfg.validatorRepository = cmp.Or(tcfg.validatorRepository, tcfg.operatorRepository)
+	tcfg.validatorImage = cmp.Or(tcfg.validatorImage, tcfg.operatorImage)
+	tcfg.validatorVersion = cmp.Or(tcfg.validatorVersion, tcfg.operatorVersion)
+
 	os.Exit(m.Run())
 }
+
+func requireFlag(value, flagName string) {
+	ginkgo.GinkgoHelper()
+	if value == "" {
+		ginkgo.Fail(fmt.Sprintf("-%s must be set", flagName))
+	}
+}
+
+var _ = ginkgo.BeforeSuite(func() {
+	requireFlag(tcfg.helmChart, "helm-chart")
+	requireFlag(tcfg.targetDriverVersion, "target-driver-version")
+})
 
 func TestE2E(t *testing.T) {
 	e2elog.InitLogs()
