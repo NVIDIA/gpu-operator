@@ -62,33 +62,42 @@ func (u *gpuClusterUpdater) updateConditions(ctx context.Context, cr *nvidiav1al
 	if err := u.client.Get(ctx, types.NamespacedName{Name: cr.Name}, instance); err != nil {
 		return fmt.Errorf("failed to get GPUCluster instance for status update: %w", err)
 	}
+	// The fetched object can be newer than the object this reconcile processed.
+	// Do not publish a stale result as current for an unreconciled generation.
+	if instance.Generation != cr.Generation {
+		return nil
+	}
 
 	switch statusType {
 	case Ready:
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:    Ready,
-			Status:  metav1.ConditionTrue,
-			Reason:  reason,
-			Message: message,
+			Type:               Ready,
+			Status:             metav1.ConditionTrue,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: cr.Generation,
 		})
 
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:   Error,
-			Status: metav1.ConditionFalse,
-			Reason: Ready,
+			Type:               Error,
+			Status:             metav1.ConditionFalse,
+			Reason:             Ready,
+			ObservedGeneration: cr.Generation,
 		})
 	case Error:
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:   Ready,
-			Status: metav1.ConditionFalse,
-			Reason: Error,
+			Type:               Ready,
+			Status:             metav1.ConditionFalse,
+			Reason:             Error,
+			ObservedGeneration: cr.Generation,
 		})
 
 		meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-			Type:    Error,
-			Status:  metav1.ConditionTrue,
-			Reason:  reason,
-			Message: message,
+			Type:               Error,
+			Status:             metav1.ConditionTrue,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: cr.Generation,
 		})
 
 		if instance.Status.State == "" {
