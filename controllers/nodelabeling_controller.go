@@ -283,7 +283,7 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 
 		modified := gpuDiscoveryStateChanged || stateLabelsModified
 		if modified {
-			if err := nlc.client.Patch(ctx, &node, client.MergeFrom(original)); err != nil {
+			if err := nlc.client.Patch(ctx, &node, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
 				return result, fmt.Errorf("unable to label node %s: %w", node.Name, err)
 			}
 			result.totalPatchedNodeCount++
@@ -623,7 +623,7 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 			node.Labels = map[string]string{}
 		}
 		node.Labels[upgradeStateLabel] = upgrade.UpgradeStateUpgradeRequired
-		if err := nlc.client.Patch(ctx, node, client.MergeFrom(original)); err != nil {
+		if err := nlc.client.Patch(ctx, node, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
 			return fmt.Errorf("failed to label node %q for orphaned driver pod %q: %w", node.Name, pod.Name, err)
 		}
 	}

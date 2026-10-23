@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1218,6 +1219,114 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			}
 		})
 	}
+}
+
+// writeNodeBeforeFirstPatch simulates another writer, such as k8s-driver-manager or the
+// upgrade state machine, changing the node after the operator read it but before the
+// operator's first patch reaches the API server.
+func writeNodeBeforeFirstPatch(t *testing.T, concurrentWrite func(*corev1.Node)) interceptor.Funcs {
+	written := false
+	return interceptor.Funcs{
+		Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			if !written {
+				written = true
+				node := &corev1.Node{}
+				require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(obj), node))
+				concurrentWrite(node)
+				require.NoError(t, c.Update(ctx, node))
+			}
+			return c.Patch(ctx, obj, patch, opts...)
+		},
+	}
+}
+
+func TestLabelGPUNodesPreservesDeployLabelPausedAfterRead(t *testing.T) {
+	const pausedValue = "paused-for-driver-upgrade"
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gpu-node",
+				Labels: map[string]string{
+					gpuPCILabelKey:    "true",
+					commonGPULabelKey: commonGPULabelValue,
+				},
+			},
+		}).
+		WithInterceptorFuncs(writeNodeBeforeFirstPatch(t, func(node *corev1.Node) {
+			node.Labels["nvidia.com/gpu.deploy.device-plugin"] = pausedValue
+			node.Labels[driverDeployLabelKey] = "pre-installed"
+		})).
+		Build()
+
+	nlc := &nodeLabelingController{
+		client:        fakeClient,
+		clusterPolicy: &gpuv1.ClusterPolicy{},
+		logger:        logr.Discard(),
+	}
+
+	_, err := nlc.labelGPUNodes(ctx)
+	require.True(t, apierrors.IsConflict(err), "got %v", err)
+	result, err := nlc.labelGPUNodes(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.totalPatchedNodeCount)
+
+	node := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "gpu-node"}, node))
+	assert.Equal(t, pausedValue, node.Labels["nvidia.com/gpu.deploy.device-plugin"])
+	assert.Equal(t, "pre-installed", node.Labels[driverDeployLabelKey])
+	assert.Equal(t, "true", node.Labels[gfdDeployLabelKey])
+}
+
+func TestLabelNodesWithOrphanedDriverPodsRechecksUpgradeStateAfterRead(t *testing.T) {
+	const namespace = "test-ns"
+	const driverName = "gpu-driver"
+	ctx := context.Background()
+	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(
+			&nvidiav1alpha1.NVIDIADriver{ObjectMeta: metav1.ObjectMeta{Name: driverName}},
+			&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name:   "node-1",
+				Labels: map[string]string{consts.NVIDIADriverOwnerLabel: driverName},
+			}},
+			&corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: namespace,
+					Labels:    map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue},
+				},
+				Spec:   corev1.PodSpec{NodeName: "node-1"},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+		).
+		WithInterceptorFuncs(writeNodeBeforeFirstPatch(t, func(node *corev1.Node) {
+			node.Labels[upgradeStateLabel] = upgrade.UpgradeStateCordonRequired
+		})).
+		Build()
+
+	nlc := &nodeLabelingController{
+		client:    fakeClient,
+		namespace: namespace,
+		logger:    logr.Discard(),
+	}
+
+	require.True(t, apierrors.IsConflict(nlc.labelNodesWithOrphanedDriverPods(ctx)))
+	require.NoError(t, nlc.labelNodesWithOrphanedDriverPods(ctx))
+
+	node := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "node-1"}, node))
+	assert.Equal(t, upgrade.UpgradeStateCordonRequired, node.Labels[upgradeStateLabel])
 }
 
 const gpuPCILabelKey = "feature.node.kubernetes.io/pci-10de.present"
