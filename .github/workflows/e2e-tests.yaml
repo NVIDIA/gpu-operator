@@ -65,6 +65,17 @@ jobs:
       operator_image: ${{ inputs.operator_image }}
       operator_version: ${{ inputs.operator_version }}
 
+  ha-failover:
+    needs: [variables]
+    if: needs.variables.outputs.push_on_build == 'true'
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/ha-failover.yaml
+    with:
+      operator_image: ${{ needs.variables.outputs.operator_image }}
+      operator_version: ${{ needs.variables.outputs.operator_version }}
+
   publish-helm-oci-chart:
     needs: [variables]
     permissions:

@@ -1,0 +1,17 @@
+{{- $pdb := .Values.operator.podDisruptionBudget | default dict }}
+{{- if and $pdb.enabled (gt (int .Values.operator.replicaCount) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gpu-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "gpu-operator"
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: "gpu-operator"
+      app: "gpu-operator"
+{{- end }}
