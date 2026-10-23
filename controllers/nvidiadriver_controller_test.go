@@ -29,6 +29,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -326,6 +327,182 @@ func TestReconcileStandalone(t *testing.T) {
 			instance := &nvidiav1alpha1.NVIDIADriver{}
 			require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: driver.Name}, instance))
 			require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
+		})
+	}
+}
+
+func TestReconcileGDSKernelModuleType(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+
+	for name, tc := range map[string]struct {
+		version                string
+		enabled                bool
+		precompiled            bool
+		gdrcopy                bool
+		requiresOpen           bool
+		omitGDS                bool
+		enabledUnspecified     bool
+		precompiledUnspecified bool
+		legacyOpen             *bool
+	}{
+		"deprecated open modules true":             {version: "2.29.4", enabled: true, requiresOpen: true, legacyOpen: new(true)},
+		"deprecated open modules false":            {version: "2.29.4", enabled: true, requiresOpen: true, legacyOpen: new(false)},
+		"reported version":                         {version: "2.29.4", enabled: true, requiresOpen: true},
+		"minimum version":                          {version: "2.17.5", enabled: true, requiresOpen: true},
+		"prefixed version":                         {version: "v2.29.4", enabled: true, requiresOpen: true},
+		"image digest":                             {version: "sha256:abcdef", enabled: true, requiresOpen: true},
+		"older version":                            {version: "2.17.4", enabled: true},
+		"GDS unspecified":                          {omitGDS: true},
+		"GDS enabled unspecified":                  {version: "2.29.4", enabledUnspecified: true},
+		"prefixed older version":                   {version: "v2.17.4", enabled: true},
+		"prefixed minimum version":                 {version: "v2.17.5", enabled: true, requiresOpen: true},
+		"prerelease below minimum":                 {version: "2.17.5-rc.1", enabled: true},
+		"precompiled unspecified":                  {version: "2.29.4", enabled: true, requiresOpen: true, precompiledUnspecified: true},
+		"GDS and GDRCopy":                          {version: "2.29.4", enabled: true, gdrcopy: true, requiresOpen: true},
+		"precompiled with GDS and GDRCopy":         {version: "2.29.4", enabled: true, gdrcopy: true, precompiled: true},
+		"precompiled with GDS unspecified":         {precompiled: true, omitGDS: true},
+		"precompiled with GDS enabled unspecified": {precompiled: true, version: "2.29.4", enabledUnspecified: true},
+		"GDS disabled":                             {version: "2.29.4"},
+		"precompiled with GDS":                     {version: "2.29.4", enabled: true, precompiled: true},
+		"precompiled with GDRCopy":                 {precompiled: true, gdrcopy: true},
+		"precompiled without GDS or GDRCopy":       {precompiled: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, moduleType := range []string{"auto", "open", "proprietary", ""} {
+				t.Run("kernelModuleType="+moduleType, func(t *testing.T) {
+					driver := &nvidiav1alpha1.NVIDIADriver{
+						ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+						Spec: nvidiav1alpha1.NVIDIADriverSpec{
+							Version:              "595.91.07",
+							KernelModuleType:     moduleType,
+							UseOpenKernelModules: tc.legacyOpen, //nolint:staticcheck // Verify the deprecated field cannot override kernelModuleType validation.
+							UsePrecompiled:       new(tc.precompiled),
+							GDRCopy:              &nvidiav1alpha1.GDRCopySpec{Enabled: new(tc.gdrcopy)},
+							GPUDirectStorage: &nvidiav1alpha1.GPUDirectStorageSpec{
+								Enabled: new(tc.enabled),
+								Version: tc.version,
+							},
+						},
+					}
+					if tc.omitGDS {
+						driver.Spec.GPUDirectStorage = nil
+					} else if tc.enabledUnspecified {
+						driver.Spec.GPUDirectStorage.Enabled = nil
+					}
+					if tc.precompiledUnspecified {
+						driver.Spec.UsePrecompiled = nil
+					}
+					cp := &gpuv1.ClusterPolicy{
+						ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+						Spec: gpuv1.ClusterPolicySpec{
+							Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(true)},
+						},
+					}
+					c := fake.NewClientBuilder().WithScheme(scheme).
+						WithObjects(cp, driver).
+						WithStatusSubresource(&nvidiav1alpha1.NVIDIADriver{}).Build()
+					updater := conditions.NewNvDriverUpdater(c)
+					// Existing CRs may retain an error from the obsolete GDS validation.
+					driver.Status.State = nvidiav1alpha1.NotReady
+					require.NoError(t, updater.SetConditionsError(t.Context(), driver, conditions.ReconcileFailed, "previous GDS validation failure"))
+					manager := &fakeStateManager{results: state.Results{Status: state.SyncStateReady}}
+					reconciler := &NVIDIADriverReconciler{
+						Client:                c,
+						Scheme:                scheme,
+						conditionUpdater:      updater,
+						nodeSelectorValidator: &FakeNodeSelectorValidator{},
+						stateManager:          manager,
+					}
+
+					_, err := reconciler.Reconcile(t.Context(), ctrl.Request{
+						NamespacedName: types.NamespacedName{Name: driver.Name},
+					})
+					require.NoError(t, err)
+
+					instance := &nvidiav1alpha1.NVIDIADriver{}
+					require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(driver), instance))
+
+					expectedError := ""
+					if tc.precompiled && (tc.enabled || tc.gdrcopy) {
+						expectedError = "not supported along with pre-compiled NVIDIA drivers"
+					} else if tc.requiresOpen && moduleType == "proprietary" {
+						expectedError = "kernelModuleType=open"
+					}
+					if expectedError != "" {
+						require.Nil(t, manager.lastCatalog, "incompatible settings must not reach state synchronization")
+						require.Equal(t, nvidiav1alpha1.NotReady, instance.Status.State)
+						errorCondition := meta.FindStatusCondition(instance.Status.Conditions, conditions.Error)
+						require.NotNil(t, errorCondition)
+						require.Equal(t, metav1.ConditionTrue, errorCondition.Status)
+						require.Equal(t, conditions.ReconcileFailed, errorCondition.Reason)
+						require.Contains(t, errorCondition.Message, expectedError)
+						if !tc.precompiled {
+							require.Contains(t, errorCondition.Message, "cannot be used with 'kernelModuleType=proprietary'")
+							require.Contains(t, errorCondition.Message, "kernelModuleType=auto")
+							require.Contains(t, errorCondition.Message, "based on the GPU and driver branch")
+						}
+						require.NotContains(t, errorCondition.Message, "useOpenKernelModules")
+						require.True(t, meta.IsStatusConditionFalse(instance.Status.Conditions, conditions.Ready))
+						// Rejected settings must stay rejected on retries without syncing resources.
+						_, err = reconciler.Reconcile(t.Context(), ctrl.Request{
+							NamespacedName: types.NamespacedName{Name: driver.Name},
+						})
+						require.NoError(t, err)
+						require.Nil(t, manager.lastCatalog)
+						if tc.precompiled {
+							return
+						}
+
+						// Correcting the explicit module type must clear the error and resume synchronization.
+						require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(driver), instance))
+						instance.Spec.KernelModuleType = "auto"
+						require.NoError(t, c.Update(t.Context(), instance))
+						_, err = reconciler.Reconcile(t.Context(), ctrl.Request{
+							NamespacedName: types.NamespacedName{Name: driver.Name},
+						})
+						require.NoError(t, err)
+						require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(driver), instance))
+					}
+
+					require.NotNil(t, manager.lastCatalog, "accepted settings must reach state synchronization")
+					require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
+					require.True(t, meta.IsStatusConditionTrue(instance.Status.Conditions, conditions.Ready))
+					require.True(t, meta.IsStatusConditionFalse(instance.Status.Conditions, conditions.Error))
+
+					_, err = reconciler.Reconcile(t.Context(), ctrl.Request{
+						NamespacedName: types.NamespacedName{Name: driver.Name},
+					})
+					require.NoError(t, err)
+					repeatedInstance := &nvidiav1alpha1.NVIDIADriver{}
+					require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(driver), repeatedInstance))
+					require.Equal(t, instance.Status, repeatedInstance.Status)
+
+					// Passing validation must not hide an unready driver pod, and readiness must recover.
+					for _, syncStatus := range []state.SyncState{state.SyncStateNotReady, state.SyncStateReady} {
+						manager.results.Status = syncStatus
+						result, err := reconciler.Reconcile(t.Context(), ctrl.Request{
+							NamespacedName: types.NamespacedName{Name: driver.Name},
+						})
+						require.NoError(t, err)
+						require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(driver), repeatedInstance))
+						require.Equal(t, nvidiav1alpha1.State(syncStatus), repeatedInstance.Status.State)
+						if syncStatus == state.SyncStateNotReady {
+							require.Positive(t, result.RequeueAfter)
+							errorCondition := meta.FindStatusCondition(repeatedInstance.Status.Conditions, conditions.Error)
+							require.NotNil(t, errorCondition)
+							require.Equal(t, metav1.ConditionTrue, errorCondition.Status)
+							require.Equal(t, conditions.DriverNotReady, errorCondition.Reason)
+							require.True(t, meta.IsStatusConditionFalse(repeatedInstance.Status.Conditions, conditions.Ready))
+						} else {
+							require.Zero(t, result.RequeueAfter)
+							require.True(t, meta.IsStatusConditionTrue(repeatedInstance.Status.Conditions, conditions.Ready))
+							require.True(t, meta.IsStatusConditionFalse(repeatedInstance.Status.Conditions, conditions.Error))
+						}
+					}
+				})
+			}
 		})
 	}
 }
