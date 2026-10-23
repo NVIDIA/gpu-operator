@@ -1167,6 +1167,65 @@ func TestTransformToolkit(t *testing.T) {
 	}
 }
 
+func TestTransformToolkitRuntimeClassName(t *testing.T) {
+	testCases := []struct {
+		name             string
+		runtime          gpuv1.Runtime
+		runtimeClassName string
+		nriEnabled       bool
+		expectedClass    *string
+	}{
+		{
+			name:    "default uses the node runtime",
+			runtime: gpuv1.Containerd,
+		},
+		{
+			name:             "containerd uses an independent runtime class",
+			runtime:          gpuv1.Containerd,
+			runtimeClassName: "toolkit-runc",
+			expectedClass:    ptr.To("toolkit-runc"),
+		},
+		{
+			name:             "cri-o uses an independent runtime class",
+			runtime:          gpuv1.CRIO,
+			runtimeClassName: "toolkit-runc",
+			expectedClass:    ptr.To("toolkit-runc"),
+		},
+		{
+			name:             "nri uses an independent runtime class",
+			runtime:          gpuv1.Containerd,
+			runtimeClassName: "toolkit-runc",
+			nriEnabled:       true,
+			expectedClass:    ptr.To("toolkit-runc"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := &gpuv1.ClusterPolicySpec{
+				Operator: gpuv1.OperatorSpec{RuntimeClass: "custom-nvidia"},
+				Toolkit: gpuv1.ToolkitSpec{
+					Repository:       "nvcr.io/nvidia/k8s",
+					Image:            "container-toolkit",
+					Version:          "v1.0.0",
+					RuntimeClassName: tc.runtimeClassName,
+				},
+				CDI: gpuv1.CDIConfigSpec{NRIPluginEnabled: ptr.To(tc.nriEnabled)},
+			}
+			ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-container-toolkit-ctr"})
+			controller := ClusterPolicyController{runtime: tc.runtime, logger: ctrl.Log.WithName("test")}
+
+			require.NoError(t, TransformToolkit(ds.DaemonSet, config, controller))
+			require.Equal(t, tc.expectedClass, ds.Spec.Template.Spec.RuntimeClassName)
+			if tc.runtime == gpuv1.Containerd && !tc.nriEnabled {
+				require.Contains(t, ds.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+					Name: "CONTAINERD_RUNTIME_CLASS", Value: "custom-nvidia",
+				})
+			}
+		})
+	}
+}
+
 func TestTransformDevicePlugin(t *testing.T) {
 	testCases := []struct {
 		description string

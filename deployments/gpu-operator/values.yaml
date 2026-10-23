@@ -267,6 +267,11 @@ toolkit:
   resources: {}
   installDir: "/usr/local/nvidia"
   hostNetwork: false
+  # Existing RuntimeClass used to start the toolkit pod. Its runtime handler must
+  # already be configured on the node. Use a class backed by the system runtime
+  # (e.g. runc) to allow recovery when the host NVIDIA runtime is unavailable.
+  # Empty uses the node's default runtime. This is separate from operator.runtimeClass.
+  runtimeClassName: ""
 
 devicePlugin:
   enabled: true
