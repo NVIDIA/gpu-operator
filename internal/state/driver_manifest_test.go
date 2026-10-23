@@ -189,6 +189,60 @@ func envValue(container corev1.Container, name string) (string, bool) {
 	return "", false
 }
 
+func TestDriverGDSKernelModuleType(t *testing.T) {
+	for _, moduleType := range []string{"auto", "open", "proprietary", ""} {
+		t.Run("kernelModuleType="+moduleType, func(t *testing.T) {
+			scheme := driverTestScheme(t)
+			driver := newDriverCR("driver-a")
+			driver.Spec.Version = "595.91.07"
+			driver.Spec.KernelModuleType = moduleType
+			driver.Spec.GPUDirectStorage = &nvidiav1alpha1.GPUDirectStorageSpec{
+				Enabled: new(true), Repository: "nvcr.io/nvidia/cloud-native", Image: "nvidia-fs", Version: "2.29.4",
+			}
+			driver.Spec.GDRCopy = &nvidiav1alpha1.GDRCopySpec{
+				Enabled: new(true), Repository: "nvcr.io/nvidia/cloud-native", Image: "gdrdrv", Version: "v2.6",
+			}
+			c := newDriverFakeClient(scheme, newGPUNode("gpu-node", driver.Name))
+			driverState := newTestStateDriver(t, c, scheme)
+			catalog := driverInfoCatalog(fakeClusterInfo{})
+
+			objects, err := driverState.getManifestObjects(t.Context(), driver, catalog)
+			require.NoError(t, err)
+			daemonSet, err := getDaemonsetFromObjects(objects)
+			require.NoError(t, err)
+
+			containers := make(map[string]corev1.Container)
+			for _, container := range daemonSet.Spec.Template.Spec.Containers {
+				containers[container.Name] = container
+			}
+			require.Contains(t, containers, "nvidia-driver-ctr")
+			driverContainer := containers["nvidia-driver-ctr"]
+			value, present := envValue(driverContainer, "KERNEL_MODULE_TYPE")
+			require.Equal(t, moduleType != "", present)
+			require.Equal(t, moduleType, value)
+			value, present = envValue(driverContainer, "OPEN_KERNEL_MODULES_ENABLED")
+			require.Equal(t, moduleType == "open", present)
+			if present {
+				require.Equal(t, "true", value)
+			}
+			value, present = envValue(driverContainer, "GDS_ENABLED")
+			require.True(t, present)
+			require.Equal(t, "true", value)
+			require.Contains(t, containers, "nvidia-fs-ctr")
+			require.Equal(t, "nvcr.io/nvidia/cloud-native/nvidia-fs:2.29.4-ubuntu22.04", containers["nvidia-fs-ctr"].Image)
+			require.Equal(t, "nvcr.io/nvidia/driver:595.91.07-ubuntu22.04", driverContainer.Image)
+			require.Contains(t, containers, "nvidia-gdrcopy-ctr")
+			require.Equal(t, "nvcr.io/nvidia/cloud-native/gdrdrv:v2.6-ubuntu22.04", containers["nvidia-gdrcopy-ctr"].Image)
+
+			repeatedObjects, err := driverState.getManifestObjects(t.Context(), driver, catalog)
+			require.NoError(t, err)
+			repeatedDaemonSet, err := getDaemonsetFromObjects(repeatedObjects)
+			require.NoError(t, err)
+			require.Equal(t, daemonSet, repeatedDaemonSet, "rendering the same configuration must be idempotent")
+		})
+	}
+}
+
 func TestNewStateDriverBadManifestDir(t *testing.T) {
 	_, err := NewStateDriver(nil, "", nil, "/nonexistent/manifest/dir")
 	require.ErrorContains(t, err, "failed to get files from manifest directory")
