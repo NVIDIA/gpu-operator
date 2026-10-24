@@ -316,7 +316,7 @@ spec:
         - name: DRIVER_INSTALL_DIR
           value: /run/nvidia/driver
         - name: DRIVER_INSTALL_DIR_CTR_PATH
-          value: /driver-root
+          value: /driver-root/driver
         image: nvcr.io/nvidia/gpu-operator-validator:test
         imagePullPolicy: IfNotPresent
         name: driver-validation
@@ -355,7 +355,7 @@ spec:
           path: /
         name: host-root
       - hostPath:
-          path: /run/nvidia/driver
+          path: /run/nvidia
           type: DirectoryOrCreate
         name: driver-install-dir
       - hostPath:

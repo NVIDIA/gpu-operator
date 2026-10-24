@@ -1494,7 +1494,7 @@ func TestVGPUDeviceManagerValidationInitContainer(t *testing.T) {
 
 	driverInstallDir := findVolumeMountByName(initCtr.VolumeMounts, "driver-install-dir")
 	require.NotNil(t, driverInstallDir)
-	require.Equal(t, "/run/nvidia/driver", driverInstallDir.MountPath)
+	require.Equal(t, "/run/nvidia", driverInstallDir.MountPath)
 	require.True(t, driverInstallDir.ReadOnly)
 	require.NotNil(t, driverInstallDir.MountPropagation)
 	require.Equal(t, corev1.MountPropagationHostToContainer, *driverInstallDir.MountPropagation)

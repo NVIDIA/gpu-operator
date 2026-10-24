@@ -49,7 +49,7 @@ spec:
               readOnly: true
               mountPropagation: HostToContainer
             - name: driver-install-dir
-              mountPath: /run/nvidia/driver
+              mountPath: /run/nvidia
               mountPropagation: HostToContainer
             - name: run-nvidia-validations
               mountPath: /run/nvidia/validations
@@ -145,7 +145,7 @@ spec:
             type: DirectoryOrCreate
         - name: driver-install-dir
           hostPath:
-            path: /run/nvidia/driver
+            path: /run/nvidia
         - name: host-root
           hostPath:
             path: /
