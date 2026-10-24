@@ -247,6 +247,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "GPUCluster")
 		os.Exit(1)
 	}
+	if err = (&controllers.SharedServiceReconciler{
+		Namespace: operatorNamespace,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SharedService")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

@@ -146,7 +146,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         - name: DCGM_REMOTE_HOSTENGINE_INFO
-          value: nvidia-dcgm-dra:5555
+          value: nvidia-dcgm:5555
         - name: KUBERNETES_ENABLE_DRA
           value: "true"
         image: nvcr.io/nvidia/k8s/dcgm-exporter:test

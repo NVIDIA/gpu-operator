@@ -132,7 +132,7 @@ func TestDCGMExporterRemoteEngineWhenDCGMEnabled(t *testing.T) {
 
 	ds := findDaemonSet(t, objs)
 	env := envMap(ds.Spec.Template.Spec.Containers[0].Env)
-	assert.Equal(t, "nvidia-dcgm-dra:5555", env["DCGM_REMOTE_HOSTENGINE_INFO"])
+	assert.Equal(t, "nvidia-dcgm:5555", env["DCGM_REMOTE_HOSTENGINE_INFO"])
 }
 
 func TestDCGMExporterPodMetadataEnrichment(t *testing.T) {
@@ -216,6 +216,13 @@ func TestDCGMExporterServiceMonitorRendered(t *testing.T) {
 	sm := findByKind(objs, "ServiceMonitor")
 	require.NotNil(t, sm, "ServiceMonitor must render when the CRD is served and it is enabled")
 	assert.Equal(t, "nvidia-dcgm-exporter-dra", sm.GetName())
+	svc := findByKind(objs, "Service")
+	require.NotNil(t, svc)
+	selector, _, err := unstructured.NestedStringMap(sm.Object, "spec", "selector", "matchLabels")
+	require.NoError(t, err)
+	for key, value := range selector {
+		assert.Equal(t, value, svc.GetLabels()[key])
+	}
 }
 
 func TestDCGMExporterServiceMonitorRelabelings(t *testing.T) {
