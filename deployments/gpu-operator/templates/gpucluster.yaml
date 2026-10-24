@@ -124,6 +124,12 @@ spec:
     {{- if .Values.dcgmExporter.serviceMonitor }}
     serviceMonitor: {{ toYaml .Values.dcgmExporter.serviceMonitor | nindent 6 }}
     {{- end }}
+    {{- with .Values.dcgmExporter.serviceAccount }}
+    {{- if and (ne .name nil) (ne (.name | toString) "") }}
+    serviceAccount:
+      name: {{ .name | toString | quote }}
+    {{- end }}
+    {{- end }}
     {{- if and (.Values.dcgmExporter.config) (.Values.dcgmExporter.config.name) }}
     config:
       name: {{ .Values.dcgmExporter.config.name }}

@@ -687,6 +687,19 @@ spec:
                           ingress methods for a service
                         type: string
                     type: object
+                  serviceAccount:
+                    description: 'Optional: ServiceAccount configuration for NVIDIA
+                      DCGM Exporter'
+                    properties:
+                      name:
+                        description: |-
+                          Name of an existing ServiceAccount in the operator namespace. When empty,
+                          the operator creates and manages its default account. The default name
+                          (nvidia-dcgm-exporter for ClusterPolicy, nvidia-dcgm-exporter-dra for
+                          GPUCluster) is reserved and must not be explicitly configured.
+                          The operator does not create, modify, adopt or delete a named account.
+                        type: string
+                    type: object
                   serviceMonitor:
                     description: 'Optional: ServiceMonitor configuration for NVIDIA
                       DCGM Exporter'
