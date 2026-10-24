@@ -7,7 +7,7 @@
             "type": "boolean"
         },
         "featureGates": {
-            "description": "[Feature gates](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/feature-gates) to enable/disable specific features.",
+            "description": "[Feature gates](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/feature-gates) to enable/disable specific features.",
             "type": "object",
             "patternProperties": {
                 "^[a-zA-Z]$": {
@@ -38,7 +38,7 @@
                     "type": "object"
                 },
                 "dnsPolicy": {
-                    "description": "NFD gc pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).",
+                    "description": "NFD gc pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).",
                     "type": "string"
                 },
                 "enable": {
@@ -46,7 +46,7 @@
                     "type": "boolean"
                 },
                 "extraArgs": {
-                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/gc-commandline-reference) to pass to nfd-gc.",
+                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/gc-commandline-reference) to pass to nfd-gc.",
                     "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.core.v1.Container/properties/args",
                     "type": "array"
                 },
@@ -81,11 +81,11 @@
                     "type": "object"
                 },
                 "livenessProbe": {
-                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).",
+                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
-                            "description": "Minimum consecutive successes for the probe before considering the pod as ready.",
+                            "description": "The number of consecutive failures for the probe before considering the container as failed and restarting it.",
                             "type": [
                                 "integer",
                                 "null"
@@ -152,7 +152,7 @@
                     "type": "object",
                     "properties": {
                         "enable": {
-                            "description": "Configure PodDisruptionBudget for the nfd-master Deployment.",
+                            "description": "Configure PodDisruptionBudget for the nfd-gc Deployment.",
                             "type": "boolean"
                         }
                     }
@@ -178,7 +178,7 @@
                     }
                 },
                 "readinessProbe": {
-                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).",
+                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
@@ -235,6 +235,11 @@
                         "integer",
                         "null"
                     ]
+                },
+                "securityContext": {
+                    "description": "[SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container) of the nfd-gc container.",
+                    "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.core.v1.SecurityContext",
+                    "type": "object"
                 },
                 "serviceAccount": {
                     "type": "object",
@@ -318,7 +323,7 @@
                     "type": "object"
                 },
                 "config": {
-                    "description": "NFD master [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/master-configuration-reference).",
+                    "description": "NFD master [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/master-configuration-reference).",
                     "type": [
                         "object",
                         "null"
@@ -349,7 +354,7 @@
                     "type": "boolean"
                 },
                 "extraArgs": {
-                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/master-commandline-reference) to pass to nfd-master.",
+                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/master-commandline-reference) to pass to nfd-master.",
                     "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.core.v1.Container/properties/args",
                     "type": "array"
                 },
@@ -394,11 +399,11 @@
                     "type": "object"
                 },
                 "livenessProbe": {
-                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).",
+                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
-                            "description": "Minimum consecutive successes for the probe before considering the pod as ready.",
+                            "description": "The number of consecutive failures for the probe before considering the container as failed and restarting it.",
                             "type": [
                                 "integer",
                                 "null"
@@ -500,7 +505,7 @@
                     }
                 },
                 "readinessProbe": {
-                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).",
+                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
@@ -593,7 +598,7 @@
                     }
                 },
                 "startupProbe": {
-                    "description": "Startup probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-startup-probes).",
+                    "description": "Startup probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
@@ -686,14 +691,14 @@
                     "type": "object"
                 },
                 "config": {
-                    "description": "Configuration for the topology updater. See the [configuration reference](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/topology-updater-configuration-reference) for details.",
+                    "description": "Configuration for the topology updater. See the [configuration reference](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/topology-updater-configuration-reference) for details.",
                     "type": [
                         "object",
                         "null"
                     ]
                 },
                 "createCRDs": {
-                    "description": "Create the NodeResourceTopology CRD. This MUST be set to true when 'enable' is true, unless the CRD is installed separately (e.g., by another Helm release or external tool). If the CRD is missing, the topology-updater pods will fail with \"NodeResourceTopology CRD is not installed\" error.",
+                    "description": "Create the NodeResourceTopology CRD. This MUST be set to true when 'enable' is true, unless the CRD is installed separately (e.g., by another Helm release or external tool). If the CRD is missing, the topology-updater pods keep running but publish nothing; they log \"waiting for NodeResourceTopology CRD to be created\" and retry indefinitely.",
                     "type": "boolean"
                 },
                 "daemonsetAnnotations": {
@@ -702,7 +707,7 @@
                     "type": "object"
                 },
                 "dnsPolicy": {
-                    "description": "NFD topology updater pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).",
+                    "description": "NFD topology updater pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).",
                     "type": "string"
                 },
                 "enable": {
@@ -710,7 +715,7 @@
                     "type": "boolean"
                 },
                 "extraArgs": {
-                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/topology-updater-commandline-reference) to pass to nfd-topology-updater.",
+                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/topology-updater-commandline-reference) to pass to nfd-topology-updater.",
                     "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.core.v1.Container/properties/args",
                     "type": "array"
                 },
@@ -759,11 +764,11 @@
                     "type": "object"
                 },
                 "livenessProbe": {
-                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).",
+                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
-                            "description": "Minimum consecutive successes for the probe before considering the pod as ready.",
+                            "description": "The number of consecutive failures for the probe before considering the container as failed and restarting it.",
                             "type": [
                                 "integer",
                                 "null"
@@ -850,7 +855,7 @@
                     }
                 },
                 "readinessProbe": {
-                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).",
+                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
@@ -940,6 +945,24 @@
                     "description": "Time to sleep between CR updates. Non-positive value implies no CR update.",
                     "type": "string"
                 },
+                "updateStrategy": {
+                    "description": "Update strategy for the nfd-topology-updater DaemonSet. The default updates multiple nodes in parallel on large clusters, so upgrades finish within Helm and Flux HelmRelease timeouts. Set `maxUnavailable: 1` to update one node at a time. To use `type: OnDelete`, also set `rollingUpdate: null` (Helm deep-merges maps). [More info](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set)",
+                    "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.apps.v1.DaemonSetUpdateStrategy",
+                    "type": "object",
+                    "properties": {
+                        "rollingUpdate": {
+                            "type": "object",
+                            "properties": {
+                                "maxUnavailable": {
+                                    "type": [
+                                        "string",
+                                        "integer"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
                 "watchNamespace": {
                     "description": "Namespace to watch pods, `*` for all namespaces.",
                     "type": "string"
@@ -960,7 +983,7 @@
                     "type": "object"
                 },
                 "config": {
-                    "description": "NFD worker [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/worker-configuration-reference).",
+                    "description": "NFD worker [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/worker-configuration-reference).",
                     "type": [
                         "object",
                         "null"
@@ -972,7 +995,7 @@
                     "type": "object"
                 },
                 "dnsPolicy": {
-                    "description": "NFD worker pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).",
+                    "description": "NFD worker pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).",
                     "type": "string"
                 },
                 "enable": {
@@ -980,7 +1003,7 @@
                     "type": "boolean"
                 },
                 "extraArgs": {
-                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/worker-commandline-reference) to pass to nfd-worker.",
+                    "description": "Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/worker-commandline-reference) to pass to nfd-worker.",
                     "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.core.v1.Container/properties/args",
                     "type": "array"
                 },
@@ -1011,11 +1034,11 @@
                     "type": "object"
                 },
                 "livenessProbe": {
-                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).",
+                    "description": "Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
-                            "description": "Minimum consecutive successes for the probe before considering the pod as ready.",
+                            "description": "The number of consecutive failures for the probe before considering the container as failed and restarting it.",
                             "type": [
                                 "integer",
                                 "null"
@@ -1048,7 +1071,7 @@
                     }
                 },
                 "mountUsrSrc": {
-                    "description": "Mount host path /user/src inside the container. Does not work on systems without /usr/src AND a read-only /usr.",
+                    "description": "Mount host path /usr/src inside the container. Does not work on systems without /usr/src AND a read-only /usr.",
                     "type": "boolean"
                 },
                 "networkPolicy": {
@@ -1106,7 +1129,7 @@
                     "minimum": 1
                 },
                 "priorityClassName": {
-                    "description": "The name of the PriorityClass to be used for the nfd-worker pods.",
+                    "description": "The name of the PriorityClass to be used for the nfd-worker pods. Takes precedence over the top-level `priorityClassName`.",
                     "type": [
                         "string",
                         "null"
@@ -1122,7 +1145,7 @@
                     }
                 },
                 "readinessProbe": {
-                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).",
+                    "description": "Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
@@ -1209,7 +1232,7 @@
                     "type": "array"
                 },
                 "updateStrategy": {
-                    "description": "Update strategy for the nfd-worker DaemonSet. Defaults to a rolling update with `maxUnavailable: \"10%\"` so upgrades complete in a bounded number of waves on clusters of any size (the Kubernetes default of `maxUnavailable: 1` rolls one node at a time and makes Helm wait and Flux HelmRelease timeouts likely on large clusters). nfd-worker is stateless and node labels persist while a worker pod restarts, so a faster roll is safe. Set `maxUnavailable: 1` to restore the Kubernetes default. To use `type: OnDelete`, also set `rollingUpdate: null` (Helm deep-merges maps). [More info](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set)",
+                    "description": "Update strategy for the nfd-worker DaemonSet. The default updates multiple nodes in parallel on large clusters, so upgrades finish within Helm and Flux HelmRelease timeouts. Set `maxUnavailable: 1` to update one node at a time. To use `type: OnDelete`, also set `rollingUpdate: null` (Helm deep-merges maps). [More info](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set)",
                     "$ref": "#/$defs/_definitions.json/definitions/io.k8s.api.apps.v1.DaemonSetUpdateStrategy",
                     "type": "object",
                     "properties": {
