@@ -6,6 +6,7 @@ metadata:
     {{- include "gpu-operator.labels" . | nindent 4 }}
     app.kubernetes.io/component: "gpu-operator"
 rules:
+{{- if .Values.platform.openshift }}
 - apiGroups:
   - config.openshift.io
   resources:
@@ -36,6 +37,7 @@ rules:
   - patch
   - delete
   - use
+{{- end }}
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
