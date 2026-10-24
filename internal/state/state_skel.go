@@ -416,10 +416,12 @@ func (s *stateSkel) deleteStateRelatedObjects(ctx context.Context) (bool, error)
 			}
 			return false, err
 		}
-		if len(l.Items) > 0 {
-			found = true
-		}
 		for _, obj := range l.Items {
+			// Shared endpoints have their own lifecycle, including during ownership migration.
+			if obj.GetKind() == "Service" && obj.GetName() == "nvidia-dcgm" {
+				continue
+			}
+			found = true
 			if obj.GetDeletionTimestamp() == nil {
 				err := s.client.Delete(ctx, &obj)
 				if err != nil && !apierrors.IsNotFound(err) {

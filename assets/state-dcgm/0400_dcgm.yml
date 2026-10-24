@@ -18,6 +18,13 @@ spec:
         app: nvidia-dcgm
         app.kubernetes.io/component: nvidia-dcgm
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: nvidia-dcgm
+              topologyKey: kubernetes.io/hostname
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm: "true"
       tolerations:

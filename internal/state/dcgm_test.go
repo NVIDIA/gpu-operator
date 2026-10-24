@@ -117,7 +117,7 @@ func TestDCGMEnabled(t *testing.T) {
 	assert.Equal(t, 1, kinds["RoleBinding"])
 	assert.Equal(t, 1, kinds["ResourceClaimTemplate"])
 	assert.Equal(t, 1, kinds["DaemonSet"])
-	assert.Equal(t, 1, kinds["Service"])
+	assert.Equal(t, 0, kinds["Service"])
 
 	claimHasAdminAccess(t, findByKind(objs, "ResourceClaimTemplate"))
 
@@ -138,13 +138,8 @@ func TestDCGMEnabled(t *testing.T) {
 	require.Len(t, ctr.Resources.Claims, 1)
 	assert.Equal(t, "admin-gpus", ctr.Resources.Claims[0].Name)
 
-	// The exporter targets this Service on port 5555.
-	svc := findByKind(objs, "Service")
-	port, found, err := unstructured.NestedSlice(svc.Object, "spec", "ports")
-	require.NoError(t, err)
-	require.True(t, found)
-	require.Len(t, port, 1)
-	assert.Equal(t, int64(5555), port[0].(map[string]any)["port"])
+	assert.Nil(t, findByKind(objs, "Service"), "Services are reconciled independently")
+
 }
 
 func TestDCGMImageFromEnvFallback(t *testing.T) {
@@ -188,15 +183,22 @@ func TestDCGMComponentLabels(t *testing.T) {
 					assert.Equal(t, "platform", ds.Labels["team"])
 					assert.Equal(t, "platform", ds.Spec.Template.Labels["team"])
 				}
-				svc := findByKind(objs, "Service")
-				require.NotNil(t, svc)
-				assert.Equal(t, component, svc.GetLabels()["app.kubernetes.io/component"])
-				assert.Equal(t, component+"-dra", svc.GetLabels()["app"])
-				assert.Equal(t, component+"-dra", svc.GetName())
-				selector, found, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
-				require.NoError(t, err)
-				require.True(t, found)
-				assert.Equal(t, map[string]string{"app": component + "-dra"}, selector)
+				if component == "nvidia-dcgm-exporter" {
+					svc := findByKind(objs, "Service")
+					require.NotNil(t, svc)
+					assert.Equal(t, "nvidia-dcgm-exporter-dra", svc.GetName())
+					selector, _, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
+					require.NoError(t, err)
+					assert.Equal(t, map[string]string{"app": "nvidia-dcgm-exporter-dra"}, selector)
+					assert.Nil(t, ds.Spec.Template.Spec.Affinity)
+					continue
+				}
+				assert.Nil(t, findByKind(objs, "Service"))
+				terms := ds.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+				require.Len(t, terms, 1)
+				assert.Equal(t, "kubernetes.io/hostname", terms[0].TopologyKey)
+				assert.Equal(t, component, terms[0].LabelSelector.MatchLabels["app.kubernetes.io/component"])
+
 			}
 		})
 	}
