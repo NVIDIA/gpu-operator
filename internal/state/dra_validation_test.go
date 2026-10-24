@@ -22,6 +22,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -61,4 +63,58 @@ func TestDRAValidationRender(t *testing.T) {
 	require.NotEmpty(t, ds.Spec.Template.Spec.ResourceClaims)
 	require.NotEmpty(t, ds.Spec.Template.Spec.Containers)
 	require.Equal(t, "nvcr.io/nvidia/gpu-operator-validator:test", ds.Spec.Template.Spec.Containers[0].Image)
+}
+
+func TestDRAValidationRenderCommonLabels(t *testing.T) {
+	tests := map[string]map[string]string{
+		"default": nil,
+		"custom label": {
+			"team": "platform",
+		},
+		"selector label collision": {
+			"app.kubernetes.io/name": "gpu-platform",
+			"team":                   "platform",
+		},
+		"upgrade controller label collision": {
+			"app": "gpu-platform",
+		},
+		"part-of label": {
+			"app.kubernetes.io/part-of": "gpu-platform",
+		},
+		"combined reserved labels": {
+			"app":                       "gpu-platform",
+			"app.kubernetes.io/name":    "gpu-platform",
+			"app.kubernetes.io/part-of": "gpu-platform",
+			"team":                      "platform",
+		},
+	}
+	for name, commonLabels := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAValidationState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.Daemonsets.Labels = commonLabels
+
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			require.NoError(t, err)
+			ds := findDaemonSet(t, objs)
+
+			// Preserve the immutable selector, not just agreement with the pod labels.
+			require.Equal(t, &metav1.LabelSelector{MatchLabels: map[string]string{
+				"app.kubernetes.io/name": "nvidia-dra-validator",
+			}}, ds.Spec.Selector)
+			selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+			require.NoError(t, err)
+			require.True(t, selector.Matches(labels.Set(ds.Spec.Template.Labels)),
+				"DaemonSet selector must match pod-template labels")
+			require.Equal(t, "nvidia-operator-validator", ds.Spec.Template.Labels["app"])
+			require.NotContains(t, ds.Spec.Template.Labels, "app.kubernetes.io/part-of")
+			if team, ok := commonLabels["team"]; ok {
+				require.Equal(t, team, ds.Spec.Template.Labels["team"])
+			}
+			// Common labels remain customizable on the DaemonSet itself.
+			for key, value := range commonLabels {
+				require.Equal(t, value, ds.Labels[key])
+			}
+		})
+	}
 }
