@@ -20,6 +20,7 @@ spec:
         description: |-
           NodeFeature resource holds the features discovered for one node in the
           cluster.
+          NodeFeature is namespaced.
         properties:
           apiVersion:
             description: |-
@@ -141,7 +142,10 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NodeFeatureGroup resource holds Node pools by featureGroup
+        description: |-
+          NodeFeatureGroup resource holds Node pools by featureGroup.
+          NodeFeatureGroup is namespaced (short name `nfg`) and has a status subresource.
+          Only objects in the namespace of nfd-master are processed.
         properties:
           apiVersion:
             description: |-
@@ -417,6 +421,8 @@ spec:
                 description: Nodes is a list of FeatureGroupNode in the cluster that
                   match the featureGroupRules
                 items:
+                  description: FeatureGroupNode is a node that matches the rules of
+                    a NodeFeatureGroup.
                   properties:
                     name:
                       description: Name of the node.
@@ -460,6 +466,7 @@ spec:
         description: |-
           NodeFeatureRule resource specifies a configuration for feature-based
           customization of node objects, such as node labeling.
+          NodeFeatureRule is cluster-scoped (short name `nfr`).
         properties:
           apiVersion:
             description: |-
