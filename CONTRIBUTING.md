@@ -77,7 +77,7 @@ can be viewed [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operato
 ## Contributions
 NVIDIA is willing to work with partners for adding platform support for the GPU Operator. The GPU Operator is open-source and permissively licensed under the Apache 2.0 license with only minimal requirements for source code [contributions](#signing).
 
-To file feature requests, bugs, or questions, submit an issue at https://github.com/NVIDIA/gpu-operator/issues
+To file feature requests or bugs, submit an issue at https://github.com/NVIDIA/gpu-operator/issues. For questions, start a discussion at https://github.com/NVIDIA/gpu-operator/discussions or ask in the `#gpu-operator` channel in our community Slack at https://inviter.co/dsx-ai-factory.
 
 All external contributions start with an issue. External contributors must have an accepted issue that is assigned to them before they open a pull request. See [Contribution workflow](#contribution-workflow). Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to [sign](#signing) their work.
 
