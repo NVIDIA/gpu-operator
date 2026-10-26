@@ -89,6 +89,20 @@ The approval / decision-making process is documented in [GOVERNANCE.md](GOVERNAN
 
 All contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+## AI Guidance
+AI-assisted contributions are welcome, however, **you must understand your code**. If you can't explain what your changes do and how they interact with the greater system without the aid of AI tools, do not contribute.
+
+The human contributor is accountable for all code, regardless of how much was AI-generated. Each contribution must name the human behind the change via a [DCO sign-off](#signing).
+
+Maintainers may close contributions without review if any of the below conditions apply. Repeat offenders will be blocked from the project.
+
+- Issues/features/bug reports do not mention a clear customer use-case.
+- The description, code, or replies to maintainers are low-quality or exceedingly long and unfocused.
+- The description or replies to maintainers are AI generated.
+- The change is not necessary, or is not minimal and focused.
+- The author is not able to satisfactorily explain changes or answer questions.
+
+
 ## Development Environment Setup
 
 ### Prerequisites

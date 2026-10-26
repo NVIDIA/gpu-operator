@@ -91,11 +91,14 @@ the CRDs in the helm chart and OLM bundle are in-sync.
 - For any significant change (architectural change, new feature, breaking change, non-trivial
   bug fix), an issue should exist describing the problem/proposal before implementation begins —
   check for or ask about a linked issue rather than assuming a PR alone is sufficient.
+- Keep PR titles short and imperative.
+- Issue or PR descriptions may not be AI generated.
+- Replies to maintainers may not be AI generated.
 - All commits must be signed off (DCO): `git commit -s`, producing a trailing
   `Signed-off-by: Name <email>` line. Do not fabricate a sign-off identity — use the configured
   git user's identity.
 - Do not open, push to, or comment on GitHub issues/PRs without explicit user confirmation.
-- Keep PR titles short and imperative; the body should explain motivation ("why"), not just restate the diff.
+- Keep all changes as minimal as possible.
 
 ## Things to avoid
 
