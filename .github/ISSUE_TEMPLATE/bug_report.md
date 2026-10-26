@@ -6,16 +6,24 @@ labels: ["bug", "needs-triage"]
 
 ---
 
-_**Important Note:  NVIDIA AI Enterprise customers can get support from NVIDIA Enterprise support. Please open a case [here](https://enterprise-support.nvidia.com/s/create-case)**._
+<!-- _**Important Note:  NVIDIA AI Enterprise customers can get support from NVIDIA Enterprise support. Please open a case [here](https://enterprise-support.nvidia.com/s/create-case)**._ -->
+
+**Motivation**
+<!-- A clear and concise description of your motivation: is this a real issue you ran into while using the product? -->
+
+**Would you like to work on this issue?**
+- [ ] Yes
+- [ ] No
+
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+<!-- A clear and concise description of what the bug is. -->
 
 **To Reproduce**
-Detailed steps to reproduce the issue.
+<!-- Detailed steps to reproduce the issue. -->
 
 **Expected behavior**
-A clear and concise description of what you expected to happen.
+<!-- A clear and concise description of what you expected to happen. -->
 
 **Environment (please provide the following information):**
  - GPU Operator Version: [e.g. v25.3.0]
@@ -36,6 +44,7 @@ A clear and concise description of what you expected to happen.
  - [ ] containerd logs `journalctl -u containerd > containerd.log`
 
 
+<!--
 Collecting full debug bundle (optional):
 
 ```
@@ -46,3 +55,4 @@ chmod +x must-gather.sh
 **NOTE**: please refer to the [must-gather](https://raw.githubusercontent.com/NVIDIA/gpu-operator/main/hack/must-gather.sh) script for debug data collected.
 
 This bundle can be submitted to us via email: **operator_feedback@nvidia.com**
+-->

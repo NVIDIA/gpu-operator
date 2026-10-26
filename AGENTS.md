@@ -88,9 +88,7 @@ the CRDs in the helm chart and OLM bundle are in-sync.
 
 ## Contribution process (see `CONTRIBUTING.md`)
 
-- For any significant change (architectural change, new feature, breaking change, non-trivial
-  bug fix), an issue should exist describing the problem/proposal before implementation begins —
-  check for or ask about a linked issue rather than assuming a PR alone is sufficient.
+- For any change, an issue should exist describing the problem/proposal before implementation begins. Additionally, the contributor should be approved to work on said issue — ensure the PR is linked to an issue the contributor has been assigned to.
 - Keep PR titles short and imperative.
 - Issue or PR descriptions may not be AI generated.
 - Replies to maintainers may not be AI generated.

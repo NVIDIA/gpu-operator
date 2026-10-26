@@ -79,17 +79,9 @@ NVIDIA is willing to work with partners for adding platform support for the GPU 
 
 To file feature requests, bugs, or questions, submit an issue at https://github.com/NVIDIA/gpu-operator/issues
 
-To contribute to the project, file a Pull Request at https://github.com/NVIDIA/gpu-operator/pulls. Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to [sign](#signing) their work.
+All external contributions start with an issue. External contributors must have an accepted issue that is assigned to them before they open a pull request. See [Contribution workflow](#contribution-workflow). Contributions do not require explicit contributor license agreements (CLA), but we expect contributors to [sign](#signing) their work.
 
-Before beginning implementation or opening a Pull Request for a significant change, first open an issue describing the problem or proposal.
-A significant change includes, but is not limited to, architectural changes, new features, breaking changes to API or behavior, and non-trivial bug fixes.
-
-Reviewers are automatically assigned to Pull Requests from the [OWNERS](CODEOWNERS) file.
-The approval / decision-making process is documented in [GOVERNANCE.md](GOVERNANCE.md)
-
-All contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-## AI Guidance
+### AI Guidance
 AI-assisted contributions are welcome, however, **you must understand your code**. If you can't explain what your changes do and how they interact with the greater system without the aid of AI tools, do not contribute.
 
 The human contributor is accountable for all code, regardless of how much was AI-generated. Each contribution must name the human behind the change via a [DCO sign-off](#signing).
@@ -102,6 +94,63 @@ Maintainers may close contributions without review if any of the below condition
 - The change is not necessary, or is not minimal and focused.
 - The author is not able to satisfactorily explain changes or answer questions.
 
+### Contribution workflow
+
+**To propose a new issue:** start at step 1.\
+**To work on an existing issue:** skip to step 3 and [claim an `accepted` issue](https://github.com/NVIDIA/gpu-operator/issues?q=is%3Aopen+label%3Aaccepted+no%3Aassignee) with no assignees.
+
+1. **Open an issue.** Use the bug report template to report a defect, or the feature request template to propose new behavior or a [major change](GOVERNANCE.md#core-decisions). Indicate if you want to work on the issue. Each new issue gets the `needs-triage` label.
+2. **Wait for triage.** A maintainer reviews the issue against the [triage criteria](#triage-criteria). The maintainer then labels the issue `accepted`, `needs-more-info`, or closes it.
+3. **Claim the issue.** When an issue is `accepted`, comment on it with the [claim template](#claiming-an-issue). Issue authors have priority if they indicate they would like to work on it. Other claims are first-come, first-served. A maintainer discusses your plan with you and assigns the issue to you when the plan is ready.
+4. **Open a pull request.** File a pull request at https://github.com/NVIDIA/gpu-operator/pulls and link the issue in the description (for example, `Fixes #1234`). Maintainers close pull requests that do not link an issue assigned to the author, and pull requests that are duplicates of existing ones.
+
+### Issue labels
+
+Each open issue has one state label and one category label. For example, `needs-triage` and `bug` together identify a bug report that no maintainer has reviewed yet.
+
+| Label | Type | Meaning |
+| ----- | ---- | ------- |
+| `needs-triage` | State | No maintainer has reviewed the issue yet. |
+| `needs-more-info` | State | Maintainers are waiting for more information from the author. If the issue has no activity for 30 days, it is closed. |
+| `accepted` | State | The issue is approved for work. Contributors can claim it. |
+| `bug` | Category | A defect in existing behavior. |
+| `feature` | Category | A request for new behavior. |
+
+### Triage criteria
+
+Maintainers use these questions to triage an issue:
+
+- Is the problem clear and reproducible?
+- Is the issue a duplicate, or does other work already address it?
+- Does the issue fit the supported use cases and the project priorities?
+- Is the proposed approach appropriate?
+- Does the issue align with the product roadmap?
+
+
+### Claiming an issue
+
+To claim an `accepted` issue, add a comment with this template:
+
+```markdown
+**Proposed Solution**
+<!-- A clear and concise description of how you plan to solve this bug/implement this feature. -->
+
+**Estimated PR Size**
+- [ ] XS (1-10 lines)
+- [ ] S (11-50 lines)
+- [ ] M (51-200 lines)
+- [ ] L (201-500 lines)
+- [ ] XL (501-1000 lines)
+- [ ] XXL (1000+ lines)
+
+**Files/Components Affected**
+<!-- Which files or components will you change? -->
+```
+
+Reviewers are automatically assigned to Pull Requests from the [OWNERS](CODEOWNERS) file.
+PR approval and decision-making for major changes are documented in [GOVERNANCE.md](GOVERNANCE.md).
+
+All contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Development Environment Setup
 
