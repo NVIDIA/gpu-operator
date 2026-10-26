@@ -190,8 +190,8 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 				logger.Error(condErr, "failed to set condition")
 			}
-			// Nothing in SetupWithManager watches Secrets, so creating the
-			// secret afterwards raises no event of its own. Come back for it.
+			// The Secret watch in SetupWithManager brings us back once the secret
+			// is created; the requeue is a fallback in case that event is missed.
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 	}
@@ -283,6 +283,38 @@ func (r *NVIDIADriverReconciler) enqueueAllNVIDIADrivers(ctx context.Context) []
 
 	reconcileRequests := make([]reconcile.Request, 0, len(list.Items))
 	for _, nvidiaDriver := range list.Items {
+		reconcileRequests = append(reconcileRequests,
+			reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      nvidiaDriver.GetName(),
+					Namespace: nvidiaDriver.GetNamespace(),
+				},
+			})
+	}
+
+	return reconcileRequests
+}
+
+// enqueueNVIDIADriversForSecret enqueues the NVIDIADriver instances whose
+// spec.secretEnv refers to the given Secret in the operator namespace, so that
+// creating, changing or deleting the Secret updates their status.
+func (r *NVIDIADriverReconciler) enqueueNVIDIADriversForSecret(ctx context.Context, secret *corev1.Secret) []reconcile.Request {
+	if secret == nil || secret.GetNamespace() != r.Namespace {
+		return nil
+	}
+
+	logger := log.FromContext(ctx)
+	list := &nvidiav1alpha1.NVIDIADriverList{}
+	if err := r.List(ctx, list); err != nil {
+		logger.Error(err, "Unable to list NVIDIADriver resources")
+		return nil
+	}
+
+	var reconcileRequests []reconcile.Request
+	for _, nvidiaDriver := range list.Items {
+		if nvidiaDriver.Spec.SecretEnv != secret.GetName() {
+			continue
+		}
 		reconcileRequests = append(reconcileRequests,
 			reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -445,6 +477,22 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			&corev1.Node{},
 			handler.TypedEnqueueRequestsFromMapFunc(nodeMapFn),
 			nodePredicate,
+		),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Watch Secrets in the operator namespace. Reconcile checks that the Secret named
+	// in spec.secretEnv exists, so creating or deleting it must reconcile the drivers using it.
+	secretMapFn := func(ctx context.Context, secret *corev1.Secret) []reconcile.Request {
+		return r.enqueueNVIDIADriversForSecret(ctx, secret)
+	}
+
+	err = c.Watch(
+		source.Kind(mgr.GetCache(),
+			&corev1.Secret{},
+			handler.TypedEnqueueRequestsFromMapFunc(secretMapFn),
 		),
 	)
 	if err != nil {

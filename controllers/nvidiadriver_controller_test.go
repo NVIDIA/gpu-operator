@@ -516,6 +516,36 @@ func TestEnqueueAllNVIDIADrivers(t *testing.T) {
 	require.Equal(t, []string{"default/driver-a", "default/driver-b"}, got)
 }
 
+func TestEnqueueNVIDIADriversForSecret(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		&nvidiav1alpha1.NVIDIADriver{
+			ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+			Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env"},
+		},
+		&nvidiav1alpha1.NVIDIADriver{
+			ObjectMeta: metav1.ObjectMeta{Name: "driver-b"},
+			Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "other-env"},
+		},
+		&nvidiav1alpha1.NVIDIADriver{ObjectMeta: metav1.ObjectMeta{Name: "driver-c"}},
+	).Build()
+	reconciler := &NVIDIADriverReconciler{Client: client, Namespace: "gpu-operator"}
+
+	// The Secret is not in the client, as for a delete event.
+	requests := reconciler.enqueueNVIDIADriversForSecret(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env", Namespace: "gpu-operator"},
+	})
+	require.Len(t, requests, 1)
+	require.Equal(t, "driver-a", requests[0].Name)
+
+	requests = reconciler.enqueueNVIDIADriversForSecret(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env", Namespace: "default"},
+	})
+	require.Empty(t, requests)
+}
+
 func TestEnqueueNVIDIADriverReconcilersIncludesDeletedDriver(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
