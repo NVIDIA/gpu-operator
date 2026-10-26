@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -1937,6 +1938,86 @@ func TestGetSanitizedKernelVersion(t *testing.T) {
 		require.NotEmpty(t, result)
 		require.Equal(t, test.expected, result)
 	}
+}
+
+func TestPrecompiledDriverDaemonSetsStayDistinctWhenKernelsSanitizeTogether(t *testing.T) {
+	ctx := context.Background()
+	// TestGetSanitizedKernelVersion treats these as one string. RHEL uname -r
+	// and the NFD kernel-version.full label include the architecture.
+	const (
+		x86Kernel = "5.14.0-427.37.1.el9_4.x86_64"
+		armKernel = "5.14.0-427.37.1.el9_4.aarch64"
+	)
+	require.Equal(t, getSanitizedKernelVersion(x86Kernel), getSanitizedKernelVersion(armKernel))
+
+	nodes := &corev1.NodeList{}
+	require.NoError(t, clusterPolicyController.client.List(ctx, nodes))
+	require.GreaterOrEqual(t, len(nodes.Items), 2)
+
+	savedLabels := map[string]map[string]string{}
+	savedMap := clusterPolicyController.kernelVersionMap
+	savedPolicy := clusterPolicyController.singleton.DeepCopy()
+	defer func() {
+		for name, labels := range savedLabels {
+			node := &corev1.Node{}
+			if err := clusterPolicyController.client.Get(ctx, types.NamespacedName{Name: name}, node); err != nil {
+				t.Errorf("restore node %s: %v", name, err)
+				continue
+			}
+			node.Labels = labels
+			if err := clusterPolicyController.client.Update(ctx, node); err != nil {
+				t.Errorf("restore node %s labels: %v", name, err)
+			}
+		}
+		clusterPolicyController.kernelVersionMap = savedMap
+		if err := updateClusterPolicy(&clusterPolicyController, savedPolicy); err != nil {
+			t.Errorf("restore ClusterPolicy: %v", err)
+		}
+	}()
+
+	kernels := []string{x86Kernel, armKernel}
+	for i := range kernels {
+		node := nodes.Items[i].DeepCopy()
+		savedLabels[node.Name] = maps.Clone(node.Labels)
+		node.Labels[nfdKernelLabelKey] = kernels[i]
+		require.NoError(t, clusterPolicyController.client.Update(ctx, node))
+	}
+
+	kernelVersionMap, err := clusterPolicyController.getKernelVersionsMap()
+	require.NoError(t, err)
+	require.Len(t, kernelVersionMap, 2)
+	clusterPolicyController.kernelVersionMap = kernelVersionMap
+
+	cp := getDriverTestInput("precompiled")
+	require.NoError(t, updateClusterPolicy(&clusterPolicyController, cp))
+	addState(&clusterPolicyController, filepath.Join(cfg.root, driverAssetsPath))
+	defer func() {
+		if err := removeState(&clusterPolicyController, clusterPolicyController.idx-1); err != nil {
+			t.Errorf("remove driver state: %v", err)
+			return
+		}
+		clusterPolicyController.idx--
+	}()
+
+	_, err = clusterPolicyController.step()
+	require.NoError(t, err)
+
+	list := &appsv1.DaemonSetList{}
+	require.NoError(t, clusterPolicyController.client.List(ctx, list, client.MatchingLabels{"app": "nvidia-driver-daemonset"}))
+	require.Len(t, list.Items, 2)
+
+	got := map[string]string{}
+	for i := range list.Items {
+		ds := &list.Items[i]
+		kernel := ds.Spec.Template.Spec.NodeSelector[nfdKernelLabelKey]
+		got[kernel] = ds.Name
+		driver := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+		require.NotNil(t, driver)
+		require.Contains(t, driver.Image, kernel)
+	}
+	require.NotEqual(t, got[x86Kernel], got[armKernel])
+	require.Contains(t, got[x86Kernel], "x86.64")
+	require.Contains(t, got[armKernel], "aarch64")
 }
 
 func TestServiceMonitor(t *testing.T) {
