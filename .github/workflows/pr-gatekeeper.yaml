@@ -1,0 +1,84 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: PR Gatekeeper
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions: {}
+
+jobs:
+  check-linked-issue:
+    name: Require an accepted issue assigned to the author
+    if: >-
+      github.event.pull_request.user.type != 'Bot' &&
+      !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: read
+      pull-requests: write
+    steps:
+      # Uses only the GitHub API; never check out pull request code under pull_request_target.
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+
+            // GitHub only links issues through closing keywords for pull requests into the default branch.
+            const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    closingIssuesReferences(first: 10) {
+                      nodes {
+                        number
+                        state
+                        repository { nameWithOwner }
+                        labels(first: 10) { nodes { name } }
+                        assignees(first: 10) { nodes { login } }
+                      }
+                    }
+                  }
+                }
+              }`, { owner, repo, number: pr.number });
+
+            const approved = repository.pullRequest.closingIssuesReferences.nodes.some((issue) =>
+              issue.state === 'OPEN'
+              && issue.repository.nameWithOwner.toLowerCase() === `${owner}/${repo}`.toLowerCase()
+              && issue.labels.nodes.some((label) => label.name === 'accepted')
+              && issue.assignees.nodes.some((assignee) => assignee.login === author));
+            if (approved) {
+              return;
+            }
+
+            const linked = repository.pullRequest.closingIssuesReferences.nodes.map((issue) =>
+              `${issue.repository.nameWithOwner}#${issue.number} ${issue.state}, labels [${issue.labels.nodes.map((label) => label.name).join(', ')}], assignees [${issue.assignees.nodes.map((assignee) => assignee.login).join(', ')}]`);
+            core.info(`Closing: no linked issue is open, accepted, and assigned to ${author}. Linked issues: ${linked.join('; ') || 'none'}.`);
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr.number,
+              body: [
+                'External pull requests must link an `accepted` issue that is assigned to the author, for example `Fixes #1234`, so this pull request has been closed.',
+                '',
+                'See the [contribution workflow](https://github.com/NVIDIA/gpu-operator/blob/main/CONTRIBUTING.md#contribution-workflow). Once you are assigned to an accepted issue, link it in the description and ask a maintainer to reopen this pull request.',
+              ].join('\n'),
+            });
+            await github.rest.pulls.update({ owner, repo, pull_number: pr.number, state: 'closed' });
