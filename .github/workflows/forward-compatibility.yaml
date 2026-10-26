@@ -16,7 +16,7 @@ name: Forward Compatibility
 
 on:
   schedule:
-    - cron: '17 4 * * 1'
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 concurrency:
