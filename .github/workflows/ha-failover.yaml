@@ -1,0 +1,205 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: HA Failover
+
+on:
+  workflow_call:
+    inputs:
+      operator_image:
+        required: true
+        type: string
+      operator_version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  ha-failover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      KUBECONFIG: /tmp/ha-kubeconfig
+      OPERATOR_IMAGE: ${{ inputs.operator_image }}
+      OPERATOR_VERSION: ${{ inputs.operator_version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.19.0
+      - name: Create kind cluster and install KWOK
+        timeout-minutes: 5
+        run: |
+          mkdir -p "$RUNNER_TEMP/ha-bin"
+          curl --fail --location --retry 3 https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64 \
+            -o "$RUNNER_TEMP/ha-bin/kind"
+          chmod +x "$RUNNER_TEMP/ha-bin/kind"
+          export PATH="$RUNNER_TEMP/ha-bin:$PATH"
+          echo "$RUNNER_TEMP/ha-bin" >> "$GITHUB_PATH"
+          cat > "$RUNNER_TEMP/ha-kind.yaml" <<'YAML'
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+          YAML
+          kind create cluster --name gpu-operator-ha --config "$RUNNER_TEMP/ha-kind.yaml" \
+            --image kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5 --wait 120s
+          docker cp gpu-operator-ha-control-plane:/usr/bin/kubectl "$RUNNER_TEMP/ha-bin/kubectl"
+          kubectl label nodes --all ha-test.nvidia.com/real-node=true
+          # These DaemonSets tolerate all taints; keep them off simulated nodes.
+          for daemonset in kindnet kube-proxy; do
+            kubectl -n kube-system patch daemonset "$daemonset" --type=merge \
+              -p '{"spec":{"template":{"spec":{"nodeSelector":{"ha-test.nvidia.com/real-node":"true"}}}}}'
+          done
+          kwok_url=https://github.com/kubernetes-sigs/kwok/releases/download/v0.8.0
+          kubectl apply -f "$kwok_url/kwok.yaml"
+          kubectl wait --for=condition=Established crd/stages.kwok.x-k8s.io --timeout=60s
+          kubectl apply -f "$kwok_url/stage-fast.yaml"
+          kubectl -n kube-system patch deployment kwok-controller --type=json -p '[
+            {"op":"add","path":"/spec/template/spec/nodeSelector","value":{"node-role.kubernetes.io/control-plane":""}},
+            {"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]},
+            {"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--v=DEBUG"}
+          ]'
+          kubectl -n kube-system rollout status deployment/kwok-controller --timeout=90s
+          kubectl get node gpu-operator-ha-control-plane -o json | jq '{
+            apiVersion: "v1", kind: "Node",
+            metadata: {name: "kwok-gpu", annotations: {"kwok.x-k8s.io/node": "fake"}, labels: {
+              "kubernetes.io/hostname": "kwok-gpu", "kubernetes.io/os": "linux", "kubernetes.io/arch": "amd64",
+              "feature.node.kubernetes.io/pci-10de.present": "true",
+              "feature.node.kubernetes.io/system-os_release.ID": "ubuntu",
+              "feature.node.kubernetes.io/system-os_release.VERSION_ID": "24.04",
+              "feature.node.kubernetes.io/kernel-version.full": "6.8.0-60-generic"}},
+            spec: {taints: [{key: "kwok.x-k8s.io/node", value: "fake", effect: "NoSchedule"}]},
+            status: {nodeInfo: .status.nodeInfo,
+              capacity: (.status.capacity + {"nvidia.com/gpu": "1"}),
+              allocatable: (.status.allocatable + {"nvidia.com/gpu": "1"})}
+          }' | kubectl apply -f -
+          kubectl wait --for=condition=Ready node/kwok-gpu --timeout=60s
+      - name: Install two operator replicas
+        timeout-minutes: 5
+        run: |
+          docker pull "$OPERATOR_IMAGE:$OPERATOR_VERSION"
+          kind load docker-image "$OPERATOR_IMAGE:$OPERATOR_VERSION" --name gpu-operator-ha
+          cat > "$RUNNER_TEMP/ha-values.yaml" <<'YAML'
+          nfd:
+            enabled: false
+          operator:
+            replicaCount: 2
+            imagePullPolicy: Never
+            leaderElection:
+              warmup: false
+            nodeSelector:
+              kubernetes.io/hostname: gpu-operator-ha-control-plane
+          daemonsets:
+            tolerations:
+            - key: kwok.x-k8s.io/node
+              operator: Equal
+              value: fake
+              effect: NoSchedule
+          YAML
+          helm install gpu-operator ./deployments/gpu-operator --namespace gpu-operator --create-namespace \
+            -f "$RUNNER_TEMP/ha-values.yaml" --set operator.repository="${OPERATOR_IMAGE%/*}" \
+            --set operator.image="${OPERATOR_IMAGE##*/}" --set operator.version="$OPERATOR_VERSION" \
+            --wait --timeout 180s
+      - name: Kill leader and verify takeover and reconciliation
+        timeout-minutes: 3
+        run: |
+          wait_for() {
+            local deadline=$((SECONDS + $1))
+            shift
+            until "$@"; do
+              (( SECONDS < deadline )) || { echo "::error::Timed out: $*"; return 1; }
+              sleep 1
+            done
+          }
+          lease_holder() {
+            kubectl -n gpu-operator get lease 53822513.nvidia.com -o jsonpath='{.spec.holderIdentity}'
+          }
+          operands_ready() {
+            kubectl -n gpu-operator get daemonsets -o json | jq -e '
+              .items | length > 0 and any(.[]; .status.desiredNumberScheduled == 1) and all(.[];
+                .status.observedGeneration == .metadata.generation and
+                (.status.numberReady // 0) == .status.desiredNumberScheduled)' > /dev/null
+          }
+          wait_for 90 operands_ready
+          kubectl -n gpu-operator get pods -l app=gpu-operator -o json > "$RUNNER_TEMP/ha-pods.json"
+          jq -e '.items | length == 2' "$RUNNER_TEMP/ha-pods.json"
+          holder=$(lease_holder)
+          leader=${holder%%_*}
+          node=$(jq -r --arg pod "$leader" '.items[] | select(.metadata.name == $pod) | .spec.nodeName' "$RUNNER_TEMP/ha-pods.json")
+          container=$(kubectl -n gpu-operator get pod "$leader" -o jsonpath='{.status.containerStatuses[0].containerID}')
+          pid=$(docker exec "$node" crictl inspect "${container#containerd://}" | jq -r '.info.pid')
+          [[ "$pid" =~ ^[1-9][0-9]*$ ]]
+          # Keep the killed replica from restarting and winning the Lease again.
+          trap 'docker exec "$node" systemctl start kubelet' EXIT
+          docker exec "$node" systemctl stop kubelet
+          [[ $(lease_holder) == "$holder" ]]
+          t0=$SECONDS
+          docker exec "$node" kill -KILL "$pid"
+          acquired() {
+            successor=$(lease_holder)
+            successor=${successor%%_*}
+            [[ "$successor" != "$leader" ]] && jq -e --arg pod "$successor" \
+              'any(.items[]; .metadata.name == $pod)' "$RUNNER_TEMP/ha-pods.json" > /dev/null
+          }
+          wait_for 60 acquired
+          marker="ha-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          kubectl patch clusterpolicy cluster-policy --type=merge \
+            -p "{\"spec\":{\"daemonsets\":{\"annotations\":{\"ha-test.nvidia.com/failover\":\"$marker\"}}}}"
+          reconciled() {
+            kubectl -n gpu-operator get daemonsets -o json | jq -e --arg marker "$marker" '
+              .items | length > 0 and all(.[]; .spec.template.metadata.annotations["ha-test.nvidia.com/failover"] == $marker)' > /dev/null
+          }
+          wait_for 60 reconciled
+          [[ $(lease_holder) == "${successor}_"* ]]
+          echo "Leader $leader killed; standby $successor reconciled in $((SECONDS - t0))s"
+          (( SECONDS - t0 <= 60 ))
+      - name: Show failure details
+        if: failure()
+        run: |
+          kubectl --request-timeout=10s -n gpu-operator get pods,daemonsets,leases -o wide || true
+          kubectl --request-timeout=10s get node kwok-gpu -o yaml || true
+          kubectl --request-timeout=10s -n kube-node-lease get lease kwok-gpu -o yaml || true
+          kubectl --request-timeout=10s -n gpu-operator logs -l app=gpu-operator --prefix --tail=100 || true
+          kubectl --request-timeout=10s -n kube-system describe pods -l app=kwok-controller || true
+          kubectl --request-timeout=10s -n kube-system logs -l app=kwok-controller --prefix --tail=-1 || true
+          if kubectl --request-timeout=10s -n kube-system get pods -l app=kwok-controller -o json |
+            jq -e 'any(.items[].status.containerStatuses[]?; .restartCount > 0)' > /dev/null; then
+            kubectl --request-timeout=10s -n kube-system logs -l app=kwok-controller --previous --prefix --tail=-1 || true
+          fi
+          pending=$(kubectl --request-timeout=10s -n gpu-operator get pods \
+            --field-selector=spec.nodeName=kwok-gpu,status.phase=Pending -o json |
+            jq -r '.items[0].metadata.name // empty') || true
+          if [[ -n "$pending" ]]; then
+            kubectl --request-timeout=10s -n gpu-operator describe pod "$pending" || true
+          fi
+      - name: Delete kind cluster
+        if: always()
+        run: kind delete cluster --name gpu-operator-ha

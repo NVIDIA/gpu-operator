@@ -84,8 +84,10 @@ operator:
   #version: ""
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
-  # leaderElection:
-  #   renewDeadline: 60s
+  replicaCount: 1
+  leaderElection:
+    # renewDeadline: 60s
+    warmup: false
   env: []
   priorityClassName: system-node-critical
   runtimeClass: nvidia
@@ -113,6 +115,10 @@ operator:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
+  podAntiAffinity:
+    enabled: true
+  podDisruptionBudget:
+    enabled: true
   logging:
     # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 'rfc3339nano')
     timeEncoding: epoch
