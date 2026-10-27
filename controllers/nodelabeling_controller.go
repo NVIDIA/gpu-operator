@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -190,14 +191,15 @@ func (r *NodeLabelingReconciler) nodeUpdateRequiresReconcile(ctx context.Context
 
 // Reconcile applies GPU-Operator related labels and annotations to all cluster nodes.
 func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconciling node labels")
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciling node labels")
 
 	clusterPolicy, gpuCluster, err := resolveActiveConfig(ctx, r.Client)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 	if clusterPolicy == nil && gpuCluster == nil {
-		r.Log.Info("No ClusterPolicy or GPUCluster CR exists, skipping node labeling")
+		logger.Info("No ClusterPolicy or GPUCluster CR exists, skipping node labeling")
 		return reconcile.Result{}, nil
 	}
 	// TODO: allow both CRs to co-exist
@@ -210,13 +212,13 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		namespace:     r.Namespace,
 		clusterPolicy: clusterPolicy,
 		gpuCluster:    gpuCluster,
-		logger:        r.Log,
+		logger:        logger,
 	}
 
 	gpuLabelUpdateResult, err := nlc.labelGPUNodes(ctx)
 	if err != nil {
 		if gpuLabelUpdateResult.totalPatchedNodeCount > 0 {
-			r.Log.Error(err, "GPU node label update failed after partially updating nodes",
+			logger.Error(err, "GPU node label update failed after partially updating nodes",
 				"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
 				"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
 			)
@@ -224,7 +226,7 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, err
 	}
 	if gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount > 0 {
-		r.Log.V(consts.LogLevelDebug).Info("GPU discovery state used by owner assignment updated; dependent node label operations will run after the node update event",
+		logger.V(consts.LogLevelDebug).Info("GPU discovery state used by owner assignment updated; dependent node label operations will run after the node update event",
 			"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
 			"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
 		)
@@ -691,7 +693,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 	}
 
 	c, err := controller.New("node-labeling-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              newLoggingReconciler(r),
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})

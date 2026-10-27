@@ -343,7 +343,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Create a new NVIDIADriver controller
 	c, err := controller.New("nvidia-driver-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              newLoggingReconciler(r),
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})

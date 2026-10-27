@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -51,7 +52,6 @@ import (
 // UpgradeReconciler reconciles Driver Daemon Sets for upgrade
 type UpgradeReconciler struct {
 	client.Client
-	Log               logr.Logger
 	Scheme            *runtime.Scheme
 	StateManager      upgrade.ClusterUpgradeStateManager
 	OperatorMetrics   *OperatorMetrics
@@ -87,7 +87,7 @@ const (
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *UpgradeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	reqLogger := r.Log.WithValues("upgrade", req.NamespacedName)
+	reqLogger := log.FromContext(ctx)
 	reqLogger.V(consts.LogLevelInfo).Info("Reconciling Upgrade")
 
 	// Requests carry the singleton name rather than a CR reference, so re-resolve the
@@ -145,7 +145,7 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace,
 		driverLabel)
 	if err != nil {
-		r.Log.Error(err, "Failed to build cluster upgrade state")
+		reqLogger.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
 	}
 
@@ -157,7 +157,7 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	if clusterPolicy.Spec.Driver.UpgradePolicy != nil && clusterPolicy.Spec.Driver.UpgradePolicy.MaxUnavailable != nil {
 		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(clusterPolicy.Spec.Driver.UpgradePolicy.MaxUnavailable, totalNodes, true)
 		if err != nil {
-			r.Log.Error(err, "Failed to compute maxUnavailable from the current total nodes")
+			reqLogger.Error(err, "Failed to compute maxUnavailable from the current total nodes")
 			return ctrl.Result{}, err
 		}
 	}
@@ -185,7 +185,7 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 
 	err = r.StateManager.ApplyState(ctx, state, clusterPolicy.Spec.Driver.UpgradePolicy)
 	if err != nil {
-		r.Log.Error(err, "Failed to apply cluster upgrade state")
+		reqLogger.Error(err, "Failed to apply cluster upgrade state")
 		return ctrl.Result{}, err
 	}
 
@@ -231,7 +231,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 	// ClusterPolicy-managed DaemonSet).
 	clusterState, err := r.StateManager.BuildState(ctx, r.OperatorNamespace, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue})
 	if err != nil {
-		r.Log.Error(err, "Failed to build cluster upgrade state")
+		reqLogger.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
 	}
 
@@ -260,7 +260,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 			reqLogger.V(consts.LogLevelInfo).Info("Auto upgrade is disabled for NVIDIADriver, cleaning up upgrade state for nodes it manages",
 				"name", nvd.Name)
 			if err := r.removeNodeUpgradeStateLabelsForNVD(ctx, nvd.Name); err != nil {
-				r.Log.Error(err, "Failed to remove upgrade state labels for NVIDIADriver", "name", nvd.Name)
+				reqLogger.Error(err, "Failed to remove upgrade state labels for NVIDIADriver", "name", nvd.Name)
 				return ctrl.Result{}, err
 			}
 			continue
@@ -277,7 +277,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 		totalNodes := r.StateManager.GetTotalManagedNodes(state)
 		maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(upgradePolicy.MaxUnavailable, totalNodes, true)
 		if err != nil {
-			r.Log.Error(err, "Failed to compute maxUnavailable for NVIDIADriver", "name", nvd.Name)
+			reqLogger.Error(err, "Failed to compute maxUnavailable for NVIDIADriver", "name", nvd.Name)
 			return ctrl.Result{}, err
 		}
 
@@ -299,7 +299,7 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 
 		reqLogger.Info("Applying upgrade policy for NVIDIADriver", "name", nvd.Name)
 		if err := r.StateManager.ApplyState(ctx, state, upgradePolicy); err != nil {
-			r.Log.Error(err, "Failed to apply cluster upgrade state for NVIDIADriver", "name", nvd.Name)
+			reqLogger.Error(err, "Failed to apply cluster upgrade state for NVIDIADriver", "name", nvd.Name)
 			return ctrl.Result{}, err
 		}
 	}
@@ -322,12 +322,13 @@ func (r *UpgradeReconciler) reconcileNVIDIADriverUpgrades(ctx context.Context, r
 // removeNodeUpgradeStateLabels loops over nodes in the cluster and removes "nvidia.com/gpu-driver-upgrade-state"
 // It is used for cleanup when autoUpgrade feature gets disabled
 func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) error {
-	r.Log.Info("Resetting node upgrade labels from all nodes")
+	logger := log.FromContext(ctx)
+	logger.Info("Resetting node upgrade labels from all nodes")
 
 	nodeList := &corev1.NodeList{}
 	err := r.List(ctx, nodeList)
 	if err != nil {
-		r.Log.Error(err, "Failed to get node list to reset upgrade labels")
+		logger.Error(err, "Failed to get node list to reset upgrade labels")
 		return err
 	}
 
@@ -341,7 +342,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 		delete(node.Labels, upgradeStateLabel)
 		err = r.Patch(ctx, &node, patch)
 		if err != nil {
-			r.Log.Error(err, "Failed to remove upgrade state label from node", "node", node)
+			logger.Error(err, "Failed to remove upgrade state label from node", "node", node)
 			return err
 		}
 
@@ -352,11 +353,12 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabels(ctx context.Context) er
 // removeNodeUpgradeStateLabelsForNVD removes the upgrade-state label from all nodes owned by
 // the given NVIDIADriver CR. It is used for cleanup when autoUpgrade is disabled for that CR.
 func (r *UpgradeReconciler) removeNodeUpgradeStateLabelsForNVD(ctx context.Context, nvdName string) error {
-	r.Log.Info("Resetting node upgrade labels for NVIDIADriver", "name", nvdName)
+	logger := log.FromContext(ctx)
+	logger.Info("Resetting node upgrade labels for NVIDIADriver", "name", nvdName)
 
 	nodeList := &corev1.NodeList{}
 	if err := r.List(ctx, nodeList, client.MatchingLabels{gpuconsts.NVIDIADriverOwnerLabel: nvdName}); err != nil {
-		r.Log.Error(err, "Failed to list nodes for NVIDIADriver", "name", nvdName)
+		logger.Error(err, "Failed to list nodes for NVIDIADriver", "name", nvdName)
 		return err
 	}
 
@@ -369,7 +371,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabelsForNVD(ctx context.Conte
 		patch := client.MergeFrom(node.DeepCopy())
 		delete(node.Labels, upgradeStateLabel)
 		if err := r.Patch(ctx, &node, patch); err != nil {
-			r.Log.Error(err, "Failed to remove upgrade state label from node", "node", node.Name)
+			logger.Error(err, "Failed to remove upgrade state label from node", "node", node.Name)
 			return err
 		}
 	}
@@ -381,7 +383,7 @@ func (r *UpgradeReconciler) removeNodeUpgradeStateLabelsForNVD(ctx context.Conte
 //nolint:dupl
 func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new controller
-	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 1,
+	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: newLoggingReconciler(r), MaxConcurrentReconciles: 1,
 		RateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR)})
 	if err != nil {
 		return err

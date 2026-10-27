@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -767,7 +768,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.singleton = clusterPolicy
 	n.ctx = ctx
 	n.idx = 0
-	n.logger = reconciler.Log
+	n.logger = log.FromContext(ctx)
 	n.client = reconciler.Client
 	n.scheme = reconciler.Scheme
 

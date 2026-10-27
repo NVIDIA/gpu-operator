@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-logr/logr"
 	promcli "github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -200,7 +199,6 @@ func newTestUpgradeReconciler(t *testing.T, objs ...client.Object) (*UpgradeReco
 	stateManager := &fakeUpgradeStateManager{state: upgrade.NewClusterUpgradeState()}
 	r := &UpgradeReconciler{
 		Client:            fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build(),
-		Log:               logr.Discard(),
 		Scheme:            scheme,
 		StateManager:      stateManager,
 		OperatorMetrics:   newTestOperatorMetrics(),
