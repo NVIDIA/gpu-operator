@@ -66,6 +66,13 @@ spec:
         app: nvidia-dcgm-dra
         app.kubernetes.io/component: nvidia-dcgm
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: nvidia-dcgm
+            topologyKey: kubernetes.io/hostname
       containers:
       - image: nvcr.io/nvidia/cloud-native/dcgm:test
         livenessProbe:
@@ -98,23 +105,4 @@ spec:
         operator: Exists
   updateStrategy:
     type: RollingUpdate
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: nvidia-dcgm-dra
-    app.kubernetes.io/component: nvidia-dcgm
-  name: nvidia-dcgm-dra
-  namespace: test-operator
-spec:
-  internalTrafficPolicy: Local
-  ports:
-  - name: dcgm
-    port: 5555
-    protocol: TCP
-    targetPort: 5555
-  selector:
-    app: nvidia-dcgm-dra
-  type: ClusterIP
 ---
