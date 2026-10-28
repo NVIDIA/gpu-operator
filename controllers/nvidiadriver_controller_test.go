@@ -505,6 +505,52 @@ func TestReconcileSecretEnvReadsOnlySecretMetadata(t *testing.T) {
 	require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
 }
 
+func TestReconcileSecretEnvLookupErrorIsRetried(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env-secret"},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env-secret", Namespace: "gpu-operator"},
+	}
+	lookupErr := errors.New("transient lookup error")
+
+	// No Secret event follows a failed lookup of an existing Secret, so the error has to be returned.
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(driver, secret).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if key.Name == secret.Name {
+					return lookupErr
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).
+		Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client:                c,
+		Scheme:                scheme,
+		Namespace:             "gpu-operator",
+		conditionUpdater:      updater,
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+
+	require.ErrorIs(t, err, lookupErr)
+	require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+	require.Equal(t, conditions.ReconcileFailed, updater.LastErrorReason)
+}
+
 func TestUpdateCrStatusPreservesNotReadyStateWhenSettingErrorCondition(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))

@@ -193,6 +193,10 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 				logger.Error(condErr, "failed to set condition")
 			}
+			// A missing Secret is picked up by the Secret watch; retry anything else.
+			if !apierrors.IsNotFound(err) {
+				return reconcile.Result{}, err
+			}
 			return reconcile.Result{}, nil
 		}
 	}
