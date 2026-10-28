@@ -73,6 +73,22 @@ func init() {
 	utilruntime.Must(apiimagev1.Install(scheme))
 }
 
+func operatorCacheOptions(operatorNamespace string) cache.Options {
+	return cache.Options{
+		DefaultNamespaces: map[string]cache.Config{
+			operatorNamespace: {},
+			// ImageStreams are read from this namespace on OpenShift.
+			consts.OpenshiftNamespace: {},
+		},
+		ByObject: map[client.Object]cache.ByObject{
+			// The shared Service controller manages Services only in the operator namespace.
+			&corev1.Service{}: {
+				Namespaces: map[string]cache.Config{operatorNamespace: {}},
+			},
+		},
+	}
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -126,14 +142,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	openshiftNamespace := consts.OpenshiftNamespace
-	cacheOptions := cache.Options{
-		DefaultNamespaces: map[string]cache.Config{
-			operatorNamespace: {},
-			// Also cache resources in the openshift namespace to retrieve ImageStreams when on an openshift  cluster
-			openshiftNamespace: {},
-		},
-	}
+	cacheOptions := operatorCacheOptions(operatorNamespace)
 
 	options := ctrl.Options{
 		Scheme:                  scheme,
@@ -245,6 +254,14 @@ func main() {
 		OperatorMetrics: operatorMetrics,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GPUCluster")
+		os.Exit(1)
+	}
+	if err = (&controllers.SharedServiceReconciler{
+		Namespace: operatorNamespace,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SharedService")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

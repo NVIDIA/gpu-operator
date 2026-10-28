@@ -17,14 +17,25 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -249,4 +260,62 @@ func TestGPUPodSpecFilterResourceList(t *testing.T) {
 			require.Equal(t, tc.wantGPUPod, gotGPUPod)
 		})
 	}
+}
+
+// Model the Helm Role: Services can only be listed in the operator namespace.
+func TestServiceCacheNamespaceScope(t *testing.T) {
+	const namespace = "test-operator"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var mu sync.Mutex
+	var paths []string
+	opts := operatorCacheOptions(namespace)
+	opts.Scheme = scheme
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{corev1.SchemeGroupVersion})
+	mapper.Add(corev1.SchemeGroupVersion.WithKind("Service"), meta.RESTScopeNamespace)
+	opts.Mapper = mapper
+	opts.HTTPClient = &http.Client{Transport: cacheTestTransport(func(req *http.Request) (*http.Response, error) {
+		mu.Lock()
+		paths = append(paths, req.URL.Path)
+		mu.Unlock()
+		if req.URL.Path != "/api/v1/namespaces/"+namespace+"/services" {
+			return &http.Response{StatusCode: http.StatusForbidden, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"Forbidden","code":403}`))}, nil
+		}
+		if req.URL.Query().Get("watch") == "true" {
+			reader, writer := io.Pipe()
+			go func() {
+				defer writer.Close()
+				if req.URL.Query().Get("sendInitialEvents") == "true" {
+					_, _ = io.WriteString(writer, `{"type":"BOOKMARK","object":{"kind":"Service","apiVersion":"v1","metadata":{"resourceVersion":"1","annotations":{"k8s.io/initial-events-end":"true"}}}}`+"\n")
+				}
+				<-req.Context().Done()
+			}()
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: reader}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"kind":"ServiceList","apiVersion":"v1","metadata":{"resourceVersion":"1"},"items":[]}`))}, nil
+	})}
+	serviceCache, err := cache.New(&rest.Config{Host: "https://cache.test"}, opts)
+	require.NoError(t, err)
+	_, err = serviceCache.GetInformer(ctx, &corev1.Service{}, cache.BlockUntilSynced(false))
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() { done <- serviceCache.Start(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		require.NoError(t, <-done)
+	})
+	require.True(t, serviceCache.WaitForCacheSync(ctx), "Service informer must sync with namespace-scoped RBAC")
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, paths)
+	for _, path := range paths {
+		require.Equal(t, fmt.Sprintf("/api/v1/namespaces/%s/services", namespace), path)
+	}
+}
+
+type cacheTestTransport func(*http.Request) (*http.Response, error)
+
+func (f cacheTestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
