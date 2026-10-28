@@ -41,6 +41,8 @@ const (
 
 	// OpenshiftNamespace indicates the main namespace of an  Openshift cluster
 	OpenshiftNamespace = "openshift"
+	// DriverToolkitImageStreamName is the name of the OpenShift Driver Toolkit ImageStream.
+	DriverToolkitImageStreamName = "driver-toolkit"
 
 	OcpDriverToolkitVersionLabel        = "openshift.driver-toolkit.rhcos"
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
