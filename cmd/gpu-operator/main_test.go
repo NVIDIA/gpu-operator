@@ -17,6 +17,8 @@
 package main
 
 import (
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func allocatedClaim(name, driver string) *resourcev1.ResourceClaim {
@@ -249,4 +254,29 @@ func TestGPUPodSpecFilterResourceList(t *testing.T) {
 			require.Equal(t, tc.wantGPUPod, gotGPUPod)
 		})
 	}
+}
+
+func TestNewCacheOptionsLimitsSecretsToOperatorNamespace(t *testing.T) {
+	opts := newCacheOptions("gpu-operator")
+
+	require.Contains(t, opts.DefaultNamespaces, "gpu-operator")
+	require.Contains(t, opts.DefaultNamespaces, consts.OpenshiftNamespace)
+
+	// The cache delegates by GVK, so the Secret entry must also match the
+	// metadata-only Secret the NVIDIADriver controller watches.
+	secretMetadata := &metav1.PartialObjectMetadata{}
+	secretMetadata.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	wantGVK, err := apiutil.GVKForObject(secretMetadata, scheme)
+	require.NoError(t, err)
+
+	var secretNamespaces []string
+	for obj, byObject := range opts.ByObject {
+		gvk, err := apiutil.GVKForObject(obj, scheme)
+		require.NoError(t, err)
+		if gvk != wantGVK {
+			continue
+		}
+		secretNamespaces = slices.Collect(maps.Keys(byObject.Namespaces))
+	}
+	require.Equal(t, []string{"gpu-operator"}, secretNamespaces)
 }

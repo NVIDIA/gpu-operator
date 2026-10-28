@@ -36,6 +36,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -594,6 +595,139 @@ func TestReconcileMultipleDefaultDriversSetsNotReadyState(t *testing.T) {
 	}
 }
 
+func TestReconcileMissingSecretEnvSetsNotReadyState(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env-secret"},
+		Status:     nvidiav1alpha1.NVIDIADriverStatus{State: nvidiav1alpha1.Ready},
+	}
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(true)},
+		},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp, driver).Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client:                client,
+		Scheme:                scheme,
+		Namespace:             "gpu-operator",
+		conditionUpdater:      updater,
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+	require.Equal(t, conditions.ReconcileFailed, updater.LastErrorReason)
+	require.Contains(t, updater.LastErrorMessage, "driver-env-secret")
+}
+
+func TestReconcileSecretEnvReadsOnlySecretMetadata(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env-secret"},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env-secret", Namespace: "gpu-operator"},
+	}
+
+	// A Get for a full Secret would make the manager cache Secret data.
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(driver, secret).
+		WithStatusSubresource(&nvidiav1alpha1.NVIDIADriver{}).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, ok := obj.(*corev1.Secret); ok {
+					return errors.New("unexpected Get for a full Secret")
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).
+		Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client:                c,
+		Scheme:                scheme,
+		Namespace:             "gpu-operator",
+		conditionUpdater:      updater,
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+		stateManager:          &fakeStateManager{results: state.Results{Status: state.SyncStateReady}},
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, updater.LastErrorMessage)
+	instance := &nvidiav1alpha1.NVIDIADriver{}
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: driver.Name}, instance))
+	require.Equal(t, nvidiav1alpha1.Ready, instance.Status.State)
+}
+
+func TestReconcileSecretEnvLookupErrorIsRetried(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+		Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env-secret"},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env-secret", Namespace: "gpu-operator"},
+	}
+	lookupErr := errors.New("transient lookup error")
+
+	// No Secret event follows a failed lookup of an existing Secret, so the error has to be returned.
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(driver, secret).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if key.Name == secret.Name {
+					return lookupErr
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).
+		Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client:                c,
+		Scheme:                scheme,
+		Namespace:             "gpu-operator",
+		conditionUpdater:      updater,
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+
+	require.ErrorIs(t, err, lookupErr)
+	require.Equal(t, nvidiav1alpha1.NotReady, updater.LastErrorState)
+	require.Equal(t, conditions.ReconcileFailed, updater.LastErrorReason)
+}
+
 func TestUpdateCrStatusPreservesNotReadyStateWhenSettingErrorCondition(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
@@ -650,6 +784,36 @@ func TestEnqueueAllNVIDIADrivers(t *testing.T) {
 	}
 	sort.Strings(got)
 	require.Equal(t, []string{"default/driver-a", "default/driver-b"}, got)
+}
+
+func TestEnqueueNVIDIADriversForSecret(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		&nvidiav1alpha1.NVIDIADriver{
+			ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+			Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "driver-env"},
+		},
+		&nvidiav1alpha1.NVIDIADriver{
+			ObjectMeta: metav1.ObjectMeta{Name: "driver-b"},
+			Spec:       nvidiav1alpha1.NVIDIADriverSpec{SecretEnv: "other-env"},
+		},
+		&nvidiav1alpha1.NVIDIADriver{ObjectMeta: metav1.ObjectMeta{Name: "driver-c"}},
+	).Build()
+	reconciler := &NVIDIADriverReconciler{Client: client, Namespace: "gpu-operator"}
+
+	// The Secret is not in the client, as for a delete event.
+	requests := reconciler.enqueueNVIDIADriversForSecret(context.Background(), &metav1.PartialObjectMetadata{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env", Namespace: "gpu-operator"},
+	})
+	require.Len(t, requests, 1)
+	require.Equal(t, "driver-a", requests[0].Name)
+
+	requests = reconciler.enqueueNVIDIADriversForSecret(context.Background(), &metav1.PartialObjectMetadata{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-env", Namespace: "default"},
+	})
+	require.Empty(t, requests)
 }
 
 func TestEnqueueNVIDIADriverReconcilersIncludesDeletedDriver(t *testing.T) {
