@@ -20,6 +20,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -182,15 +184,18 @@ func TestDriverRBACFollowsDetectedPlatform(t *testing.T) {
 			foundOpenShift := false
 			for _, rule := range resources.ClusterRole.Rules {
 				for _, group := range rule.APIGroups {
-					if group == "" {
-						foundNodes = true
-					}
-					if group == "config.openshift.io" {
+					if strings.HasSuffix(group, ".openshift.io") {
 						foundOpenShift = true
 					}
 				}
+				if slices.Contains(rule.APIGroups, "") && slices.Contains(rule.Resources, "nodes") {
+					foundNodes = true
+					for _, verb := range []string{"get", "list", "patch", "update", "watch"} {
+						require.Contains(t, rule.Verbs, verb, "nodes permission must survive on both platforms")
+					}
+				}
 			}
-			require.True(t, foundNodes, "common node permissions must be kept on both platforms")
+			require.True(t, foundNodes, "node get/list/patch/update/watch must be kept on both platforms")
 			require.Equal(t, tc.wantOpenShiftRule, foundOpenShift)
 		})
 	}
