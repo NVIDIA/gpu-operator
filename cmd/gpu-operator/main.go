@@ -126,14 +126,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	openshiftNamespace := consts.OpenshiftNamespace
-	cacheOptions := cache.Options{
-		DefaultNamespaces: map[string]cache.Config{
-			operatorNamespace: {},
-			// Also cache resources in the openshift namespace to retrieve ImageStreams when on an openshift  cluster
-			openshiftNamespace: {},
-		},
-	}
+	cacheOptions := newCacheOptions(operatorNamespace)
 
 	options := ctrl.Options{
 		Scheme:                  scheme,
@@ -261,6 +254,24 @@ func main() {
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
+	}
+}
+
+func newCacheOptions(operatorNamespace string) cache.Options {
+	return cache.Options{
+		DefaultNamespaces: map[string]cache.Config{
+			operatorNamespace: {},
+			// Also cache resources in the openshift namespace to retrieve ImageStreams when on an openshift  cluster
+			consts.OpenshiftNamespace: {},
+		},
+		ByObject: map[client.Object]cache.ByObject{
+			// Secrets are only read in the operator namespace, and the operator has no
+			// access to them in the openshift namespace. The cache is picked by GVK, so
+			// this also covers metadata-only Secret informers.
+			&corev1.Secret{}: {
+				Namespaces: map[string]cache.Config{operatorNamespace: {}},
+			},
+		},
 	}
 }
 

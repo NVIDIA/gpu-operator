@@ -184,15 +184,16 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	secretName := instance.Spec.SecretEnv
 	if len(secretName) > 0 {
 		key := client.ObjectKey{Namespace: r.Namespace, Name: secretName}
-		if err := r.Get(ctx, key, &corev1.Secret{}); err != nil {
+		// Only the metadata is needed here, so this check does not cache full Secret objects.
+		secret := &metav1.PartialObjectMetadata{}
+		secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+		if err := r.Get(ctx, key, secret); err != nil {
 			logger.Error(err, "failed to get secret")
 			instance.Status.State = nvidiav1alpha1.NotReady
 			if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 				logger.Error(condErr, "failed to set condition")
 			}
-			// The Secret watch in SetupWithManager brings us back once the secret
-			// is created; the requeue is a fallback in case that event is missed.
-			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+			return reconcile.Result{}, nil
 		}
 	}
 
@@ -298,7 +299,7 @@ func (r *NVIDIADriverReconciler) enqueueAllNVIDIADrivers(ctx context.Context) []
 // enqueueNVIDIADriversForSecret enqueues the NVIDIADriver instances whose
 // spec.secretEnv refers to the given Secret in the operator namespace, so that
 // creating, changing or deleting the Secret updates their status.
-func (r *NVIDIADriverReconciler) enqueueNVIDIADriversForSecret(ctx context.Context, secret *corev1.Secret) []reconcile.Request {
+func (r *NVIDIADriverReconciler) enqueueNVIDIADriversForSecret(ctx context.Context, secret *metav1.PartialObjectMetadata) []reconcile.Request {
 	if secret == nil || secret.GetNamespace() != r.Namespace {
 		return nil
 	}
@@ -485,13 +486,16 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Watch Secrets in the operator namespace. Reconcile checks that the Secret named
 	// in spec.secretEnv exists, so creating or deleting it must reconcile the drivers using it.
-	secretMapFn := func(ctx context.Context, secret *corev1.Secret) []reconcile.Request {
+	// Only the metadata is watched, and the manager cache limits Secrets to the operator namespace.
+	secretMapFn := func(ctx context.Context, secret *metav1.PartialObjectMetadata) []reconcile.Request {
 		return r.enqueueNVIDIADriversForSecret(ctx, secret)
 	}
 
+	secretMetadata := &metav1.PartialObjectMetadata{}
+	secretMetadata.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
 	err = c.Watch(
 		source.Kind(mgr.GetCache(),
-			&corev1.Secret{},
+			secretMetadata,
 			handler.TypedEnqueueRequestsFromMapFunc(secretMapFn),
 		),
 	)
