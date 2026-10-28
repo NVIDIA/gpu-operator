@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 )
 
 const (
@@ -239,30 +240,11 @@ func addState(n *ClusterPolicyController, path string) {
 
 // OpenshiftVersion fetches OCP version
 func OpenshiftVersion(ctx context.Context) (string, error) {
-	cfg := config.GetConfigOrDie()
-	client, err := configv1.NewForConfig(cfg)
+	info, err := clusterinfo.New(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	v, err := client.ClusterVersions().Get(ctx, "version", metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	for _, condition := range v.Status.History {
-		if condition.State != "Completed" {
-			continue
-		}
-
-		ocpV := strings.Split(condition.Version, ".")
-		if len(ocpV) > 1 {
-			return ocpV[0] + "." + ocpV[1], nil
-		}
-		return ocpV[0], nil
-	}
-
-	return "", fmt.Errorf("failed to find Completed Cluster Version")
+	return info.GetOpenshiftVersion()
 }
 
 // KubernetesVersion fetches the Kubernetes API server version

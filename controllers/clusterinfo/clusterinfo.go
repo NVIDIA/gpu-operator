@@ -267,6 +267,31 @@ func getContainerRuntime(ctx context.Context, config *rest.Config) (string, erro
 }
 
 func getOpenshiftVersion(ctx context.Context, config *rest.Config) (string, error) {
+	// Check the API surface before reading ClusterVersion. On ordinary Kubernetes
+	// clusters, GET on the OpenShift resource can otherwise fail with Forbidden
+	// when the operator is correctly deployed without OpenShift-specific RBAC.
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return "", err
+	}
+	resources, err := discoveryClient.ServerResourcesForGroupVersion("config.openshift.io/v1")
+	if apierrors.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	found := false
+	for _, resource := range resources.APIResources {
+		if resource.Name == "clusterversions" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return "", nil
+	}
+
 	client, err := ocpconfigv1.NewForConfig(config)
 	if err != nil {
 		return "", err
