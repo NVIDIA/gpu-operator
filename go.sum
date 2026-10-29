@@ -1,5 +1,5 @@
-cyphar.com/go-pathrs v0.2.5 h1:SnX9FBvnoyn3lUs1dkMgZ52bAETpirNu3FTRh5HlRik=
-cyphar.com/go-pathrs v0.2.5/go.mod h1:y8f1EMG7r+hCuFf/rXsKqMJrJAUoADZGNh5/vZPKcGc=
+cyphar.com/go-pathrs v0.2.6 h1:+btfBJ7qWKZo+TDJlDZ2tPqToKdN8QD4BAOqomueXZg=
+cyphar.com/go-pathrs v0.2.6/go.mod h1:y8f1EMG7r+hCuFf/rXsKqMJrJAUoADZGNh5/vZPKcGc=
 dario.cat/mergo v1.0.1 h1:Ra4+bf83h2ztPIQYNP99R6m+Y7KfnARDfID+a+vLl4s=
 dario.cat/mergo v1.0.1/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEKWjV8V+WSxDXJ4NFATAsZjh8iIbsQIg=
@@ -20,8 +20,8 @@ github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDs
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494 h1:j+tWK79l9AouBulQps7rxILLhy2fWYcEhH4zgYjth/o=
 github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494/go.mod h1:L+aiCiTKN63AX9SWz/F8pv9Jw9FIfI+dAEr7VA+KowE=
-github.com/NVIDIA/nvidia-container-toolkit v1.20.1 h1:DsE0Pnu2XAl7IC00W2tmld7i/GerwnZGzRbmChj295Q=
-github.com/NVIDIA/nvidia-container-toolkit v1.20.1/go.mod h1:8Wes3Zi3GAXHt3mYynZo3yPof02+3GwpCArqS/qaq/A=
+github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972 h1:BtGX8wKW8P8jkxT7B3arAVVV+x6vZSven3HisAGKcOE=
+github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972/go.mod h1:lEnnLR31EH4EEy46cT4a3KO6jF1seyk15MYcMjPCT58=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
@@ -166,8 +166,8 @@ github.com/onsi/ginkgo/v2 v2.32.1 h1:6tlvcDm/3sE8lGJbZ4+d4mO3RLy24/tQWOFzVSQNIfw
 github.com/onsi/ginkgo/v2 v2.32.1/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.42.1 h1:iN1rCUX+44NZ1Dc97MPoeFYbFR0vh8zxoxMFwKdyZ6I=
 github.com/onsi/gomega v1.42.1/go.mod h1:REff/hsDsodHoKlWsP2mAPhu1+5/6hVYNf9rIEBpeSg=
-github.com/opencontainers/cgroups v0.0.9 h1:zHNGu6y7rGnbm8vqK92ZgOYNARcZ7XvnBobA5BOUkzE=
-github.com/opencontainers/cgroups v0.0.9/go.mod h1:hPBRvnBhLZueEN0eJyozMeM3HeFGYlZW9KnO//px6G4=
+github.com/opencontainers/cgroups v0.1.0 h1:6W05KiDvgj1yi/6D13SJCvYx8TAESz67szvHPxhfcrs=
+github.com/opencontainers/cgroups v0.1.0/go.mod h1:hPBRvnBhLZueEN0eJyozMeM3HeFGYlZW9KnO//px6G4=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/openshift/api v0.0.0-20260727141720-967cc4c36c9b h1:KrCRsYw5Pt7jwb2LHL48uEdHjKLKa4TD4brBcdO530A=
