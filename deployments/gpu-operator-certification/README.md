@@ -5,15 +5,20 @@ A self-certification test suite for ISVs to validate NVIDIA GPU Operator compati
 ## Quick Start
 
 ```bash
+# Namespace the GPU Operator runs in, for example nvidia-gpu-operator on OpenShift
+export NAMESPACE=gpu-operator
+
 # Deploy (GPU Operator must be installed)
-kubectl apply -f deployments/gpu-operator-certification/gpu-operator-certification.yaml
+kubectl apply -f deployments/gpu-operator-certification/gpu-operator-certification.yaml -n $NAMESPACE
 
 # View results
-kubectl logs job/gpu-operator-certification -n gpu-operator
+kubectl logs job/gpu-operator-certification -n $NAMESPACE
 
 # Download results.json and report.html
 hack/download-certification-results.sh
 ```
+
+If the GPU Operator runs in a namespace other than `gpu-operator`, change the `namespace` of the ClusterRoleBinding subject in `gpu-operator-certification.yaml` to match before applying. `kubectl apply -n` does not set it.
 
 ## Configuration
 
@@ -28,7 +33,7 @@ TEST_SETS: "all"               # Run all TestSets
 
 | Key | Default | Description |
 |-------|---------|-------------|
-| `namespace` | `gpu-operator` | GPU Operator namespace |
+| `namespace` | `gpu-operator` | GPU Operator namespace, set with `kubectl apply -n` and in the ClusterRoleBinding subject |
 | `TEST_TIMEOUT` | `15m` | Timeout for readiness checks |
 | `TEST_SETS` | `all` | TestSets to run (use `!` prefix to exclude) |
 | `TEST_WORKLOAD_IMAGE` | `nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04` | Image for the TS1000 GPU workload pod |
@@ -40,8 +45,8 @@ TEST_SETS: "all"               # Run all TestSets
 The Job reads the ConfigMap only when its pod starts, so delete the Job before applying a changed configuration:
 
 ```bash
-kubectl delete job gpu-operator-certification -n gpu-operator
-kubectl apply -f deployments/gpu-operator-certification/gpu-operator-certification.yaml
+kubectl delete job gpu-operator-certification -n $NAMESPACE
+kubectl apply -f deployments/gpu-operator-certification/gpu-operator-certification.yaml -n $NAMESPACE
 ```
 
 ## Test Sets
