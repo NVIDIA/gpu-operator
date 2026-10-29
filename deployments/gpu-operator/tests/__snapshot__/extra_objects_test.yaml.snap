@@ -1,0 +1,19 @@
+should match snapshot for an extra object provided as a structured map:
+  1: |
+    apiVersion: v1
+    data:
+      foo: bar
+    kind: ConfigMap
+    metadata:
+      name: extra-cm
+      namespace: gpu-operator
+should match snapshot for an extra object provided as a templated string:
+  1: |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: extra-secret
+      namespace: gpu-operator
+    stringData:
+      release: gpu-operator
+    type: Opaque
