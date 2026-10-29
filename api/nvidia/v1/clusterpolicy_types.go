@@ -834,6 +834,15 @@ type ToolkitSpec struct {
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostNetwork for NVIDIA Container Toolkit"
 	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
 	HostNetwork *bool `json:"hostNetwork,omitempty"`
+
+	// RuntimeClassName selects an existing RuntimeClass for the Container Toolkit pod.
+	// A class backed by a non-NVIDIA runtime allows the toolkit to start when the
+	// host NVIDIA runtime is unavailable. If empty, the node's default runtime is used.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="RuntimeClass for NVIDIA Container Toolkit"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:text"
+	RuntimeClassName string `json:"runtimeClassName,omitempty"`
 }
 
 // DevicePluginSpec defines the properties for NVIDIA Device Plugin deployment
