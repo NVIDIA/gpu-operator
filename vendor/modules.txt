@@ -1,4 +1,4 @@
-# cyphar.com/go-pathrs v0.2.5
+# cyphar.com/go-pathrs v0.2.6
 ## explicit; go 1.18
 cyphar.com/go-pathrs
 cyphar.com/go-pathrs/internal/fdutils
@@ -42,7 +42,7 @@ github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
 github.com/NVIDIA/k8s-operator-libs/pkg/crdutil
 github.com/NVIDIA/k8s-operator-libs/pkg/upgrade
-# github.com/NVIDIA/nvidia-container-toolkit v1.20.1
+# github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972
 ## explicit; go 1.26.0
 github.com/NVIDIA/nvidia-container-toolkit/cmd/nvidia-ctk/system/create-dev-char-symlinks
 github.com/NVIDIA/nvidia-container-toolkit/internal/devices
@@ -287,7 +287,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/opencontainers/cgroups v0.0.9
+# github.com/opencontainers/cgroups v0.1.0
 ## explicit; go 1.24.0
 github.com/opencontainers/cgroups/devices/config
 # github.com/opencontainers/go-digest v1.0.0
