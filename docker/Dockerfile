@@ -81,6 +81,11 @@ RUN mkdir /busybox \
  && cp /bin/busybox /busybox/busybox \
  && /busybox/busybox --install -s /busybox
 
+# Fail the build if busybox prefers applets (CONFIG_FEATURE_PREFER_APPLETS=y).
+# See https://github.com/NVIDIA/k8s-driver-manager/issues/299
+COPY hack/check-busybox-prefer-applets.sh /tmp/check-busybox-prefer-applets.sh
+RUN /tmp/check-busybox-prefer-applets.sh /busybox/busybox
+
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
 FROM nvcr.io/nvidia/distroless/cc:v4.1.6@sha256:1c3f23958b14384dd07e57696954c6722861c3ee5de372fdc2af75a8e4b75313
