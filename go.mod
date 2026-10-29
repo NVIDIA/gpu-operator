@@ -7,7 +7,7 @@ require (
 	github.com/NVIDIA/go-nvlib v0.12.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494
-	github.com/NVIDIA/nvidia-container-toolkit v1.20.1
+	github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.4
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	cyphar.com/go-pathrs v0.2.5 // indirect
+	cyphar.com/go-pathrs v0.2.6 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
@@ -89,7 +89,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/opencontainers/cgroups v0.0.9 // indirect
+	github.com/opencontainers/cgroups v0.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
