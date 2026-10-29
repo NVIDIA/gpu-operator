@@ -28,12 +28,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"golang.org/x/mod/semver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
@@ -5321,7 +5321,9 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	createRuntimeClassFunc := transformRuntimeClass
-	if semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
+	// An unparseable version is treated as older than the minimum, so fall back to the legacy API.
+	k8sVersion, err := semver.NewVersion(n.k8sVersion)
+	if err != nil || k8sVersion.Compare(semver.MustParse(nodev1MinimumAPIVersion)) <= 0 {
 		createRuntimeClassFunc = transformRuntimeClassLegacy
 	}
 
