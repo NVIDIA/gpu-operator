@@ -28,7 +28,7 @@
   "separateMultipleMajor": false,
   "separateMinorPatch": false,
   "pruneStaleBranches": true,
-  "rebaseWhen": "always",
+  "rebaseWhen": "behind-base-branch",
 
   "customManagers": [
     {
