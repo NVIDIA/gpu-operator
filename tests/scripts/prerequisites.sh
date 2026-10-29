@@ -13,8 +13,8 @@ mkdir -p "${LOG_DIR}"
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "Load kernel modules i2c_core and ipmi_msghandler"
-sudo modprobe -a i2c_core ipmi_msghandler
+echo "Load kernel module ipmi_msghandler"
+sudo modprobe -a ipmi_msghandler
 
 echo "Install dependencies"
 sudo apt update && sudo apt install -y jq
