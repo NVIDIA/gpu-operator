@@ -1891,6 +1891,19 @@ func TestDCGMExporter(t *testing.T) {
 				require.Equal(t, value, getContainerEnv(&ds.Spec.Template.Spec.Containers[0], key), "unexpected value for env var %s on daemonset nvidia-dcgm-exporter", key)
 			}
 
+			// A slow start gets up to 5 minutes before the liveness probe applies.
+			startupProbe := ds.Spec.Template.Spec.Containers[0].StartupProbe
+			require.NotNil(t, startupProbe, "dcgm-exporter must have a startup probe")
+			require.NotNil(t, startupProbe.HTTPGet)
+			require.Equal(t, "/health", startupProbe.HTTPGet.Path)
+			require.Equal(t, int32(5), startupProbe.PeriodSeconds)
+			require.Equal(t, int32(60), startupProbe.FailureThreshold)
+
+			// Liveness and readiness start once the startup probe succeeds, so a
+			// delay would only hold back a pod that is already serving.
+			require.Zero(t, ds.Spec.Template.Spec.Containers[0].LivenessProbe.InitialDelaySeconds)
+			require.Zero(t, ds.Spec.Template.Spec.Containers[0].ReadinessProbe.InitialDelaySeconds)
+
 			// Verify cluster-scoped RBAC and SA token mount match the feature toggle.
 			clusterRoleKey := client.ObjectKey{Name: "nvidia-dcgm-exporter-read-pods"}
 			clusterRole := &rbacv1.ClusterRole{}
