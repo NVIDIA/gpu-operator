@@ -47,7 +47,6 @@ import (
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
-	"github.com/NVIDIA/gpu-operator/internal/driver"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
@@ -138,6 +137,7 @@ var (
 	driverInstallDirFlag            string
 	driverInstallDirCtrPathFlag     string
 	driverValidationSkipGPUInitFlag bool
+	vgpuLicenseStatusEnabledFlag    bool
 )
 
 // defaultGPUWorkloadConfig is "vm-passthrough" unless
@@ -385,6 +385,13 @@ func main() {
 			Destination: &driverValidationSkipGPUInitFlag,
 			Sources:     cli.EnvVars("DRIVER_VALIDATION_SKIP_GPU_INIT"),
 		},
+		&cli.BoolFlag{
+			Name:        "vgpu-license-status-enabled",
+			Value:       false,
+			Usage:       "publish each GPU's vGPU license state in a Node annotation (metrics component only)",
+			Destination: &vgpuLicenseStatusEnabledFlag,
+			Sources:     cli.EnvVars("VGPU_LICENSE_STATUS_ENABLED"),
+		},
 	}
 
 	// Log version info
@@ -609,6 +616,13 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		metrics := &Metrics{
 			ctx: ctx,
 		}
+		if vgpuLicenseStatusEnabledFlag {
+			reporter, err := NewLicenseReporter()
+			if err != nil {
+				return fmt.Errorf("error starting license reporter: %w", err)
+			}
+			go reporter.Run(ctx)
+		}
 		err := metrics.run()
 		if err != nil {
 			return fmt.Errorf("error running validation-metrics exporter: %s", err)
@@ -757,7 +771,7 @@ func nvidiaSMIArgs() []string {
 	return nil
 }
 
-func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
+func validateDriverContainer(ctx context.Context, silent bool, driverManagedByOperator bool) error {
 	if driverManagedByOperator {
 		log.Infof("Driver is not pre-installed on the host and is managed by GPU Operator. Checking driver container status.")
 		if err := assertDriverContainerReady(silent); err != nil {
@@ -765,21 +779,11 @@ func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 		}
 	}
 
-	driverRoot := driver.Root(driverInstallDirCtrPathFlag)
-
 	validateDriver := func(silent bool) error {
-		driverLibraryPath, err := driverRoot.GetDriverLibraryPath()
+		cmd, err := nvidiaSMICommand(ctx, driverInstallDirCtrPathFlag, nvidiaSMIArgs()...)
 		if err != nil {
-			return fmt.Errorf("failed to locate driver libraries: %w", err)
+			return err
 		}
-
-		nvidiaSMIPath, err := driverRoot.GetNvidiaSMIPath()
-		if err != nil {
-			return fmt.Errorf("failed to locate nvidia-smi: %w", err)
-		}
-		cmd := exec.Command(nvidiaSMIPath, nvidiaSMIArgs()...)
-		// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
-		cmd.Env = utils.SetEnvVar(os.Environ(), "LD_PRELOAD", utils.PrependPathListEnvvar("LD_PRELOAD", driverLibraryPath))
 		if !silent {
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
@@ -818,7 +822,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 		return driverInfo{}, fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
 	}
 
-	err = validateDriverContainer(silent, driverManagedByOperator)
+	err = validateDriverContainer(d.ctx, silent, driverManagedByOperator)
 	if err != nil {
 		return driverInfo{}, err
 	}

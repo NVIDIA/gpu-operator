@@ -3545,6 +3545,28 @@ func TestTransformNodeStatusExporter(t *testing.T) {
 					},
 				}),
 		},
+		{
+			description: "node status exporter with license reporting enabled",
+			ds:          NewDaemonset().WithContainer(corev1.Container{Name: "dummy"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				NodeStatusExporter: gpuv1.NodeStatusExporterSpec{
+					Repository: "nvcr.io/nvidia",
+					Image:      "gpu-operator",
+					Version:    "test",
+					Env:        []gpuv1.EnvVar{{Name: VGPULicenseStatusEnabledEnvName, Value: "true"}},
+				},
+			},
+			expectedDs: NewDaemonset().WithContainer(corev1.Container{
+				Name:            "dummy",
+				Image:           "nvcr.io/nvidia/gpu-operator:test",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{Name: DevicePluginEnabledEnvName, Value: "true"},
+					{Name: VGPULicenseStatusEnabledEnvName, Value: "true"},
+				},
+				SecurityContext: &corev1.SecurityContext{RunAsUser: rootUID},
+			}),
+		},
 	}
 
 	for _, tc := range testCases {

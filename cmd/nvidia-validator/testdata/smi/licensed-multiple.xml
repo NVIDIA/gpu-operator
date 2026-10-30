@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<!DOCTYPE nvidia_smi_log SYSTEM "nvsmi_device_v13.dtd">
+<nvidia_smi_log>
+  <timestamp>Thu Oct 29 21:56:28 2026</timestamp>
+  <driver_version>580.105.08</driver_version>
+  <attached_gpus>2</attached_gpus>
+  <gpu id="00000000:03:00.0">
+    <uuid>GPU-00000000-0000-0000-0000-000000000001</uuid>
+    <product_name>NVIDIA H100XM-80C</product_name>
+    <gpu_virtualization_mode>
+      <virtualization_mode>VGPU</virtualization_mode>
+      <host_vgpu_mode>N/A</host_vgpu_mode>
+      <vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+    </gpu_virtualization_mode>
+    <vgpu_software_licensed_product>
+      <licensed_product_name>NVIDIA Virtual Compute Server</licensed_product_name>
+      <license_status>Licensed (Expiry: 2026-10-30 21:26:9 GMT)</license_status>
+    </vgpu_software_licensed_product>
+  </gpu>
+  <gpu id="00000000:03:01.0">
+    <uuid>GPU-00000000-0000-0000-0000-000000000002</uuid>
+    <product_name>NVIDIA H100XM-80C</product_name>
+    <gpu_virtualization_mode>
+      <virtualization_mode>VGPU</virtualization_mode>
+      <host_vgpu_mode>N/A</host_vgpu_mode>
+      <vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+    </gpu_virtualization_mode>
+    <vgpu_software_licensed_product>
+      <licensed_product_name>NVIDIA Virtual Compute Server</licensed_product_name>
+      <license_status>Licensed (Expiry: 2026-10-30 21:26:9 GMT)</license_status>
+    </vgpu_software_licensed_product>
+  </gpu>
+</nvidia_smi_log>

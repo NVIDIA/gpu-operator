@@ -1,0 +1,108 @@
+<?xml version="1.0" ?>
+<!DOCTYPE nvidia_smi_log SYSTEM "nvsmi_device_v13.dtd">
+<nvidia_smi_log>
+	<timestamp>Mon Nov  2 22:26:12 2026</timestamp>
+	<driver_version>580.65.06</driver_version>
+	<cuda_version>13.0</cuda_version>
+	<attached_gpus>8</attached_gpus>
+	<gpu id="00000000:07:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780000</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>VGPU</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name>NVIDIA Virtual Compute Server</licensed_product_name>
+			<license_status>Licensed (Expiry: Not available)</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+	<gpu id="00000000:0F:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780001</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>VGPU</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name>NVIDIA Virtual Compute Server</licensed_product_name>
+			<license_status>Licensed (Expiry: ERR!)</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+	<gpu id="00000000:47:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780002</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>VGPU</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name>NVIDIA Virtual Compute Server</licensed_product_name>
+			<license_status>Licensed (Expiry: N/A)</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+	<gpu id="00000000:4E:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780003</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>Pass-Through</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name>NVIDIA Virtual Applications</licensed_product_name>
+			<license_status>Licensed (Expiry: N/A)</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+	<gpu id="00000000:87:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780004</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>Pass-Through</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name>NVIDIA RTX Virtual Workstation</licensed_product_name>
+			<license_status>Licensed (Expiry: 2027-3-4 5:6:7 GMT)</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+	<gpu id="00000000:90:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780005</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>Pass-Through</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+	</gpu>
+	<gpu id="00000000:B7:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780006</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>VGPU</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name></licensed_product_name>
+			<license_status>Unlicensed</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+	<gpu id="00000000:BD:00.0">
+		<product_name>NVIDIA A100-SXM4-40GB</product_name>
+		<uuid>GPU-12345678-1234-1234-1234-123456780007</uuid>
+		<gpu_virtualization_mode>
+			<virtualization_mode>None</virtualization_mode>
+			<host_vgpu_mode>N/A</host_vgpu_mode>
+			<vgpu_heterogeneous_mode>N/A</vgpu_heterogeneous_mode>
+		</gpu_virtualization_mode>
+		<vgpu_software_licensed_product>
+			<licensed_product_name>NVIDIA Virtual Applications</licensed_product_name>
+			<license_status>Licensed (Expiry: N/A)</license_status>
+		</vgpu_software_licensed_product>
+	</gpu>
+</nvidia_smi_log>

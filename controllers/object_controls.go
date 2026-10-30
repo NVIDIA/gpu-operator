@@ -129,6 +129,8 @@ const (
 	DCGMExporterPodUIDEnvName = "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID"
 	// DCGMExporterPodLabelAllowlistEnvName is the env name holding the exported pod label allowlist
 	DCGMExporterPodLabelAllowlistEnvName = "DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX"
+	// VGPULicenseStatusEnabledEnvName enables vGPU license reporting in node-status-exporter.
+	VGPULicenseStatusEnabledEnvName = "VGPU_LICENSE_STATUS_ENABLED"
 	// GPUDirectRDMAEnabledEnvName indicates if GPU direct RDMA is enabled through GPU operator
 	GPUDirectRDMAEnabledEnvName = "GPU_DIRECT_RDMA_ENABLED"
 	// UseHostMOFEDEnvName indicates if MOFED driver is pre-installed on the host
@@ -472,6 +474,35 @@ var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
 		return config.DCGMExporter.IsKubernetesPodMetadataEnabled() ||
 			dcgmExporterEnvEnablesPodMetadata(config.DCGMExporter.Env)
 	},
+	"nvidia-node-status-exporter-license": func(config *gpuv1.ClusterPolicySpec) bool {
+		return nodeStatusExporterEnvEnablesLicenseReporting(config.NodeStatusExporter.Env)
+	},
+}
+
+// nodeStatusExporterEnvEnablesLicenseReporting parses the value as the exporter's
+// bool flag does. The last value wins, as setContainerEnv applies them in order.
+func nodeStatusExporterEnvEnablesLicenseReporting(envs []gpuv1.EnvVar) bool {
+	enabled := false
+	for _, env := range envs {
+		if env.Name == VGPULicenseStatusEnabledEnvName {
+			enabled, _ = strconv.ParseBool(env.Value)
+		}
+	}
+	return enabled
+}
+
+// mergeStates reports NotReady if either state is NotReady, Ready if either is
+// Ready, and Disabled otherwise. A Disabled resource must not hold back its
+// siblings, because rbacGates disables one role while the state stays enabled.
+func mergeStates(a, b gpuv1.State) gpuv1.State {
+	switch {
+	case a == gpuv1.NotReady || b == gpuv1.NotReady:
+		return gpuv1.NotReady
+	case a == gpuv1.Ready || b == gpuv1.Ready:
+		return gpuv1.Ready
+	default:
+		return gpuv1.Disabled
+	}
 }
 
 func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
@@ -482,11 +513,25 @@ func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
 	return gate(config)
 }
 
-// ClusterRole creates ClusterRole resource
-func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
+// ClusterRoles creates the ClusterRole resources of a state. A ClusterRole that
+// rbacGates disables is deleted and does not affect the returned state.
+func ClusterRoles(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Disabled
+	for i := range n.resources[n.idx].ClusterRoles {
+		stat, err := createClusterRole(n, i)
+		if err != nil {
+			return stat, err
+		}
+		status = mergeStates(status, stat)
+	}
+	return status, nil
+}
+
+// createClusterRole creates a ClusterRole resource
+func createClusterRole(n ClusterPolicyController, clusterRoleIdx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].ClusterRole.DeepCopy()
+	obj := n.resources[state].ClusterRoles[clusterRoleIdx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
@@ -532,11 +577,26 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	return gpuv1.Ready, nil
 }
 
-// ClusterRoleBinding creates ClusterRoleBinding resource
-func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
+// ClusterRoleBindings creates the ClusterRoleBinding resources of a state. A
+// ClusterRoleBinding that rbacGates disables is deleted and does not affect the
+// returned state.
+func ClusterRoleBindings(n ClusterPolicyController) (gpuv1.State, error) {
+	status := gpuv1.Disabled
+	for i := range n.resources[n.idx].ClusterRoleBindings {
+		stat, err := createClusterRoleBinding(n, i)
+		if err != nil {
+			return stat, err
+		}
+		status = mergeStates(status, stat)
+	}
+	return status, nil
+}
+
+// createClusterRoleBinding creates a ClusterRoleBinding resource
+func createClusterRoleBinding(n ClusterPolicyController, clusterRoleBindingIdx int) (gpuv1.State, error) {
 	ctx := n.ctx
 	state := n.idx
-	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
+	obj := n.resources[state].ClusterRoleBindings[clusterRoleBindingIdx].DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
 	logger := n.logger.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)

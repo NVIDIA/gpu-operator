@@ -474,6 +474,15 @@ nodeStatusExporter:
   #version: ""
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
+  # With nodeStatusExporter.enabled=true, publish the vGPU license state of each
+  # GPU in the nvidia.com/vgpu-license Node annotation by adding:
+  #   - name: VGPU_LICENSE_STATUS_ENABLED
+  #     value: "true"
+  # The operator then creates a cluster-scoped ClusterRole/ClusterRoleBinding
+  # granting the exporter patch on nodes.
+  # The annotation contains the last published report; failed queries and
+  # disabling reporting leave it unchanged. It is not a readiness guarantee.
+  env: []
   resources: {}
   hostNetwork: false
 

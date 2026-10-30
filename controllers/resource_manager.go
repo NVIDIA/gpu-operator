@@ -50,8 +50,8 @@ type Resources struct {
 	ServiceAccount             corev1.ServiceAccount
 	Role                       rbacv1.Role
 	RoleBinding                rbacv1.RoleBinding
-	ClusterRole                rbacv1.ClusterRole
-	ClusterRoleBinding         rbacv1.ClusterRoleBinding
+	ClusterRoles               []rbacv1.ClusterRole
+	ClusterRoleBindings        []rbacv1.ClusterRoleBinding
 	ConfigMaps                 []corev1.ConfigMap
 	DaemonSet                  appsv1.DaemonSet
 	Deployment                 appsv1.Deployment
@@ -142,13 +142,23 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 			panicIfError(err)
 			ctrl = append(ctrl, RoleBinding)
 		case "ClusterRole":
-			_, _, err := s.Decode(m, nil, &res.ClusterRole)
+			clusterRole := rbacv1.ClusterRole{}
+			_, _, err := s.Decode(m, nil, &clusterRole)
 			panicIfError(err)
-			ctrl = append(ctrl, ClusterRole)
+			res.ClusterRoles = append(res.ClusterRoles, clusterRole)
+			// only add the ctrl function when the first ClusterRole is added for this component
+			if len(res.ClusterRoles) == 1 {
+				ctrl = append(ctrl, ClusterRoles)
+			}
 		case "ClusterRoleBinding":
-			_, _, err := s.Decode(m, nil, &res.ClusterRoleBinding)
+			clusterRoleBinding := rbacv1.ClusterRoleBinding{}
+			_, _, err := s.Decode(m, nil, &clusterRoleBinding)
 			panicIfError(err)
-			ctrl = append(ctrl, ClusterRoleBinding)
+			res.ClusterRoleBindings = append(res.ClusterRoleBindings, clusterRoleBinding)
+			// only add the ctrl function when the first ClusterRoleBinding is added for this component
+			if len(res.ClusterRoleBindings) == 1 {
+				ctrl = append(ctrl, ClusterRoleBindings)
+			}
 		case "ConfigMap":
 			cm := corev1.ConfigMap{}
 			_, _, err := s.Decode(m, nil, &cm)

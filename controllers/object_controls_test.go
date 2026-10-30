@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/yaml"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -1917,6 +1918,141 @@ func TestDCGMExporter(t *testing.T) {
 				t.Fatalf("error removing state %v:", err)
 			}
 			clusterPolicyController.idx--
+		})
+	}
+}
+
+func TestNodeStatusExporterEnvEnablesLicenseReporting(t *testing.T) {
+	env := func(name, value string) []gpuv1.EnvVar { return []gpuv1.EnvVar{{Name: name, Value: value}} }
+	for name, tc := range map[string]struct {
+		env  []gpuv1.EnvVar
+		want bool
+	}{
+		"unset":          {},
+		"true":           {env: env(VGPULicenseStatusEnabledEnvName, "true"), want: true},
+		"TRUE":           {env: env(VGPULicenseStatusEnabledEnvName, "TRUE"), want: true},
+		"1":              {env: env(VGPULicenseStatusEnabledEnvName, "1"), want: true},
+		"false":          {env: env(VGPULicenseStatusEnabledEnvName, "false")},
+		"empty":          {env: env(VGPULicenseStatusEnabledEnvName, "")},
+		"not a boolean":  {env: env(VGPULicenseStatusEnabledEnvName, "yes")},
+		"other variable": {env: env("OTHER", "true")},
+		"last value disables reporting": {
+			env: []gpuv1.EnvVar{{Name: VGPULicenseStatusEnabledEnvName, Value: "true"}, {Name: VGPULicenseStatusEnabledEnvName, Value: "false"}},
+		},
+		"last value enables reporting": {
+			env:  []gpuv1.EnvVar{{Name: VGPULicenseStatusEnabledEnvName, Value: "false"}, {Name: VGPULicenseStatusEnabledEnvName, Value: "true"}},
+			want: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, nodeStatusExporterEnvEnablesLicenseReporting(tc.env))
+		})
+	}
+}
+
+// The license role grants patch on nodes, so it exists only while the exporter
+// and license reporting are both enabled. The cases run in order against one
+// state.
+func TestNodeStatusExporterLicenseRBAC(t *testing.T) {
+	const baseName, licenseName = "nvidia-node-status-exporter", "nvidia-node-status-exporter-license"
+	controller := ClusterPolicyController{
+		ctx:    t.Context(),
+		client: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(),
+		scheme: scheme.Scheme,
+		logger: ctrl.Log.WithName("test"),
+	}
+	addState(&controller, filepath.Join(cfg.root, "assets/state-node-status-exporter"))
+
+	exists := func(obj client.Object, name string) bool {
+		t.Helper()
+		err := controller.client.Get(t.Context(), client.ObjectKey{Name: name}, obj)
+		if apierrors.IsNotFound(err) {
+			return false
+		}
+		require.NoError(t, err)
+		return true
+	}
+	licenseEnv := []gpuv1.EnvVar{{Name: VGPULicenseStatusEnabledEnvName, Value: "true"}}
+	for _, tc := range []struct {
+		name             string
+		exporterEnabled  *bool
+		env              []gpuv1.EnvVar
+		wantExporterRole bool
+		wantLicense      bool
+		wantState        gpuv1.State
+	}{
+		{name: "reporting off", exporterEnabled: new(true), wantExporterRole: true, wantState: gpuv1.Ready},
+		{name: "reporting on", exporterEnabled: new(true), env: licenseEnv, wantExporterRole: true, wantLicense: true, wantState: gpuv1.Ready},
+		{name: "reporting turned off again", exporterEnabled: new(true), wantExporterRole: true, wantState: gpuv1.Ready},
+		{name: "reporting reenabled before exporter disabled", exporterEnabled: new(true), env: licenseEnv, wantExporterRole: true, wantLicense: true, wantState: gpuv1.Ready},
+		{name: "exporter disabled", exporterEnabled: new(false), env: licenseEnv, wantState: gpuv1.Disabled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cp := clusterPolicy.DeepCopy()
+			cp.Spec.NodeStatusExporter.Enabled = tc.exporterEnabled
+			cp.Spec.NodeStatusExporter.Env = tc.env
+			controller.singleton = cp
+			roles, err := ClusterRoles(controller)
+			require.NoError(t, err)
+			bindings, err := ClusterRoleBindings(controller)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantState, roles)
+			require.Equal(t, tc.wantState, bindings)
+
+			require.Equal(t, tc.wantExporterRole, exists(&rbacv1.ClusterRole{}, baseName))
+			require.Equal(t, tc.wantExporterRole, exists(&rbacv1.ClusterRoleBinding{}, baseName))
+			require.Equal(t, tc.wantLicense, exists(&rbacv1.ClusterRole{}, licenseName))
+			licenseBinding := &rbacv1.ClusterRoleBinding{}
+			require.Equal(t, tc.wantLicense, exists(licenseBinding, licenseName))
+			if tc.wantLicense {
+				require.Equal(t, licenseName, licenseBinding.RoleRef.Name)
+				require.Len(t, licenseBinding.Subjects, 1)
+				require.Equal(t, baseName, licenseBinding.Subjects[0].Name, "the license role is bound to the exporter's ServiceAccount")
+			}
+		})
+	}
+}
+
+// The exporter's own role only reads Nodes. Patching is a separate role.
+func TestNodeStatusExporterRBACAssets(t *testing.T) {
+	for name, tc := range map[string]struct {
+		asset     string
+		wantVerbs []string
+	}{
+		"exporter":          {asset: "0300_clusterrole.yaml", wantVerbs: []string{"get", "list", "watch"}},
+		"license reporting": {asset: "0320_clusterrole_license.yaml", wantVerbs: []string{"patch"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join(cfg.root, "assets/state-node-status-exporter", tc.asset))
+			require.NoError(t, err)
+			var role rbacv1.ClusterRole
+			require.NoError(t, yaml.Unmarshal(data, &role))
+			var verbs []string
+			for _, rule := range role.Rules {
+				require.Equal(t, []string{""}, rule.APIGroups)
+				require.Equal(t, []string{"nodes"}, rule.Resources, "the role must not cover other resources, such as nodes/status")
+				verbs = append(verbs, rule.Verbs...)
+			}
+			require.ElementsMatch(t, tc.wantVerbs, verbs)
+		})
+	}
+}
+
+func TestMergeStates(t *testing.T) {
+	for name, tc := range map[string]struct {
+		a, b, want gpuv1.State
+	}{
+		"not ready and ready":    {a: gpuv1.NotReady, b: gpuv1.Ready, want: gpuv1.NotReady},
+		"ready and not ready":    {a: gpuv1.Ready, b: gpuv1.NotReady, want: gpuv1.NotReady},
+		"not ready and disabled": {a: gpuv1.NotReady, b: gpuv1.Disabled, want: gpuv1.NotReady},
+		"disabled and not ready": {a: gpuv1.Disabled, b: gpuv1.NotReady, want: gpuv1.NotReady},
+		"ready and disabled":     {a: gpuv1.Ready, b: gpuv1.Disabled, want: gpuv1.Ready},
+		"disabled and ready":     {a: gpuv1.Disabled, b: gpuv1.Ready, want: gpuv1.Ready},
+		"ready and ready":        {a: gpuv1.Ready, b: gpuv1.Ready, want: gpuv1.Ready},
+		"disabled and disabled":  {a: gpuv1.Disabled, b: gpuv1.Disabled, want: gpuv1.Disabled},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, mergeStates(tc.a, tc.b))
 		})
 	}
 }

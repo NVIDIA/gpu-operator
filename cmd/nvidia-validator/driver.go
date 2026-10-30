@@ -17,7 +17,13 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+
 	"github.com/NVIDIA/gpu-operator/internal/driver"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 // driverInfo contains information about an NVIDIA driver installation.
@@ -74,4 +80,23 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 		devRoot:           devRoot,
 		devRootCtrPath:    devRootCtrPath,
 	}
+}
+
+// nvidiaSMICommand returns a command that runs nvidia-smi from the driver installed
+// under driverRoot with args. It fails if nvidia-smi or libnvidia-ml.so.1 cannot
+// be found.
+func nvidiaSMICommand(ctx context.Context, driverRoot string, args ...string) (*exec.Cmd, error) {
+	root := driver.Root(driverRoot)
+	library, err := root.GetDriverLibraryPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to locate driver libraries: %w", err)
+	}
+	binary, err := root.GetNvidiaSMIPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to locate nvidia-smi: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, binary, args...)
+	// In order for nvidia-smi to run, we need to update LD_PRELOAD to include the path to libnvidia-ml.so.1.
+	cmd.Env = utils.SetEnvVar(os.Environ(), "LD_PRELOAD", utils.PrependPathListEnvvar("LD_PRELOAD", library))
+	return cmd, nil
 }
