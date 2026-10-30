@@ -108,6 +108,12 @@ spec:
               fieldPath: metadata.namespace
         - name: IMAGE_NAME
           value: {{ .DRADriver.ImagePath | quote }}
+        {{- if .DRADriver.Spec.ImagePullSecrets }}
+        # Comma-separated secret names propagated to the compute-domain-daemon
+        # DaemonSet pod specs created by the controller.
+        - name: CD_DAEMON_IMAGE_PULL_SECRET_NAMES
+          value: "{{- range $i, $s := .DRADriver.Spec.ImagePullSecrets }}{{ if $i }},{{ end }}{{ $s }}{{ end }}"
+        {{- end }}
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
         - name: LEADER_ELECTION_ENABLED
