@@ -331,6 +331,132 @@ func TestDRADriverHealthcheckDisabled(t *testing.T) {
 	assert.Nil(t, gpus.LivenessProbe)
 }
 
+func TestDRADriverHealthcheckPortCollision(t *testing.T) {
+	for name, tc := range map[string]struct {
+		computeDomainsEnabled bool
+		gpus                  *nvidiav1alpha1.DRADriverHealthcheckSpec
+		computeDomains        *nvidiav1alpha1.DRADriverHealthcheckSpec
+		wantErr               string
+	}{
+		"same explicit port": {
+			computeDomainsEnabled: true,
+			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
+			wantErr:               "both resolve to 52000",
+		},
+		// Only one field is set, yet it collides with the other container's default;
+		// this is why the check runs on resolved ports rather than the raw spec.
+		"gpus set to the computeDomains default": {
+			computeDomainsEnabled: true,
+			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(51515))},
+			wantErr:               "both resolve to 51515",
+		},
+		"computeDomains set to the gpus default": {
+			computeDomainsEnabled: true,
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(51516))},
+			wantErr:               "both resolve to 51516",
+		},
+		"different ports": {
+			computeDomainsEnabled: true,
+			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52001))},
+		},
+		"defaults do not collide": {
+			computeDomainsEnabled: true,
+		},
+		"computeDomains disabled ignores collision": {
+			gpus:           &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
+			computeDomains: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
+		},
+		"both health services disabled": {
+			computeDomainsEnabled: true,
+			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Enabled: new(false)},
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Enabled: new(false)},
+		},
+		// The enabled side deliberately uses the disabled side's default port: it must
+		// pass because a disabled service never binds.
+		"one health service disabled": {
+			computeDomainsEnabled: true,
+			gpus:                  &nvidiav1alpha1.DRADriverHealthcheckSpec{Enabled: new(false)},
+			computeDomains:        &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(51516))},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.DRADriver.ComputeDomains.Enabled = new(tc.computeDomainsEnabled)
+			cr.Spec.DRADriver.GPUs.KubeletPlugin.Healthcheck = tc.gpus
+			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck = tc.computeDomains
+
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				assert.ErrorContains(t, err, "spec.draDriver.gpus.kubeletPlugin.healthcheck.port")
+				assert.ErrorContains(t, err, "spec.draDriver.computeDomains.kubeletPlugin.healthcheck.port")
+				assert.Nil(t, objs)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotEmpty(t, objs)
+		})
+	}
+}
+
+func TestDRADriverKubeletPluginReservedEnv(t *testing.T) {
+	for name, tc := range map[string]struct {
+		computeDomainsEnabled bool
+		gpusEnv               []nvidiav1.EnvVar
+		computeDomainsEnv     []nvidiav1.EnvVar
+		wantErr               []string
+	}{
+		"gpus overrides HEALTHCHECK_PORT": {
+			gpusEnv: []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51515"}},
+			wantErr: []string{"spec.draDriver.gpus.kubeletPlugin.env", "HEALTHCHECK_PORT"},
+		},
+		// The typed ports stay at their distinct defaults, so validateHealthcheckPorts
+		// passes, yet the env entry moves gpus onto the computeDomains port.
+		"gpus overrides HEALTHCHECK_PORT onto the computeDomains port": {
+			computeDomainsEnabled: true,
+			gpusEnv:               []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51515"}},
+			wantErr:               []string{"spec.draDriver.gpus.kubeletPlugin.env", "HEALTHCHECK_PORT"},
+		},
+		"computeDomains overrides HEALTHCHECK_PORT": {
+			computeDomainsEnabled: true,
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51516"}},
+			wantErr:               []string{"spec.draDriver.computeDomains.kubeletPlugin.env", "HEALTHCHECK_PORT"},
+		},
+		// The second container is not rendered, so its env is never applied.
+		"computeDomains env ignored when disabled": {
+			computeDomainsEnv: []nvidiav1.EnvVar{{Name: "HEALTHCHECK_PORT", Value: "51516"}},
+		},
+		"unrelated env is allowed": {
+			computeDomainsEnabled: true,
+			gpusEnv:               []nvidiav1.EnvVar{{Name: "LOG_VERBOSITY", Value: "6"}},
+			computeDomainsEnv:     []nvidiav1.EnvVar{{Name: "ALT_PROC_DEVICES_PATH", Value: "/host/proc-devices"}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.DRADriver.ComputeDomains.Enabled = new(tc.computeDomainsEnabled)
+			cr.Spec.DRADriver.GPUs.KubeletPlugin.Env = tc.gpusEnv
+			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Env = tc.computeDomainsEnv
+
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			if len(tc.wantErr) > 0 {
+				require.Error(t, err)
+				for _, want := range tc.wantErr {
+					assert.ErrorContains(t, err, want)
+				}
+				assert.Nil(t, objs)
+				return
+			}
+			require.NoError(t, err)
+			assert.NotEmpty(t, objs)
+		})
+	}
+}
+
 func TestDRADriverRenderDRAUnsupported(t *testing.T) {
 	s := newTestDRAState(t)
 
