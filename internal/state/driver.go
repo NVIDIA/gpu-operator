@@ -548,6 +548,29 @@ func getDefaultStartupProbe(spec *nvidiav1alpha1.NVIDIADriverSpec) *nvidiav1alph
 	}
 }
 
+// applyStartupProbeDefaults fills unset (zero) fields of a user-specified startup probe with the operator
+// defaults. A partially specified startupProbe otherwise renders explicit zeros into the driver DaemonSet,
+// and the API server then substitutes the generic Kubernetes probe defaults (failureThreshold 3,
+// periodSeconds 10, timeoutSeconds 1) in place of the operator's longer driver-startup window, which can
+// restart-loop a driver that is still compiling. This mirrors setContainerProbe on the ClusterPolicy path.
+func applyStartupProbeDefaults(probe, defaults *nvidiav1alpha1.ContainerProbeSpec) {
+	if probe.InitialDelaySeconds == 0 {
+		probe.InitialDelaySeconds = defaults.InitialDelaySeconds
+	}
+	if probe.TimeoutSeconds == 0 {
+		probe.TimeoutSeconds = defaults.TimeoutSeconds
+	}
+	if probe.PeriodSeconds == 0 {
+		probe.PeriodSeconds = defaults.PeriodSeconds
+	}
+	if probe.SuccessThreshold == 0 {
+		probe.SuccessThreshold = defaults.SuccessThreshold
+	}
+	if probe.FailureThreshold == 0 {
+		probe.FailureThreshold = defaults.FailureThreshold
+	}
+}
+
 func getDriverImagePath(spec *nvidiav1alpha1.NVIDIADriverSpec, nodePool nodePool) (string, error) {
 	os := nodePool.osTag
 
@@ -595,6 +618,8 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 
 	if spec.StartupProbe == nil {
 		spec.StartupProbe = getDefaultStartupProbe(spec)
+	} else {
+		applyStartupProbeDefaults(spec.StartupProbe, getDefaultStartupProbe(spec))
 	}
 
 	spec.Labels = sanitizeDriverLabels(spec.Labels)

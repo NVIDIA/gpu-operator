@@ -418,6 +418,52 @@ func TestGetDriverSpecErrors(t *testing.T) {
 	})
 }
 
+func TestGetDriverSpecStartupProbeDefaults(t *testing.T) {
+	newDriverCR := func(probe *nvidiav1alpha1.ContainerProbeSpec) *nvidiav1alpha1.NVIDIADriver {
+		return &nvidiav1alpha1.NVIDIADriver{
+			ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+			Spec: nvidiav1alpha1.NVIDIADriverSpec{
+				DriverType: nvidiav1alpha1.GPU,
+				Repository: "nvcr.io/nvidia",
+				Image:      "driver",
+				Version:    "535.104.05",
+				Manager: nvidiav1alpha1.DriverManagerSpec{
+					Repository: "nvcr.io/nvidia/cloud-native",
+					Image:      "k8s-driver-manager",
+					Version:    "v0.6.0",
+				},
+				StartupProbe: probe,
+			},
+		}
+	}
+
+	testCases := map[string]struct {
+		startupProbe *nvidiav1alpha1.ContainerProbeSpec
+		expected     *nvidiav1alpha1.ContainerProbeSpec
+	}{
+		"nil startup probe uses all operator defaults": {
+			startupProbe: nil,
+			expected: &nvidiav1alpha1.ContainerProbeSpec{
+				InitialDelaySeconds: 60, TimeoutSeconds: 60, PeriodSeconds: 10, SuccessThreshold: 1, FailureThreshold: 120,
+			},
+		},
+		"partial startup probe keeps set fields and defaults the rest": {
+			startupProbe: &nvidiav1alpha1.ContainerProbeSpec{InitialDelaySeconds: 120},
+			expected: &nvidiav1alpha1.ContainerProbeSpec{
+				InitialDelaySeconds: 120, TimeoutSeconds: 60, PeriodSeconds: 10, SuccessThreshold: 1, FailureThreshold: 120,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			spec, err := getDriverSpec(newDriverCR(tc.startupProbe), nodePool{osTag: "ubuntu22.04"})
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, spec.Spec.StartupProbe)
+		})
+	}
+}
+
 func TestHandleDefaultImagesInObjectsManagerImageSet(t *testing.T) {
 	scheme := driverTestScheme(t)
 	driverState := newTestStateDriver(t, newDriverFakeClient(scheme), scheme)
