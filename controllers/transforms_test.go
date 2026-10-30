@@ -423,7 +423,7 @@ func TestTransformForRuntime(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
-						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir, MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)},
 					},
 				}),
 		},
@@ -457,7 +457,7 @@ func TestTransformForRuntime(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
-						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir, MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)},
 					},
 				}),
 		},
@@ -491,7 +491,7 @@ func TestTransformForRuntime(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: DefaultRuntimeConfigTargetDir},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
-						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "containerd-socket", MountPath: DefaultRuntimeSocketTargetDir, MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)},
 					},
 				}),
 		},
@@ -535,7 +535,7 @@ func TestTransformForRuntime(t *testing.T) {
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "docker-config", MountPath: DefaultRuntimeConfigTargetDir},
-						{Name: "docker-socket", MountPath: DefaultRuntimeSocketTargetDir},
+						{Name: "docker-socket", MountPath: DefaultRuntimeSocketTargetDir, MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)},
 					},
 				}),
 		},
@@ -934,7 +934,7 @@ func TestTransformToolkit(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
-						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/", MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
@@ -1014,7 +1014,7 @@ func TestTransformToolkit(t *testing.T) {
 					VolumeMounts: []corev1.VolumeMount{
 						{Name: "containerd-config", MountPath: "/runtime/config-dir/"},
 						{Name: "containerd-drop-in-config", MountPath: "/runtime/config-dir.d/"},
-						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/"},
+						{Name: "containerd-socket", MountPath: "/runtime/sock-dir/", MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)},
 					},
 				}).
 				WithHostPathVolume("containerd-config", "/var/lib/rancher/k3s/agent/etc/containerd", ptr.To(corev1.HostPathDirectoryOrCreate)).
