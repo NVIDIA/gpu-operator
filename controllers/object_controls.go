@@ -3271,10 +3271,22 @@ func getSanitizedKernelVersion(kernelVersion string) string {
 	return strings.ToLower(sanitizedVersion)
 }
 
+// kernelSuffixForPrecompiledDaemonSet is the kernel portion of a precompiled
+// driver DaemonSet name. It rewrites '_' so the result is a legal name, and
+// it keeps architecture and page-size tokens. getSanitizedKernelVersion drops
+// those tokens, but the node selector and the image tag keep the raw kernel,
+// so kernels that sanitize together still need different objects.
+func kernelSuffixForPrecompiledDaemonSet(kernelVersion string) string {
+	return strings.Trim(strings.ToLower(strings.ReplaceAll(kernelVersion, "_", ".")), ".")
+}
+
+func precompiledDriverDaemonSetName(kernelVersion, nodeOS string) string {
+	return commonDriverDaemonsetName + "-" + kernelSuffixForPrecompiledDaemonSet(kernelVersion) + "-" + nodeOS
+}
+
 func transformPrecompiledDriverDaemonset(obj *appsv1.DaemonSet, n ClusterPolicyController) (err error) {
-	sanitizedVersion := getSanitizedKernelVersion(n.currentKernelVersion)
 	// prepare the DaemonSet to be kernel-version specific
-	obj.Name += "-" + sanitizedVersion + "-" + n.kernelVersionMap[n.currentKernelVersion]
+	obj.Name = precompiledDriverDaemonSetName(n.currentKernelVersion, n.kernelVersionMap[n.currentKernelVersion])
 
 	// add unique labels for each kernel-version specific Daemonset
 	obj.Labels[precompiledIdentificationLabelKey] = precompiledIdentificationLabelValue
@@ -4376,7 +4388,9 @@ func precompiledDriverDaemonsets(ctx context.Context, n ClusterPolicyController)
 	}
 
 	n.logger.V(1).Info("preparing pre-compiled driver daemonsets")
+	desired := make(map[string]struct{}, len(n.kernelVersionMap))
 	for kernelVersion, os := range n.kernelVersionMap {
+		desired[precompiledDriverDaemonSetName(kernelVersion, os)] = struct{}{}
 		// set current kernel version
 		n.currentKernelVersion = kernelVersion
 
@@ -4394,9 +4408,41 @@ func precompiledDriverDaemonsets(ctx context.Context, n ClusterPolicyController)
 		}
 	}
 
+	// A name that only used the arch-stripped kernel is not in desired.
+	// Leave it in place when this pass failed to create the replacements.
+	if len(errs) == 0 && len(desired) > 0 {
+		if err := n.deleteUndesiredPrecompiledDaemonsets(ctx, desired); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	// reset current kernel version
 	n.currentKernelVersion = ""
 	return overallState, errs
+}
+
+func (n ClusterPolicyController) deleteUndesiredPrecompiledDaemonsets(ctx context.Context, desired map[string]struct{}) error {
+	list := &appsv1.DaemonSetList{}
+	err := n.client.List(ctx, list, client.MatchingLabels{
+		precompiledIdentificationLabelKey: precompiledIdentificationLabelValue,
+	})
+	if err != nil {
+		return fmt.Errorf("list precompiled driver daemonsets: %w", err)
+	}
+	for i := range list.Items {
+		ds := &list.Items[i]
+		if _, ok := desired[ds.Name]; ok {
+			continue
+		}
+		if !strings.HasPrefix(ds.Name, commonDriverDaemonsetName) {
+			continue
+		}
+		n.logger.Info("Deleting precompiled driver DaemonSet that does not match a current kernel", "Name", ds.Name)
+		if err := n.client.Delete(ctx, ds); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("delete precompiled driver daemonset %s: %w", ds.Name, err)
+		}
+	}
+	return nil
 }
 
 // ocpDriverToolkitDaemonSets goes through all the RHCOS versions
