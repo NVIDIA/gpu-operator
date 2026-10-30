@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.13.0
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
-	github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494
+	github.com/NVIDIA/k8s-operator-libs v0.0.0-20261020171813-42ee2fff224f
 	github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc

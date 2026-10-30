@@ -18,8 +18,8 @@ github.com/NVIDIA/go-nvlib v0.13.0 h1:veqetT7p2m+u7yPVAtXQ/nLAqotTdZF1+RzpLd1Yci
 github.com/NVIDIA/go-nvlib v0.13.0/go.mod h1:OmA7IhiBevXA4jUElFQjwmAZJLqrIAofyyn9MvRcz7s=
 github.com/NVIDIA/k8s-kata-manager v0.2.3 h1:d5+gRFqU5el/fKMXhHUaPY7haj+dbHL4nDsO/q05LBo=
 github.com/NVIDIA/k8s-kata-manager v0.2.3/go.mod h1:xx5OUiMsHyKbyX0JjKHqAftvqS8vx00LFn/5EaMdtB4=
-github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494 h1:j+tWK79l9AouBulQps7rxILLhy2fWYcEhH4zgYjth/o=
-github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494/go.mod h1:L+aiCiTKN63AX9SWz/F8pv9Jw9FIfI+dAEr7VA+KowE=
+github.com/NVIDIA/k8s-operator-libs v0.0.0-20261020171813-42ee2fff224f h1:UeAm5zDax07lYEl4cpJMO29QQusgsztdCj27LTI1IVM=
+github.com/NVIDIA/k8s-operator-libs v0.0.0-20261020171813-42ee2fff224f/go.mod h1:TfactzFEcVt03/Qi40SkwOawkVVTXfNZJvhkS7hzTaM=
 github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972 h1:BtGX8wKW8P8jkxT7B3arAVVV+x6vZSven3HisAGKcOE=
 github.com/NVIDIA/nvidia-container-toolkit v1.20.2-0.20261028213818-2251bb91d972/go.mod h1:lEnnLR31EH4EEy46cT4a3KO6jF1seyk15MYcMjPCT58=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=

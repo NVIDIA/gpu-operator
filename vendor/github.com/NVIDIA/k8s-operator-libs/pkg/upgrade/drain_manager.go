@@ -96,11 +96,6 @@ func (m *DrainManagerImpl) ScheduleNodesDrain(ctx context.Context, drainConfig *
 	}
 
 	for _, node := range drainConfig.Nodes {
-		// We need to shadow the loop variable or initialize some other one with its value
-		// to avoid concurrency issues when launching goroutines.
-		// If a loop variable is used as it is, all/most goroutines, spawned inside this loop,
-		// will use the 'node' value of the last item in drainConfig.Nodes
-		node := node
 		if !m.drainingNodes.Has(node.Name) {
 			m.log.V(consts.LogLevelInfo).Info("Schedule drain for node", "node", node.Name)
 			logEvent(m.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(), "Scheduling drain of the node")
