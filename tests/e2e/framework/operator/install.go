@@ -87,7 +87,7 @@ func NewInstall(chartValues ...string) *Install {
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if install.Clients.Kube != nil {
-			install.failureLogsSaved = saveLogsOnFailure(ctx, install.Clients, TestContext.OperatorNamespace)
+			install.failureLogsSaved = saveLogsOnFailure(ctx, install.Clients, TestContext.OperatorNamespace, WorkloadNamespace)
 		}
 	})
 
@@ -98,14 +98,14 @@ func (install *Install) uninstall(ctx context.Context) {
 	ginkgo.GinkgoHelper()
 
 	if !install.failureLogsSaved {
-		saveLogsOnFailure(ctx, install.Clients, TestContext.OperatorNamespace)
+		saveLogsOnFailure(ctx, install.Clients, TestContext.OperatorNamespace, WorkloadNamespace)
 	}
 
 	var cleanupErrs []error
 	if err := install.Operator.Uninstall(ctx, install.releaseName); err != nil {
 		cleanupErrs = append(cleanupErrs, fmt.Errorf("failed to uninstall release %s: %w", install.releaseName, err))
 		if TestContext.LogDir != "" {
-			saveLogs(ctx, install.Clients, filepath.Join(containerLogDir(), "uninstall"), TestContext.OperatorNamespace)
+			saveLogs(ctx, install.Clients, filepath.Join(containerLogDir(), "uninstall"), TestContext.OperatorNamespace, WorkloadNamespace)
 		}
 	}
 

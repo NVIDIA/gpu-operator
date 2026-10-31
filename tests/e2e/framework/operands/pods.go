@@ -31,6 +31,7 @@ import (
 
 const (
 	OperandReadyTimeout = 45 * time.Minute
+	podDeletionTimeout  = 45 * time.Minute
 )
 
 func WaitForPodsReady(ctx context.Context, clients e2eoperator.Clients, selector string) {
@@ -43,5 +44,14 @@ func WaitForPodsReady(ctx context.Context, clients e2eoperator.Clients, selector
 			g.Expect(helpers.IsPodReady(&pod)).To(gomega.BeTrue(), "pod %s is not ready", pod.Name)
 			g.Expect(pod.DeletionTimestamp).To(gomega.BeNil(), "pod %s is terminating", pod.Name)
 		}
+	})
+}
+
+func WaitForPodsDeleted(ctx context.Context, clients e2eoperator.Clients, selector string) {
+	ginkgo.GinkgoHelper()
+	framework.WaitFor(ctx, podDeletionTimeout, fmt.Sprintf("waiting for pods %q in %s to be deleted", selector, e2eoperator.TestContext.OperatorNamespace), func(g gomega.Gomega) {
+		pods, err := clients.Pods.List(ctx, e2eoperator.TestContext.OperatorNamespace, selector)
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(pods).To(gomega.BeEmpty(), "pods matching %q still exist", selector)
 	})
 }

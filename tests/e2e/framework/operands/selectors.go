@@ -29,6 +29,13 @@ var DefaultOperandSelectors = []string{
 	AppSelector("nvidia-operator-validator"),
 }
 
+var DefaultRestartCheckedOperandSelectors = []string{
+	helpers.DriverComponentSelector,
+	AppSelector("nvidia-container-toolkit-daemonset"),
+	AppSelector("nvidia-device-plugin-daemonset"),
+	AppSelector("gpu-feature-discovery"),
+}
+
 func AppSelector(app string) string {
 	return "app=" + app
 }

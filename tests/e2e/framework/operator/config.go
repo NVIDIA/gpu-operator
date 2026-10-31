@@ -24,7 +24,9 @@ import (
 )
 
 const (
-	TestNamePrefix = "gpu-operator-e2e"
+	TestNamePrefix    = "gpu-operator-e2e"
+	WorkloadNamespace = "default"
+	ClusterPolicyName = "cluster-policy"
 )
 
 type TestContextType struct {
