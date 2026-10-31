@@ -18,12 +18,16 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 type NodeClient struct {
@@ -37,20 +41,18 @@ func NewNodeClient(client kubernetes.Interface) *NodeClient {
 }
 
 func (h *NodeClient) LabelNode(ctx context.Context, nodeName, key, value string) error {
-	node, err := h.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]string{key: value},
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get node: %w", err)
+		return fmt.Errorf("failed to build the label patch for node %s: %w", nodeName, err)
 	}
 
-	if node.Labels == nil {
-		node.Labels = make(map[string]string)
-	}
-
-	node.Labels[key] = value
-
-	_, err = h.client.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.client.CoreV1().Nodes().Patch(ctx, nodeName, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to update node: %w", err)
+		return fmt.Errorf("failed to label node %s with %s=%s: %w", nodeName, key, value, err)
 	}
 
 	return nil
@@ -89,6 +91,10 @@ func (h *NodeClient) GetNodesByLabel(ctx context.Context, labelKey, labelValue s
 	return nodeList.Items, nil
 }
 
+func (h *NodeClient) ListGPUNodes(ctx context.Context) ([]corev1.Node, error) {
+	return h.GetNodesByLabel(ctx, consts.GPUPresentLabel, "true")
+}
+
 func (h *NodeClient) ListNodes(ctx context.Context) ([]corev1.Node, error) {
 	nodeList, err := h.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -106,7 +112,7 @@ func (h *NodeClient) LabelAllNodes(ctx context.Context, key, value string) error
 
 	for _, node := range nodes {
 		if err := h.LabelNode(ctx, node.Name, key, value); err != nil {
-			return fmt.Errorf("failed to label node %s: %w", node.Name, err)
+			return err
 		}
 	}
 

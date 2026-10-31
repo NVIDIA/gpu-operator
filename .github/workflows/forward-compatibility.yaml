@@ -16,7 +16,7 @@ name: Forward Compatibility
 
 on:
   schedule:
-    - cron: '17 4 * * 1'
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -92,6 +92,7 @@ jobs:
       operator_version: ${{ needs.find-main-chart.outputs.operator_version }}
       chart_reference: ${{ needs.find-main-chart.outputs.chart_reference }}
       chart_version: ${{ needs.find-main-chart.outputs.chart_version }}
+      use_ginkgo: true
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

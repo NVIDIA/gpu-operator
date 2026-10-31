@@ -39,26 +39,30 @@ func NewDaemonSetClient(client kubernetes.Interface) *DaemonSetClient {
 }
 
 func (h *DaemonSetClient) GetByLabel(ctx context.Context, namespace, labelKey, labelValue string) (*appsv1.DaemonSet, error) {
-	labelSelector := labels.SelectorFromSet(map[string]string{
+	daemonSets, err := h.List(ctx, namespace, labels.SelectorFromSet(map[string]string{
 		labelKey: labelValue,
-	}).String()
-
-	daemonSetList, err := h.client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
+	}).String())
 	if err != nil {
-		return nil, fmt.Errorf("failed to list DaemonSets: %w", err)
+		return nil, err
 	}
 
-	if len(daemonSetList.Items) == 0 {
+	if len(daemonSets) == 0 {
 		return nil, fmt.Errorf("no DaemonSet found with label %s=%s", labelKey, labelValue)
 	}
 
-	if len(daemonSetList.Items) > 1 {
+	if len(daemonSets) > 1 {
 		return nil, fmt.Errorf("multiple DaemonSets found with label %s=%s", labelKey, labelValue)
 	}
 
-	return &daemonSetList.Items[0], nil
+	return &daemonSets[0], nil
+}
+
+func (h *DaemonSetClient) List(ctx context.Context, namespace, selector string) ([]appsv1.DaemonSet, error) {
+	daemonSetList, err := h.client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list DaemonSets %q in namespace %s: %w", selector, namespace, err)
+	}
+	return daemonSetList.Items, nil
 }
 
 func (h *DaemonSetClient) Get(ctx context.Context, namespace, name string) (*appsv1.DaemonSet, error) {
@@ -79,28 +83,6 @@ func (h *DaemonSetClient) WaitForReady(ctx context.Context, namespace, name stri
 
 		return false, nil
 	})
-}
-
-func (h *DaemonSetClient) IsReady(ctx context.Context, namespace, name string) (bool, error) {
-	daemonSet, err := h.Get(ctx, namespace, name)
-	if err != nil {
-		return false, err
-	}
-
-	return daemonSet.Status.NumberReady == daemonSet.Status.DesiredNumberScheduled && daemonSet.Status.NumberReady > 0, nil
-}
-
-func (h *DaemonSetClient) GetImage(ctx context.Context, namespace, name string) (string, error) {
-	daemonSet, err := h.Get(ctx, namespace, name)
-	if err != nil {
-		return "", fmt.Errorf("failed to get DaemonSet: %w", err)
-	}
-
-	if len(daemonSet.Spec.Template.Spec.Containers) == 0 {
-		return "", fmt.Errorf("DaemonSet has no containers")
-	}
-
-	return daemonSet.Spec.Template.Spec.Containers[0].Image, nil
 }
 
 func (h *DaemonSetClient) CheckNoRestarts(ctx context.Context, namespace, name string) error {

@@ -14,8 +14,10 @@
 # limitations under the License.
 **/
 
-package e2e
+package operator
 
-const (
-	e2eTestPrefix = "gpu-operator-e2e"
-)
+import "github.com/onsi/ginkgo/v2"
+
+func Describe(area, text string, args ...any) bool {
+	return ginkgo.Describe(TestNamePrefix+"-"+text, append([]any{ginkgo.Label(area)}, args...)...)
+}
