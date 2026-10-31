@@ -18,10 +18,15 @@ package framework
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const waitForPollInterval = 5 * time.Second
@@ -30,4 +35,12 @@ func WaitFor(ctx context.Context, timeout time.Duration, description string, che
 	ginkgo.GinkgoHelper()
 	ginkgo.By(description)
 	gomega.Eventually(ctx, check).WithTimeout(timeout).WithPolling(waitForPollInterval).Should(gomega.Succeed())
+}
+
+func WaitForPodNotFound(ctx context.Context, kubeClient kubernetes.Interface, namespace, podName string, timeout time.Duration) {
+	ginkgo.GinkgoHelper()
+	WaitFor(ctx, timeout, fmt.Sprintf("waiting for pod %s/%s to be deleted", namespace, podName), func(g gomega.Gomega) {
+		_, err := kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+		g.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, "a NotFound error"))
+	})
 }
