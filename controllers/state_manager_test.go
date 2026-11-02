@@ -361,6 +361,84 @@ func TestIsValidWorkloadConfig(t *testing.T) {
 	}
 }
 
+func TestGetDefaultWorkloadConfig(t *testing.T) {
+	tests := map[string]struct {
+		sandboxWorkloads gpuv1.SandboxWorkloadsSpec
+		want             string
+	}{
+		"sandbox workloads unset": {
+			want: gpuWorkloadConfigContainer,
+		},
+		"sandbox workloads disabled ignores defaultWorkload": {
+			sandboxWorkloads: gpuv1.SandboxWorkloadsSpec{Enabled: new(false), DefaultWorkload: gpuWorkloadConfigVMPassthrough},
+			want:             gpuWorkloadConfigContainer,
+		},
+		"sandbox workloads enabled without defaultWorkload": {
+			sandboxWorkloads: gpuv1.SandboxWorkloadsSpec{Enabled: new(true)},
+			want:             gpuWorkloadConfigContainer,
+		},
+		"sandbox workloads enabled with vm-passthrough": {
+			sandboxWorkloads: gpuv1.SandboxWorkloadsSpec{Enabled: new(true), DefaultWorkload: gpuWorkloadConfigVMPassthrough},
+			want:             gpuWorkloadConfigVMPassthrough,
+		},
+		"sandbox workloads enabled with vm-vgpu": {
+			sandboxWorkloads: gpuv1.SandboxWorkloadsSpec{Enabled: new(true), DefaultWorkload: gpuWorkloadConfigVMVgpu},
+			want:             gpuWorkloadConfigVMVgpu,
+		},
+		"sandbox workloads enabled with invalid defaultWorkload": {
+			sandboxWorkloads: gpuv1.SandboxWorkloadsSpec{Enabled: new(true), DefaultWorkload: "invalid"},
+			want:             gpuWorkloadConfigContainer,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, getDefaultWorkloadConfig(&tc.sandboxWorkloads))
+		})
+	}
+}
+
+func TestGetWorkloadConfig(t *testing.T) {
+	tests := map[string]struct {
+		labels         map[string]string
+		sandboxEnabled bool
+		want           string
+		wantErr        bool
+	}{
+		"sandbox disabled ignores label and default": {
+			labels: map[string]string{gpuWorkloadConfigLabelKey: gpuWorkloadConfigVMPassthrough},
+			want:   gpuWorkloadConfigContainer,
+		},
+		"valid label": {
+			labels:         map[string]string{gpuWorkloadConfigLabelKey: gpuWorkloadConfigVMVgpu},
+			sandboxEnabled: true,
+			want:           gpuWorkloadConfigVMVgpu,
+		},
+		"missing label uses default": {
+			labels:         map[string]string{},
+			sandboxEnabled: true,
+			want:           gpuWorkloadConfigVMPassthrough,
+			wantErr:        true,
+		},
+		"invalid label uses default": {
+			labels:         map[string]string{gpuWorkloadConfigLabelKey: "invalid"},
+			sandboxEnabled: true,
+			want:           gpuWorkloadConfigVMPassthrough,
+			wantErr:        true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := getWorkloadConfig(tc.labels, tc.sandboxEnabled, gpuWorkloadConfigVMPassthrough)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestHasOperandsDisabled(t *testing.T) {
 	tests := []struct {
 		labels map[string]string

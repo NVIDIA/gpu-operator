@@ -358,7 +358,7 @@ func (r *ClusterPolicyReconciler) enqueueAllClusterPolicies(ctx context.Context)
 	return cpToRec
 }
 
-func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
+func addWatchNewGPUNode(ctx context.Context, r *ClusterPolicyReconciler, c controller.Controller, mgr ctrl.Manager) error {
 	// Define a mapping from the Node object in the event to one or more
 	// ClusterPolicy objects to Reconcile
 	mapFn := func(ctx context.Context, n *corev1.Node) []reconcile.Request {
@@ -382,9 +382,10 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			gpuCommonLabelAdded := !hasCommonGPULabel(oldLabels) && hasCommonGPULabel(newLabels)
 			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
 
-			oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
-			newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
-			gpuWorkloadConfigLabelChanged := oldGPUWorkloadConfig != newGPUWorkloadConfig
+			gpuWorkloadConfigLabelChanged, err := gpuWorkloadConfigChanged(ctx, r, oldLabels, newLabels)
+			if err != nil {
+				r.Log.Error(err, "failed to resolve GPU workload config for node label update", "name", nodeName)
+			}
 
 			oldOSTreeLabel := oldLabels[nfdOSTreeVersionLabelKey]
 			newOSTreeLabel := newLabels[nfdOSTreeVersionLabelKey]
@@ -478,7 +479,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 	}
 
 	// Watch for changes to Node labels and requeue the owner ClusterPolicy
-	err = addWatchNewGPUNode(r, c, mgr)
+	err = addWatchNewGPUNode(ctx, r, c, mgr)
 	if err != nil {
 		return err
 	}
