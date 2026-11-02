@@ -4065,11 +4065,12 @@ func TestTransformVGPUManager(t *testing.T) {
 	mockClient := fake.NewFakeClient(node, kernelModuleConfigMap)
 
 	testCases := []struct {
-		description   string
-		daemonset     Daemonset
-		cpSpec        *gpuv1.ClusterPolicySpec
-		client        client.Client
-		errorExpected bool
+		description      string
+		daemonset        Daemonset
+		cpSpec           *gpuv1.ClusterPolicySpec
+		client           client.Client
+		ocpDriverToolkit OpenShiftDriverToolkit
+		errorExpected    bool
 	}{
 		{
 			description: "transform vgpu manager with kernel module config",
@@ -4096,6 +4097,60 @@ func TestTransformVGPUManager(t *testing.T) {
 			client:        mockClient,
 			errorExpected: false,
 		},
+		{
+			description: "transform vgpu manager with kernel module config and openshift driver toolkit",
+			daemonset: Daemonset{
+				&appsv1.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-ds",
+						Namespace: "test-ns",
+						Labels:    map[string]string{},
+					},
+					Spec: appsv1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{},
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{},
+							},
+							Spec: corev1.PodSpec{
+								NodeSelector: map[string]string{},
+							},
+						},
+					},
+				},
+			}.
+				WithInitContainer(corev1.Container{Name: "k8s-driver-manager"}).
+				WithContainer(corev1.Container{Name: "nvidia-vgpu-manager-ctr"}).
+				WithContainer(corev1.Container{Name: "openshift-driver-toolkit-ctr"}),
+			cpSpec: &gpuv1.ClusterPolicySpec{
+				VGPUManager: gpuv1.VGPUManagerSpec{
+					Repository:      "nvcr.io/nvidia",
+					Image:           "vgpu-manager",
+					Version:         "550.90.07",
+					ImagePullPolicy: "IfNotPresent",
+					DriverManager: gpuv1.DriverManagerSpec{
+						Repository:      "nvcr.io/nvidia/cloud-native",
+						Image:           "k8s-driver-manager",
+						ImagePullPolicy: "IfNotPresent",
+						Version:         "v0.8.0",
+					},
+					KernelModuleConfig: &gpuv1.KernelModuleConfigSpec{
+						Name: "vgpu-kernel-module-config",
+					},
+				},
+			},
+			client: mockClient,
+			ocpDriverToolkit: OpenShiftDriverToolkit{
+				enabled:             true,
+				currentRhcosVersion: "413.92.202304252344-0",
+				rhcosDriverToolkitImages: map[string]string{
+					"413.92.202304252344-0": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:abc123",
+				},
+			},
+			errorExpected: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -4104,6 +4159,7 @@ func TestTransformVGPUManager(t *testing.T) {
 				logger:            ctrl.Log.WithName("test"),
 				client:            tc.client,
 				operatorNamespace: "test-ns",
+				ocpDriverToolkit:  tc.ocpDriverToolkit,
 			}
 			err := TransformVGPUManager(tc.daemonset.DaemonSet, tc.cpSpec, ctrl)
 			if tc.errorExpected {
@@ -4111,19 +4167,13 @@ func TestTransformVGPUManager(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			// Verify only the vgpu-manager container has the kernel module config
-			container := findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
-			require.NotNil(t, container)
-			require.Len(t, container.VolumeMounts, 1)
-			require.Equal(t, corev1.VolumeMount{
+			expectedVolumeMount := corev1.VolumeMount{
 				Name:      "vgpu-kernel-module-config",
 				ReadOnly:  true,
 				MountPath: "/drivers/nvidia.conf",
 				SubPath:   "nvidia.conf",
-			}, container.VolumeMounts[0])
-			// Verify the ConfigMap volume is added
-			require.Len(t, tc.daemonset.Spec.Template.Spec.Volumes, 1)
-			require.Equal(t, corev1.Volume{
+			}
+			expectedVolume := corev1.Volume{
 				Name: "vgpu-kernel-module-config",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -4138,7 +4188,21 @@ func TestTransformVGPUManager(t *testing.T) {
 						},
 					},
 				},
-			}, tc.daemonset.Spec.Template.Spec.Volumes[0])
+			}
+			// Verify the vgpu-manager container has the kernel module config
+			container := findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "nvidia-vgpu-manager-ctr")
+			require.NotNil(t, container)
+			require.Contains(t, container.VolumeMounts, expectedVolumeMount)
+			if tc.ocpDriverToolkit.enabled {
+				dtkContainer := findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr")
+				require.NotNil(t, dtkContainer)
+				require.Contains(t, dtkContainer.VolumeMounts, expectedVolumeMount)
+			} else {
+				require.Len(t, container.VolumeMounts, 1)
+				require.Nil(t, findContainerByName(tc.daemonset.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr"))
+			}
+			// Verify the ConfigMap volume is added
+			require.Contains(t, tc.daemonset.Spec.Template.Spec.Volumes, expectedVolume)
 		})
 	}
 }

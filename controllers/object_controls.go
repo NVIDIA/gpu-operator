@@ -3861,6 +3861,11 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 			return fmt.Errorf("failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		if n.ocpDriverToolkit.enabled {
+			if driverToolkitContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr"); driverToolkitContainer != nil {
+				driverToolkitContainer.VolumeMounts = append(driverToolkitContainer.VolumeMounts, volumeMounts...)
+			}
+		}
 		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.VGPUManager.KernelModuleConfig.Name, itemsToInclude))
 	}
 
