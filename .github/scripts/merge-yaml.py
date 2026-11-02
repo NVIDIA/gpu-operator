@@ -16,8 +16,23 @@
 
 import argparse
 import pathlib
+import re
 
 import yaml
+
+
+class NumericStringQuotingDumper(yaml.SafeDumper):
+    pass
+
+
+# Helm reads values.yaml with YAML 1.2 rules, which treat short commit hashes such as
+# 08013248 or 12345e67, and 0o-prefixed octal, as numbers; PyYAML follows YAML 1.1 and
+# writes them unquoted.
+NumericStringQuotingDumper.add_implicit_resolver(
+    "tag:yaml.org,2002:float",
+    re.compile(r"^[-+]?(0[oO][0-7_]+|(\.[0-9]+|[0-9]+(\.[0-9]*)?)([eE][-+]?[0-9]+)?)$"),
+    list("-+.0123456789"),
+)
 
 
 def load_yaml(path):
@@ -45,7 +60,13 @@ def main():
 
     merged = merge_yaml(load_yaml(args.base), load_yaml(args.override))
     with args.output.open("w") as f:
-        yaml.safe_dump(merged, f, default_flow_style=False, sort_keys=False)
+        yaml.dump(
+            merged,
+            f,
+            Dumper=NumericStringQuotingDumper,
+            default_flow_style=False,
+            sort_keys=False,
+        )
 
     print(f"Merged {args.override} into {args.output}")
 
