@@ -3861,6 +3861,9 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 			return fmt.Errorf("failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		// When OpenShift Driver Toolkit is enabled, openshift-driver-toolkit-ctr executes
+		// the driver installation script that reads /drivers/nvidia.conf, so mount the
+		// kernel module configuration ConfigMap into it as well.
 		if n.ocpDriverToolkit.enabled {
 			if driverToolkitContainer := findContainerByName(obj.Spec.Template.Spec.Containers, "openshift-driver-toolkit-ctr"); driverToolkitContainer != nil {
 				driverToolkitContainer.VolumeMounts = append(driverToolkitContainer.VolumeMounts, volumeMounts...)
