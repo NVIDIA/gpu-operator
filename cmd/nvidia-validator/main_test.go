@@ -18,12 +18,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
@@ -171,6 +173,149 @@ spec:
 			if tc.wantErrIs != nil {
 				require.ErrorIs(t, err, tc.wantErrIs)
 			}
+		})
+	}
+}
+
+func TestWaitForMIGReconfiguration(t *testing.T) {
+	errGetNode := errors.New("get node failed")
+
+	tests := map[string]struct {
+		// states is the mig.config.state label value returned by each call; the last value repeats.
+		// An empty value means the label is absent.
+		states []string
+		getErr error
+		// cancelAfter cancels the context after this many calls when non-zero.
+		cancelAfter int
+		timeout     time.Duration
+		// wantCalls is not checked when zero, because the call count at a timeout depends on timing.
+		wantCalls  int
+		wantErr    error
+		wantErrMsg string
+	}{
+		"label is absent": {
+			states:    []string{""},
+			wantCalls: 1,
+		},
+		"state is success": {
+			states:    []string{"success"},
+			wantCalls: 1,
+		},
+		"state is failed": {
+			states:    []string{"failed"},
+			wantCalls: 1,
+		},
+		"state changes from pending to success": {
+			states:    []string{"pending", "pending", "success"},
+			wantCalls: 3,
+		},
+		"state changes from rebooting to success": {
+			states:    []string{"rebooting", "success"},
+			wantCalls: 2,
+		},
+		"node cannot be fetched": {
+			getErr:    errGetNode,
+			wantCalls: 1,
+			wantErr:   errGetNode,
+		},
+		"context is canceled while pending": {
+			states:      []string{"pending"},
+			cancelAfter: 2,
+			wantCalls:   2,
+			wantErr:     context.Canceled,
+		},
+		"times out while pending": {
+			states:     []string{"pending"},
+			timeout:    20 * time.Millisecond,
+			wantErr:    context.DeadlineExceeded,
+			wantErrMsg: "MIG reconfiguration did not complete within 20ms (nvidia.com/mig.config.state=pending)",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			calls := 0
+			getNodeLabels := func(context.Context) (map[string]string, error) {
+				calls++
+				if tc.cancelAfter != 0 && calls >= tc.cancelAfter {
+					cancel()
+				}
+				if tc.getErr != nil {
+					return nil, tc.getErr
+				}
+				state := tc.states[min(calls, len(tc.states))-1]
+				if state == "" {
+					return map[string]string{}, nil
+				}
+				return map[string]string{migConfigStateLabelKey: state}, nil
+			}
+
+			timeout := tc.timeout
+			if timeout == 0 {
+				timeout = time.Minute
+			}
+			err := waitForMIGReconfiguration(ctx, time.Millisecond, timeout, getNodeLabels)
+
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			if tc.wantErrMsg != "" {
+				require.ErrorContains(t, err, tc.wantErrMsg)
+			}
+			if tc.wantCalls != 0 {
+				require.Equal(t, tc.wantCalls, calls)
+			}
+		})
+	}
+}
+
+func TestValidateFlagsCUDA(t *testing.T) {
+	tests := map[string]struct {
+		namespace    string
+		nodeName     string
+		withWorkload bool
+		wantErr      string
+	}{
+		"namespace is empty": {
+			nodeName:     "node",
+			withWorkload: true,
+			wantErr:      "invalid -ns <namespace> flag: must not be empty string for cuda validation",
+		},
+		"node name is empty with workload": {
+			namespace:    "gpu-operator",
+			withWorkload: true,
+			wantErr:      "invalid -n <node-name> flag: must not be empty string for cuda validation with workload",
+		},
+		"node name is set with workload": {
+			namespace:    "gpu-operator",
+			nodeName:     "node",
+			withWorkload: true,
+		},
+		"node name is empty without workload": {
+			namespace: "gpu-operator",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			origComponent, origNamespace, origNodeName, origWithWorkload := componentFlag, namespaceFlag, nodeNameFlag, withWorkloadFlag
+			t.Cleanup(func() {
+				componentFlag, namespaceFlag, nodeNameFlag, withWorkloadFlag = origComponent, origNamespace, origNodeName, origWithWorkload
+			})
+			componentFlag, namespaceFlag, nodeNameFlag, withWorkloadFlag = "cuda", tc.namespace, tc.nodeName, tc.withWorkload
+
+			_, err := validateFlags(context.Background(), nil)
+
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tc.wantErr)
 		})
 	}
 }
