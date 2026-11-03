@@ -15,8 +15,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 4 ]]; then
-    echo "Usage: $0 CHART_DIRECTORY VALUES_OVERRIDES_FILE OPERATOR_IMAGE OPERATOR_VERSION" >&2
+if [[ $# -ne 5 ]]; then
+    echo "Usage: $0 CHART_DIRECTORY VALUES_OVERRIDES_FILE OPERATOR_IMAGE OPERATOR_VERSION OUTDATED_IMAGES_FILE" >&2
     exit 1
 fi
 
@@ -24,6 +24,7 @@ chart_directory="$1"
 values_overrides_file="$2"
 operator_image="$3"
 operator_version="$4"
+outdated_images_file="$5"
 
 script_directory=$(dirname "${BASH_SOURCE[0]}")
 
@@ -47,7 +48,7 @@ if ! command -v helm &> /dev/null; then
     exit 1
 fi
 
-latest_image_lines=$("${script_directory}/get-latest-images.sh" \
+latest_image_lines=$("${script_directory}/get-latest-images.sh" --outdated-images-file "${outdated_images_file}" \
     toolkit device-plugin mig-manager driver-manager vgpu-device-manager \
     kata-sandbox-device-plugin kubevirt-gpu-device-plugin cc-manager)
 

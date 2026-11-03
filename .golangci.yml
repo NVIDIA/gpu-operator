@@ -4,6 +4,7 @@ linters:
     - contextcheck
     - gocritic
     - gosec
+    - loggercheck
     - misspell
     - modernize
     - unconvert

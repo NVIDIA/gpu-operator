@@ -106,6 +106,7 @@ jobs:
       contents: read
     outputs:
       resolved_images: ${{ steps.images.outputs.resolved_images }}
+      outdated_images: ${{ steps.images.outputs.outdated_images }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -152,8 +153,14 @@ jobs:
           set -euo pipefail
 
           resolved_image_lines=$(.github/scripts/prepare-main-values.sh \
-            deployments/gpu-operator values-overrides.yaml "${OPERATOR_IMAGE}" "${OPERATOR_VERSION}")
+            deployments/gpu-operator values-overrides.yaml "${OPERATOR_IMAGE}" "${OPERATOR_VERSION}" \
+            outdated-images.txt)
           echo "resolved_images=${resolved_image_lines//$'\n'/ }" >> "${GITHUB_OUTPUT}"
+
+          # Joined with a literal \n so the Slack payload's JSON string shows one image per line.
+          outdated_images=$(awk '{ printf "• %s: %s, built from <%s|%s> of %s (<%s|newer commits>)\\n", $1, $2, $5, $3, $4, $6 }' \
+            outdated-images.txt)
+          echo "outdated_images=${outdated_images}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload values override file and merged chart values
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -277,6 +284,27 @@ jobs:
             "${CHART_VERSION}" \
             "${BUNDLE_IMAGE}" \
             "${operand_images[@]}"
+
+  notify-outdated-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    needs: [main-version, prepare-main-values, record-main-build]
+    if: ${{ github.event_name == 'schedule' && needs.prepare-main-values.outputs.outdated_images != '' }}
+    env:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+    steps:
+      - name: Send Slack notification
+        if: ${{ env.SLACK_BOT_TOKEN != '' }}
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL_ID }}",
+              "text": ":warning: *GPU Operator Main Build Published With Older Images*\n\n*Version:* ${{ needs.main-version.outputs.main_version }}\n\nThe newest commits of these operands have no image, so the build uses an image older than 24 hours:\n${{ needs.prepare-main-values.outputs.outdated_images }}\n*Details:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+            }
 
   notify-failure:
     runs-on: ubuntu-latest
