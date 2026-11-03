@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -3276,8 +3278,18 @@ func getSanitizedKernelVersion(kernelVersion string) string {
 // it keeps architecture and page-size tokens. getSanitizedKernelVersion drops
 // those tokens, but the node selector and the image tag keep the raw kernel,
 // so kernels that sanitize together still need different objects.
+//
+// Replacing '_' with '.' would give 5.14.0-el9.x86_64 and 5.14.0-el9.x86.64
+// the same name. A kernel that contains '_' also gets a short hash of the
+// lowercased raw string. A kernel with no '_' keeps the name it had before.
 func kernelSuffixForPrecompiledDaemonSet(kernelVersion string) string {
-	return strings.Trim(strings.ToLower(strings.ReplaceAll(kernelVersion, "_", ".")), ".")
+	lower := strings.ToLower(kernelVersion)
+	suffix := strings.Trim(strings.ReplaceAll(lower, "_", "."), ".")
+	if !strings.Contains(lower, "_") {
+		return suffix
+	}
+	sum := sha256.Sum256([]byte(lower))
+	return suffix + "-" + hex.EncodeToString(sum[:4])
 }
 
 func precompiledDriverDaemonSetName(kernelVersion, nodeOS string) string {
@@ -4423,12 +4435,15 @@ func precompiledDriverDaemonsets(ctx context.Context, n ClusterPolicyController)
 
 func (n ClusterPolicyController) deleteUndesiredPrecompiledDaemonsets(ctx context.Context, desired map[string]struct{}) error {
 	list := &appsv1.DaemonSetList{}
-	err := n.client.List(ctx, list, client.MatchingLabels{
-		precompiledIdentificationLabelKey: precompiledIdentificationLabelValue,
-	})
+	err := n.client.List(ctx, list,
+		client.InNamespace(n.operatorNamespace),
+		client.MatchingLabels{
+			precompiledIdentificationLabelKey: precompiledIdentificationLabelValue,
+		})
 	if err != nil {
 		return fmt.Errorf("list precompiled driver daemonsets: %w", err)
 	}
+	var deleteErrs []error
 	for i := range list.Items {
 		ds := &list.Items[i]
 		if _, ok := desired[ds.Name]; ok {
@@ -4439,10 +4454,10 @@ func (n ClusterPolicyController) deleteUndesiredPrecompiledDaemonsets(ctx contex
 		}
 		n.logger.Info("Deleting precompiled driver DaemonSet that does not match a current kernel", "Name", ds.Name)
 		if err := n.client.Delete(ctx, ds); err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("delete precompiled driver daemonset %s: %w", ds.Name, err)
+			deleteErrs = append(deleteErrs, fmt.Errorf("delete precompiled driver daemonset %s: %w", ds.Name, err))
 		}
 	}
-	return nil
+	return errors.Join(deleteErrs...)
 }
 
 // ocpDriverToolkitDaemonSets goes through all the RHCOS versions
