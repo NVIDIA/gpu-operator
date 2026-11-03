@@ -731,21 +731,28 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 }
 
 func validateHostDriver(silent bool) error {
+	return validateHostDriverInRoot("/host", runCommand, silent)
+}
+
+// validateHostDriverInRoot takes the host root and the command runner as
+// arguments so that tests can exercise it against a fake host root without
+// running chroot.
+func validateHostDriverInRoot(hostRootCtrPath string, run func(command string, args []string, silent bool) error, silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
-	if fileInfo, err := os.Lstat(filepath.Join("/host", wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
+	if fileInfo, err := os.Lstat(filepath.Join(hostRootCtrPath, wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
 		log.Infof("WSL2 system detected, assuming driver is pre-installed")
 		disableDevCharSymlinkCreation = true
 		return nil
 	}
 
-	nvidiaSMIPath, err := resolveHostNvidiaSMI("/host")
+	nvidiaSMIPath, err := resolveHostNvidiaSMI(hostRootCtrPath)
 	if err != nil {
 		return err
 	}
 	command := "chroot"
-	args := append([]string{"/host", nvidiaSMIPath}, nvidiaSMIArgs()...)
+	args := append([]string{hostRootCtrPath, nvidiaSMIPath}, nvidiaSMIArgs()...)
 
-	if err := runCommand(command, args, silent); err != nil {
+	if err := run(command, args, silent); err != nil {
 		// nvidia-smi exists on the host but failed. Do not guess why: nvidia-smi
 		// prints the reason itself, and err carries its actual exit status.
 		// Only say that a host nvidia-smi was found, which the bare exit status
