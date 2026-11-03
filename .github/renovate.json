@@ -176,6 +176,15 @@
       "groupSlug": "go-toolchain",
       "separateMajorMinor": false,
       "separateMinorPatch": false
+    },
+    {
+      "description": "Update DCGM and DCGM Exporter together: each DCGM Exporter release needs the DCGM hostengine version it was built with",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["nvcr.io/nvidia/cloud-native/dcgm", "nvcr.io/nvidia/k8s/dcgm-exporter"],
+      "groupName": "DCGM and DCGM Exporter",
+      "groupSlug": "dcgm-and-dcgm-exporter",
+      "branchTopic": "dcgm-and-dcgm-exporter",
+      "commitMessageTopic": "DCGM and DCGM Exporter"
     }
   ]
 }

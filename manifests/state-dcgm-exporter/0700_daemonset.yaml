@@ -129,17 +129,25 @@ spec:
         ports:
         - name: "metrics"
           containerPort: 9400
+        # A large metric file on a node with many GPUs can take about a minute
+        # before /health answers. The startup probe allows up to 5 minutes;
+        # the liveness and readiness probes start as soon as it succeeds, so they
+        # need no initial delay.
+        startupProbe:
+          httpGet:
+            port: 9400
+            path: /health
+          periodSeconds: 5
+          failureThreshold: 60
         livenessProbe:
           httpGet:
             port: 9400
             path: /health
-          initialDelaySeconds: 45
           periodSeconds: 5
         readinessProbe:
           httpGet:
             port: 9400
             path: /health
-          initialDelaySeconds: 45
         resources:
           {{- if .DCGMExporter.Spec.Resources }}
           {{- if .DCGMExporter.Spec.Resources.Limits }}
