@@ -60,8 +60,7 @@ For information on platform support and getting started, visit the official docu
 
 ## Contributions
 [Read the document on contributions](CONTRIBUTING.md). 
-You can contribute by opening a [pull request](https://help.github.com/en/articles/about-pull-requests).
 Contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Support and Getting Help
-Please open [an issue on the GitHub project](https://github.com/NVIDIA/gpu-operator/issues/new) for any questions. Your feedback is appreciated.
+Please start [a discussion on the GitHub project](https://github.com/NVIDIA/gpu-operator/discussions) for any questions. You can also join our [community Slack](https://inviter.co/dsx-ai-factory). Your feedback is appreciated.
