@@ -56,6 +56,16 @@ app.kubernetes.io/managed-by: {{ include "gpu-operator.name" . }}
 {{- end }}
 {{- end -}}
 
+{{/*
+Selector labels for the operator pods. The Deployment selector, the pod
+anti-affinity and the PodDisruptionBudget use these labels. Do not add
+labels that change between releases: the Deployment selector is immutable.
+*/}}
+{{- define "gpu-operator.selectorLabels" -}}
+app.kubernetes.io/component: "gpu-operator"
+app: "gpu-operator"
+{{- end -}}
+
 {{- define "gpu-operator.matchLabels" -}}
 app.kubernetes.io/name: {{ include "gpu-operator.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}

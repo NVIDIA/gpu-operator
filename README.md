@@ -42,6 +42,12 @@ After installation, the GPU Operator and its operands should be up and running.
 Note:
 To deploy the GPU Operator on OpenShift, follow the instructions in the [official documentation](https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html).
 
+## Operator high availability
+
+Helm installations run one operator replica by default. Increase `operator.replicaCount` to run multiple replicas with leader election. Unless explicitly disabled, the chart also adds soft pod anti-affinity and a PodDisruptionBudget (PDB) requiring at least one available replica.
+
+OLM installations continue to deploy one operator replica and do not include the Helm chart's PDB or pod anti-affinity. Helm values do not configure OLM installations. Administrators can manually increase replicas and add anti-affinity through the installed ClusterServiceVersion (CSV), then create a PDB separately, following `deployments/gpu-operator/templates/poddisruptionbudget.yaml`.
+
 
 ## Product Documentation
 For information on platform support and getting started, visit the official documentation [repository](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html).
