@@ -79,6 +79,7 @@ func main() {
 	var probeAddr string
 	var pprofAddr string
 	var renewDeadline time.Duration
+	var leaderElectionWarmup bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&pprofAddr, "pprof-bind-address", "",
@@ -95,6 +96,9 @@ func main() {
 			"Only enabled when the --leader-elect flag is set. "+
 			"If undefined, the renew deadline defaults to the controller-runtime manager's default RenewDeadline. "+
 			"By setting this option, the LeaseDuration is also set as RenewDealine + 5s.")
+	flag.BoolVar(&leaderElectionWarmup, "leader-election-warmup", false,
+		"Enable informer cache warmup for the operator's standby replicas."+
+			"Only enabled when the --leader-elect flag is set.")
 
 	opts := zap.Options{
 		StacktraceLevel: zapcore.PanicLevel,
@@ -126,16 +130,17 @@ func main() {
 	}
 
 	options := ctrl.Options{
-		Scheme:                  scheme,
-		Metrics:                 metricsOptions,
-		HealthProbeBindAddress:  probeAddr,
-		PprofBindAddress:        pprofAddr,
-		LeaderElection:          enableLeaderElection,
-		LeaderElectionNamespace: leaderElectionNamespace,
-		LeaderElectionID:        "53822513.nvidia.com",
-		WebhookServer:           webhookServer,
-		Cache:                   operatorcache.Options(operatorNamespace),
-		NewCache:                operatorcache.New,
+		Scheme:                        scheme,
+		Metrics:                       metricsOptions,
+		HealthProbeBindAddress:        probeAddr,
+		PprofBindAddress:              pprofAddr,
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionNamespace:       leaderElectionNamespace,
+		LeaderElectionID:              "53822513.nvidia.com",
+		LeaderElectionReleaseOnCancel: true,
+		WebhookServer:                 webhookServer,
+		Cache:                         operatorcache.Options(operatorNamespace),
+		NewCache:                      operatorcache.New,
 	}
 
 	if enableLeaderElection && int(renewDeadline) != 0 {
@@ -143,6 +148,10 @@ func main() {
 
 		options.RenewDeadline = &renewDeadline
 		options.LeaseDuration = &leaseDuration
+	}
+
+	if enableLeaderElection && leaderElectionWarmup {
+		options.Controller.EnableWarmup = &leaderElectionWarmup
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
@@ -249,6 +258,14 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
+	go func() {
+		select {
+		case <-mgr.Elected():
+			setupLog.Info("registering operator metrics")
+			operatorMetrics.Register()
+		case <-ctx.Done():
+		}
+	}()
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

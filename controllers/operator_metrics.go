@@ -66,8 +66,8 @@ const (
 	operatorMetricsNamespace = "gpu_operator"
 )
 
-// InitOperatorMetrics registers all GPU operator Prometheus metrics with the
-// controller-runtime registry and returns the initialised OperatorMetrics.
+// InitOperatorMetrics creates GPU operator Prometheus metrics. The metrics are
+// registered after the manager becomes leader.
 func InitOperatorMetrics() *OperatorMetrics {
 	m := &OperatorMetrics{
 		gpuNodesTotal: promcli.NewGauge(
@@ -195,8 +195,16 @@ func InitOperatorMetrics() *OperatorMetrics {
 			},
 		),
 	}
+	return m
+}
 
-	metrics.Registry.MustRegister(
+// Register exposes GPU operator metrics through the controller-runtime registry.
+func (m *OperatorMetrics) Register() {
+	m.register(metrics.Registry)
+}
+
+func (m *OperatorMetrics) register(registry promcli.Registerer) {
+	registry.MustRegister(
 		m.gpuNodesTotal,
 
 		m.reconciliationLastSuccess,
@@ -218,6 +226,4 @@ func InitOperatorMetrics() *OperatorMetrics {
 		m.upgradesFailed,
 		m.upgradesPending,
 	)
-
-	return m
 }
