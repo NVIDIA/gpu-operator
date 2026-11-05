@@ -617,7 +617,8 @@ func TestGetManifestObjectsHandleDefaultImagesError(t *testing.T) {
 }
 
 func TestSyncGetManifestObjectsError(t *testing.T) {
-	driverState := newTestStateDriver(t, nil, driverTestScheme(t))
+	scheme := driverTestScheme(t)
+	driverState := newTestStateDriver(t, newDriverFakeClient(scheme), scheme)
 
 	syncState, err := driverState.Sync(context.Background(), newDriverCR("driver-a"), NewInfoCatalog())
 
@@ -625,7 +626,7 @@ func TestSyncGetManifestObjectsError(t *testing.T) {
 	assert.Equal(t, SyncState(SyncStateNotReady), syncState)
 }
 
-func TestSyncCleanupError(t *testing.T) {
+func TestSyncDriverDaemonSetsWithoutOwnerSelectorError(t *testing.T) {
 	scheme := driverTestScheme(t)
 	errDaemonSetList := errors.New("injected daemonset list error")
 	fakeClient := newDriverClientWithInterceptors(scheme,
@@ -636,8 +637,34 @@ func TestSyncCleanupError(t *testing.T) {
 	syncState, err := driverState.Sync(context.Background(), newDriverCR("driver-a"), driverInfoCatalog(fakeClusterInfo{}))
 
 	require.ErrorIs(t, err, errDaemonSetList)
+	require.ErrorContains(t, err, "failed to check for driver DaemonSets without an owner selector")
+	assert.Equal(t, SyncState(SyncStateNotReady), syncState)
+}
+
+func TestSyncCleanupError(t *testing.T) {
+	scheme := driverTestScheme(t)
+	errDaemonSetList := errors.New("injected daemonset list error")
+	daemonSetLists := 0
+	fakeClient := newDriverClientWithInterceptors(scheme, interceptor.Funcs{
+		List: func(ctx context.Context, wrappedClient client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			if _, ok := list.(*appsv1.DaemonSetList); ok {
+				daemonSetLists++
+				// Allow the ownership check to finish before failing cleanup.
+				if daemonSetLists == 2 {
+					return errDaemonSetList
+				}
+			}
+			return wrappedClient.List(ctx, list, opts...)
+		},
+	}, newGPUNode("gpu-node", "driver-a"))
+	driverState := newTestStateDriver(t, fakeClient, scheme)
+
+	syncState, err := driverState.Sync(t.Context(), newDriverCR("driver-a"), driverInfoCatalog(fakeClusterInfo{}))
+
+	require.ErrorIs(t, err, errDaemonSetList)
 	require.ErrorContains(t, err, "failed to cleanup stale driver DaemonSets")
 	assert.Equal(t, SyncState(SyncStateNotReady), syncState)
+	assert.Equal(t, 2, daemonSetLists)
 }
 
 func TestSyncCreateOrUpdateError(t *testing.T) {
