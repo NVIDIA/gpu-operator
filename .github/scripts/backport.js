@@ -100,7 +100,41 @@ for (const targetBranch of branches) {
     // Push the backport branch (force to handle updates)
     core.info(`Pushing ${backportBranch} to origin`);
     execSync(`git push --force-with-lease origin ${backportBranch}`, { stdio: 'inherit' });
-    
+
+    // Re-create each new commit through the Git Data API so the resulting chain shows as "Verified"
+    core.info(`Re-creating commits via the Git Data API to get verified signatures`);
+    const newCommitShas = execSync(`git log --format=%H ${targetBranch}..${backportBranch}`, { encoding: 'utf-8' })
+      .trim().split('\n').filter(Boolean).reverse(); // oldest -> newest
+
+    // Use the same base that produced the cherry-picked trees. The remote
+    // target branch may have advanced since the initial fetch.
+    let parentSha = execSync(`git rev-parse ${targetBranch}`, {
+      encoding: 'utf-8'
+    }).trim();
+
+    for (const sha of newCommitShas) {
+      const treeSha = execSync(`git rev-parse ${sha}^{tree}`, { encoding: 'utf-8' }).trim();
+      const message = execSync(`git log -1 --format=%B ${sha}`, { encoding: 'utf-8' });
+
+      const { data: newCommit } = await github.rest.git.createCommit({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        message,
+        tree: treeSha,
+        parents: [parentSha]
+      });
+      parentSha = newCommit.sha;
+    }
+
+    core.info(`Repointing ${backportBranch} at signed commit ${parentSha}`);
+    await github.rest.git.updateRef({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      ref: `heads/${backportBranch}`,
+      sha: parentSha,
+      force: true
+    });
+
     // Check if a PR already exists for this backport branch
     const { data: existingPRs } = await github.rest.pulls.list({
       owner: context.repo.owner,
