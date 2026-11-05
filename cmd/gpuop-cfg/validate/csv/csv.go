@@ -82,6 +82,11 @@ func (m command) run(ctx context.Context, opts *options) error {
 		return fmt.Errorf("failed to load csv yaml: %v", err)
 	}
 
+	err = validateReplicas(csv)
+	if err != nil {
+		return fmt.Errorf("failed to validate replicas: %v", err)
+	}
+
 	err = validateImages(ctx, csv)
 	if err != nil {
 		return fmt.Errorf("failed to validate images: %v", err)
@@ -92,6 +97,20 @@ func (m command) run(ctx context.Context, opts *options) error {
 		return fmt.Errorf("failed to validate alm-example: %v", err)
 	}
 
+	return nil
+}
+
+func validateReplicas(csv *v1alpha1.ClusterServiceVersion) error {
+	for _, deployment := range csv.Spec.InstallStrategy.StrategySpec.DeploymentSpecs {
+		if deployment.Name != "gpu-operator" {
+			continue
+		}
+
+		replicas := deployment.Spec.Replicas
+		if replicas != nil && *replicas < 1 {
+			return fmt.Errorf("gpu-operator replicas must be at least 1")
+		}
+	}
 	return nil
 }
 

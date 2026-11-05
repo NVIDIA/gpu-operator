@@ -17,6 +17,7 @@
 package gpuoperator
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 	"testing"
@@ -28,6 +29,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 )
+
+func TestOperatorRejectsInvalidReplicaCount(t *testing.T) {
+	if _, err := exec.LookPath("helm"); err != nil {
+		t.Skip("helm binary not found in PATH")
+	}
+
+	for _, replicas := range []int{0, -1} {
+		t.Run(fmt.Sprint(replicas), func(t *testing.T) {
+			cmd := exec.Command("helm", "template", "gpu-operator", ".", "--values", "-")
+			cmd.Stdin = strings.NewReader(fmt.Sprintf("operator:\n  replicaCount: %d\n", replicas))
+			out, err := cmd.CombinedOutput()
+			require.Error(t, err)
+			require.Contains(t, string(out), "operator.replicaCount must be at least 1")
+		})
+	}
+}
 
 // renderChart returns the operator Deployment and, if rendered, its PodDisruptionBudget.
 func renderChart(t *testing.T, values string) (*appsv1.Deployment, *policyv1.PodDisruptionBudget) {
