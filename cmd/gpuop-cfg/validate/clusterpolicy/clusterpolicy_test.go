@@ -17,6 +17,10 @@
 package clusterpolicy
 
 import (
+	"context"
+	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -24,6 +28,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
+	"sigs.k8s.io/yaml"
+
+	v1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -43,4 +50,52 @@ func TestNewCommand(t *testing.T) {
 	assert.Contains(t, inputFlag.Names(), "input")
 	assert.NotEmpty(t, inputFlag.Usage)
 	assert.Equal(t, "-", inputFlag.Value)
+}
+
+func TestCommandRun(t *testing.T) {
+	clearImagePathEnvVars(t)
+
+	clusterPolicyYAMLWithResolvableImages, err := yaml.Marshal(&v1.ClusterPolicy{Spec: *newClusterPolicySpecWithResolvableImages(t)})
+	require.NoError(t, err)
+
+	testCases := []struct {
+		description           string
+		inputFileContents     string
+		expectedErrorMessages []string
+	}{
+		{
+			description:           "malformed clusterpolicy yaml",
+			inputFileContents:     "\tnot: : valid: yaml",
+			expectedErrorMessages: []string{"failed to load clusterpolicy spec"},
+		},
+		{
+			description:           "no images in the clusterpolicy or the environment",
+			inputFileContents:     "",
+			expectedErrorMessages: []string{"failed to validate images", "DRIVER_IMAGE"},
+		},
+		{
+			description:       "every validated image resolves",
+			inputFileContents: string(clusterPolicyYAMLWithResolvableImages),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			inputPath := filepath.Join(t.TempDir(), "clusterpolicy.yaml")
+			require.NoError(t, os.WriteFile(inputPath, []byte(tc.inputFileContents), 0o600))
+
+			cmd := NewCommand(logrus.New())
+			cmd.Writer = io.Discard
+			cmd.ErrWriter = io.Discard
+
+			err := cmd.Run(context.Background(), []string{"clusterpolicy", "--input", inputPath})
+			if len(tc.expectedErrorMessages) == 0 {
+				require.NoError(t, err)
+				return
+			}
+			for _, expectedErrorMessage := range tc.expectedErrorMessages {
+				require.ErrorContains(t, err, expectedErrorMessage)
+			}
+		})
+	}
 }
