@@ -126,7 +126,7 @@ jobs:
             exit 1
           fi
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
+        uses: NVIDIA/holodeck@8cd286c867a2be37c73a905123e6a689c084243c # v0.6.0
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -208,7 +208,7 @@ jobs:
             exit 1
           fi
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
+        uses: NVIDIA/holodeck@8cd286c867a2be37c73a905123e6a689c084243c # v0.6.0
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
