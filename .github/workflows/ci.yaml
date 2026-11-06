@@ -29,12 +29,19 @@ concurrency:
 permissions: {}
 
 jobs:
+  commit-verification:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/commit-verification.yaml
+
   variables:
+    needs: [commit-verification]
     permissions:
       contents: read
     uses: ./.github/workflows/variables.yaml
 
   code-scanning:
+    needs: [commit-verification]
     permissions:
       contents: read
       security-events: write
@@ -42,31 +49,34 @@ jobs:
     uses: ./.github/workflows/code-scanning.yaml
 
   config-checks:
+    needs: [commit-verification]
     permissions:
       contents: read
     uses: ./.github/workflows/config-checks.yaml
 
   golang-checks:
+    needs: [commit-verification]
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/golang-checks.yaml
 
   third-party-notices:
+    needs: [commit-verification]
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/third-party-notices-check.yaml
 
   coverage:
-    needs: [golang-checks]
+    needs: [commit-verification, golang-checks]
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/coverage.yaml
 
   image-builds:
-    needs: [variables, config-checks, golang-checks]
+    needs: [commit-verification, variables, config-checks, golang-checks]
     permissions:
       contents: read
       id-token: write
@@ -79,7 +89,7 @@ jobs:
       operator_image_base: ${{ needs.variables.outputs.operator_image_base }}
 
   e2e-tests:
-    needs: [variables, image-builds]
+    needs: [commit-verification, variables, image-builds]
     permissions:
       contents: read
       id-token: write
@@ -95,7 +105,7 @@ jobs:
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [variables, e2e-tests]
+    needs: [commit-verification, variables, e2e-tests]
     permissions:
       contents: read
       packages: write
