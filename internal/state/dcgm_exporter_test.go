@@ -81,7 +81,7 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 	assert.Equal(t, 1, kinds["RoleBinding"])
 	assert.Equal(t, 1, kinds["ResourceClaimTemplate"])
 	assert.Equal(t, 1, kinds["DaemonSet"])
-	assert.Equal(t, 1, kinds["Service"])
+	assert.Equal(t, 2, kinds["Service"])
 	// DRA attribution needs the ResourceSlice informer, so the read ClusterRole is
 	// always bound. No ServiceMonitor by default.
 	assert.Equal(t, 1, kinds["ClusterRole"])
@@ -272,10 +272,19 @@ func TestDCGMExporterServiceType(t *testing.T) {
 	objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 	require.NoError(t, err)
 
-	svc := findByKind(objs, "Service")
-	require.NotNil(t, svc)
-	svcType, _, _ := unstructured.NestedString(svc.Object, "spec", "type")
-	assert.Equal(t, "NodePort", svcType)
-	itpValue, _, _ := unstructured.NestedString(svc.Object, "spec", "internalTrafficPolicy")
-	assert.Equal(t, "Local", itpValue)
+	for _, name := range []string{"nvidia-dcgm-exporter", "nvidia-dcgm-exporter-dra"} {
+		svc := findByKindAndName(objs, "Service", name)
+		require.NotNil(t, svc)
+		svcType, _, _ := unstructured.NestedString(svc.Object, "spec", "type")
+		assert.Equal(t, "NodePort", svcType)
+		itpValue, _, _ := unstructured.NestedString(svc.Object, "spec", "internalTrafficPolicy")
+		assert.Equal(t, "Local", itpValue)
+		selector, _, _ := unstructured.NestedStringMap(svc.Object, "spec", "selector")
+		assert.Equal(t, map[string]string{"app": "nvidia-dcgm-exporter-dra"}, selector)
+		if name == "nvidia-dcgm-exporter" {
+			assert.Equal(t, "true", svc.GetAnnotations()["prometheus.io/scrape"])
+		} else {
+			assert.NotContains(t, svc.GetAnnotations(), "prometheus.io/scrape")
+		}
+	}
 }
