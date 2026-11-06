@@ -161,6 +161,20 @@ operator:
   #     #   targetLabel: namespace
   #     #   action: replace
 
+webhook:
+  # Run admission handlers in a separate Deployment and service account.
+  enabled: false
+  # Defaults to the operator image; override to test a webhook image independently.
+  image: ""
+  replicas: 1
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
 mig:
   strategy: single
 
