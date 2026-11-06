@@ -44,4 +44,5 @@ remote \
     VALUES_FILE="${VALUES_FILE:-}" \
     HELM_CHART="${HELM_CHART:-}" \
     HELM_CHART_VERSION="${HELM_CHART_VERSION:-}" \
+    USE_GINKGO="${USE_GINKGO:-}" \
         ${TEST_CASE}

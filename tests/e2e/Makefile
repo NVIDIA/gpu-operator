@@ -20,19 +20,31 @@ OPERATOR_VERSION ?= v23.9.0
 
 HELM_CHART ?= $(CURDIR)/../../deployments/gpu-operator
 
+TARGET_DRIVER_VERSION ?= $(shell sed -n 's/^: $${TARGET_DRIVER_VERSION:="\(.*\)"}$$/\1/p' $(CURDIR)/../scripts/.definitions.sh)
+
+LOG_DIR ?= /tmp/logs
+
+GINKGO_LABEL_FILTER ?= clusterpolicy
+
 .PHONY: e2e-test
 e2e-test:
 	@if [ -z ${KUBECONFIG} ]; then \
 		echo "[ERR] KUBECONFIG is missing, must be set"; \
 		exit 1; \
 	fi
-	$(GO_CMD) test -v . -args \
+	$(GO_CMD) test -v -timeout 0 . -args \
 		-kubeconfig=$(KUBECONFIG) \
+		$(if $(TEST_NAMESPACE),-namespace=$(TEST_NAMESPACE)) \
 		-operator-repository=$(OPERATOR_REPOSITORY) \
 		-operator-image=$(OPERATOR_IMAGE) \
 		-operator-version=$(OPERATOR_VERSION) \
-		-validator-repository=$(OPERATOR_REPOSITORY) \
-		-validator-image=$(OPERATOR_IMAGE) \
-		-validator-version=$(OPERATOR_VERSION) \
 		-helm-chart=$(HELM_CHART) \
-		-ginkgo.focus="gpu-operator-e2e"
+		$(if $(HELM_CHART_VERSION),-helm-chart-version=$(HELM_CHART_VERSION)) \
+		$(if $(VALUES_FILE),-values-file=$(VALUES_FILE)) \
+		$(if $(CONTAINER_RUNTIME),-container-runtime=$(CONTAINER_RUNTIME)) \
+		$(if $(TARGET_DRIVER_VERSION),-target-driver-version=$(TARGET_DRIVER_VERSION)) \
+		-log-dir=$(LOG_DIR) \
+		-ginkgo.timeout=65m \
+		-ginkgo.fail-on-empty \
+		-ginkgo.focus="gpu-operator-e2e" \
+		-ginkgo.label-filter="$(GINKGO_LABEL_FILTER)"
