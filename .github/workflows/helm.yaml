@@ -1,0 +1,58 @@
+---
+name: helm
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deployments/gpu-operator/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHART_NAME: gpu-operator
+  CHART_DIR: deployments
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+
+      - name: Run chart-testing (lint)
+        run: |
+          ct lint \
+            --target-branch ${{ github.event.repository.default_branch }} \
+            --all \
+            --validate-maintainers=false \
+            --chart-dirs ${{ env.CHART_DIR }}
+
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      - name: Install helm-unittest plugin
+        run: |
+          echo "Installing helm-unittest plugin..."
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git --verify=false --version v1.0.3 # 6f82a998e0b5461762ca959f87f5dd344af5e4eb
+
+      - name: Run helm unittest
+        run: helm unittest ${{ env.CHART_DIR }}/${{ env.CHART_NAME }}

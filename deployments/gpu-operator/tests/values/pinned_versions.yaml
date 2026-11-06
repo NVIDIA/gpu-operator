@@ -1,0 +1,42 @@
+# Snapshot suites load this file so that snapshots do not record the operand
+# image versions in values.yaml. Renovate bumps those versions in PRs that do
+# not run the chart tests, so recorded versions would go stale on main and fail
+# the next unrelated chart PR. The "renders only pinned image versions" tests
+# fail when a rendered version is missing here.
+driver:
+  version: pinned
+  manager:
+    version: pinned
+toolkit:
+  version: pinned
+devicePlugin:
+  version: pinned
+dcgm:
+  version: pinned
+dcgmExporter:
+  version: pinned
+gfd:
+  version: pinned
+migManager:
+  version: pinned
+gds:
+  version: pinned
+gdrcopy:
+  version: pinned
+vgpuManager:
+  driverManager:
+    version: pinned
+vgpuDeviceManager:
+  version: pinned
+vfioManager:
+  version: pinned
+  driverManager:
+    version: pinned
+sandboxDevicePlugin:
+  version: pinned
+kataSandboxDevicePlugin:
+  version: pinned
+ccManager:
+  version: pinned
+draDriver:
+  version: pinned
