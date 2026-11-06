@@ -469,6 +469,9 @@ spec:
     {{- if .Values.toolkit.hostNetwork }}
     hostNetwork: {{ .Values.toolkit.hostNetwork }}
     {{- end }}
+    {{- if .Values.toolkit.runtimeClassName }}
+    runtimeClassName: {{ .Values.toolkit.runtimeClassName | quote }}
+    {{- end }}
   devicePlugin:
     enabled: {{ .Values.devicePlugin.enabled }}
     {{- if .Values.devicePlugin.repository }}
