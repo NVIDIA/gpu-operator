@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -5436,4 +5437,31 @@ func TestApplyCommonDaemonsetMetadataLogging(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The upgrade controller selects ClusterPolicy driver pods by the component label, so DTK must
+// keep it even though it renames the app label per RHCOS version.
+func TestTransformOpenShiftDriverToolkitKeepsComponentLabel(t *testing.T) {
+	driverLabels := map[string]string{
+		DriverLabelKey:       DriverLabelValue,
+		AppComponentLabelKey: DriverAppComponentLabelValue,
+	}
+	ds := NewDaemonset().
+		WithName(commonDriverDaemonsetName).
+		WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithContainer(corev1.Container{Name: "openshift-driver-toolkit-ctr"})
+	ds.Labels = maps.Clone(driverLabels)
+	ds.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{DriverLabelKey: DriverLabelValue}}
+	ds.Spec.Template.Labels = maps.Clone(driverLabels)
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{}
+
+	n := ClusterPolicyController{}
+	n.ocpDriverToolkit.enabled = true
+	n.ocpDriverToolkit.currentRhcosVersion = "413.92.202304252344-0"
+
+	require.NoError(t, transformOpenShiftDriverToolkitContainer(ds.DaemonSet, &gpuv1.ClusterPolicySpec{}, n, "nvidia-driver-ctr"))
+
+	require.NotEqual(t, DriverLabelValue, ds.Spec.Template.Labels[DriverLabelKey])
+	require.Equal(t, DriverAppComponentLabelValue, ds.Labels[AppComponentLabelKey])
+	require.Equal(t, DriverAppComponentLabelValue, ds.Spec.Template.Labels[AppComponentLabelKey])
 }

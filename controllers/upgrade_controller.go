@@ -126,28 +126,17 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	}
 	r.OperatorMetrics.driverAutoUpgradeEnabled.Set(driverAutoUpgradeEnabled)
 
-	var driverLabel map[string]string
+	// The app label is renamed per RHCOS version on OpenShift DTK DaemonSets, so select on the
+	// component label, which every ClusterPolicy driver DaemonSet carries unchanged.
+	driverLabel := map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}
+	reqLogger.Info("Using label selector", "selector", driverLabel)
 
-	// initialize with common app=nvidia-driver-daemonset label
-	driverLabelKey := DriverLabelKey
-	driverLabelValue := DriverLabelValue
-
-	if clusterPolicyCtrl.openshift != "" && clusterPolicyCtrl.ocpDriverToolkit.enabled {
-		// For OCP, when DTK is enabled app=nvidia-driver-daemonset label is not constant and changes
-		// based on rhcos version. Hence use DTK label instead
-		driverLabelKey = ocpDriverToolkitIdentificationLabel
-		driverLabelValue = ocpDriverToolkitIdentificationValue
-	}
-
-	driverLabel = map[string]string{driverLabelKey: driverLabelValue}
-	reqLogger.Info("Using label selector", "key", driverLabelKey, "value", driverLabelValue)
-
-	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace,
-		driverLabel)
+	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace, driverLabel)
 	if err != nil {
 		reqLogger.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
 	}
+	excludeNVIDIADriverNodeStates(state)
 
 	reqLogger.Info("Propagate state to state manager")
 	reqLogger.V(consts.LogLevelDebug).Info("Current cluster upgrade state", "state", state)
@@ -194,6 +183,31 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
 	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
 	return ctrl.Result{RequeueAfter: plannedRequeueInterval}, nil
+}
+
+// excludeNVIDIADriverNodeStates drops nodes whose driver DaemonSet is owned by an NVIDIADriver.
+// Those DaemonSets share the driver component label and are left in place when ClusterPolicy
+// stops delegating via useNvidiaDriverCRD, but ClusterPolicy must not drive their upgrades.
+func excludeNVIDIADriverNodeStates(state *upgrade.ClusterUpgradeState) {
+	for stateKey, nodeStates := range state.NodeStates {
+		kept := make([]*upgrade.NodeUpgradeState, 0, len(nodeStates))
+		for _, nodeState := range nodeStates {
+			if !isOwnedByNVIDIADriver(nodeState.DriverDaemonSet) {
+				kept = append(kept, nodeState)
+			}
+		}
+		state.NodeStates[stateKey] = kept
+	}
+}
+
+func isOwnedByNVIDIADriver(ds *appsv1.DaemonSet) bool {
+	if ds == nil {
+		return false
+	}
+	owner := metav1.GetControllerOf(ds)
+	return owner != nil &&
+		owner.APIVersion == nvidiav1alpha1.SchemeGroupVersion.String() &&
+		owner.Kind == nvidiav1alpha1.NVIDIADriverCRDName
 }
 
 // reconcileNVIDIADriverUpgrades handles driver upgrade reconciliation when the NVIDIADriver CRD
