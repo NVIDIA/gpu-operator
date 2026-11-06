@@ -127,7 +127,7 @@
       "matchPackageNames": [
         "nvcr.io/nvidia/cloud-native/dcgm"
       ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-(?<build>\\d+)-ubi\\d+$",
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-(?<build>\\d+))?-(?<compatibility>ubi\\d+)$",
       "separateMajorMinor": false
     },
     {
