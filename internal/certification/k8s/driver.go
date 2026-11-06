@@ -204,7 +204,7 @@ func (c *Clients) GDRCopyEligibleNodes(ctx context.Context) (map[string]bool, er
 		}
 		nodeList, err := c.ListNodes(ctx, strings.Join(parts, ","))
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("listing nodes for NVIDIADriver %s: %w", driver.Name, err)
 		}
 		for _, node := range nodeList.Items {
 			nodes[node.Name] = true
