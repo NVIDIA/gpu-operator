@@ -508,6 +508,11 @@ func (in *AlertmanagerSpec) DeepCopyInto(out *AlertmanagerSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	out.AlertmanagerConfigMatcherStrategy = in.AlertmanagerConfigMatcherStrategy
+	if in.AlertmanagerConfigFileSystemMode != nil {
+		in, out := &in.AlertmanagerConfigFileSystemMode, &out.AlertmanagerConfigFileSystemMode
+		*out = new(AlertmanagerConfigFileSystemMode)
+		**out = **in
+	}
 	if in.MinReadySeconds != nil {
 		in, out := &in.MinReadySeconds, &out.MinReadySeconds
 		*out = new(int32)
@@ -1144,6 +1149,11 @@ func (in *CommonPrometheusFields) DeepCopyInto(out *CommonPrometheusFields) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
+		**out = **in
+	}
 	if in.MinReadySeconds != nil {
 		in, out := &in.MinReadySeconds, &out.MinReadySeconds
 		*out = new(int32)
@@ -1680,6 +1690,16 @@ func (in *GlobalTelegramConfig) DeepCopyInto(out *GlobalTelegramConfig) {
 	if in.APIURL != nil {
 		in, out := &in.APIURL, &out.APIURL
 		*out = new(URL)
+		**out = **in
+	}
+	if in.BotToken != nil {
+		in, out := &in.BotToken, &out.BotToken
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.BotTokenFile != nil {
+		in, out := &in.BotTokenFile, &out.BotTokenFile
+		*out = new(string)
 		**out = **in
 	}
 }
@@ -2353,6 +2373,11 @@ func (in *PodMonitorSpec) DeepCopyInto(out *PodMonitorSpec) {
 		*out = new(ScrapeProtocol)
 		**out = **in
 	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
+		**out = **in
+	}
 	if in.LabelLimit != nil {
 		in, out := &in.LabelLimit, &out.LabelLimit
 		*out = new(int64)
@@ -2499,6 +2524,11 @@ func (in *ProbeSpec) DeepCopyInto(out *ProbeSpec) {
 	if in.FallbackScrapeProtocol != nil {
 		in, out := &in.FallbackScrapeProtocol, &out.FallbackScrapeProtocol
 		*out = new(ScrapeProtocol)
+		**out = **in
+	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
 		**out = **in
 	}
 	if in.LabelLimit != nil {
@@ -3630,6 +3660,11 @@ func (in *ServiceMonitorSpec) DeepCopyInto(out *ServiceMonitorSpec) {
 		*out = new(ScrapeProtocol)
 		**out = **in
 	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
+		**out = **in
+	}
 	if in.TargetLimit != nil {
 		in, out := &in.TargetLimit, &out.TargetLimit
 		*out = new(int64)
@@ -4512,7 +4547,7 @@ func (in *WebTLSConfig) DeepCopyInto(out *WebTLSConfig) {
 	}
 	if in.ClientAuthType != nil {
 		in, out := &in.ClientAuthType, &out.ClientAuthType
-		*out = new(string)
+		*out = new(ClientAuthType)
 		**out = **in
 	}
 	if in.MinVersion != nil {
