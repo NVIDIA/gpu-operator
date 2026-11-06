@@ -731,21 +731,35 @@ func isDriverManagedByOperator(ctx context.Context) (bool, error) {
 }
 
 func validateHostDriver(silent bool) error {
+	return validateHostDriverInRoot("/host", runCommand, silent)
+}
+
+// validateHostDriverInRoot takes the host root and the command runner as
+// arguments so that tests can exercise it against a fake host root without
+// running chroot.
+func validateHostDriverInRoot(hostRootCtrPath string, run func(command string, args []string, silent bool) error, silent bool) error {
 	log.Info("Attempting to validate a pre-installed driver on the host")
-	if fileInfo, err := os.Lstat(filepath.Join("/host", wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
+	if fileInfo, err := os.Lstat(filepath.Join(hostRootCtrPath, wslNvidiaSMIPath)); err == nil && fileInfo.Size() != 0 {
 		log.Infof("WSL2 system detected, assuming driver is pre-installed")
 		disableDevCharSymlinkCreation = true
 		return nil
 	}
 
-	nvidiaSMIPath, err := resolveHostNvidiaSMI("/host")
+	nvidiaSMIPath, err := resolveHostNvidiaSMI(hostRootCtrPath)
 	if err != nil {
 		return err
 	}
 	command := "chroot"
-	args := append([]string{"/host", nvidiaSMIPath}, nvidiaSMIArgs()...)
+	args := append([]string{hostRootCtrPath, nvidiaSMIPath}, nvidiaSMIArgs()...)
 
-	return runCommand(command, args, silent)
+	if err := run(command, args, silent); err != nil {
+		// nvidia-smi exists on the host but failed. Do not guess why: nvidia-smi
+		// prints the reason itself, and err carries its actual exit status.
+		// Only say that a host nvidia-smi was found, which the bare exit status
+		// does not.
+		return fmt.Errorf("found '%s' on the host, but running it failed: %w", nvidiaSMIPath, err)
+	}
+	return nil
 }
 
 // With driver-validation-skip-gpu-init, validate with 'nvidia-smi --version',
@@ -794,7 +808,7 @@ func validateDriverContainer(silent bool, driverManagedByOperator bool) error {
 			if !withWaitFlag {
 				return fmt.Errorf("error validating driver: %w", err)
 			}
-			log.Warningf("failed to validate the driver, retrying after %d seconds\n", sleepIntervalSecondsFlag)
+			log.Warningf("failed to validate the driver, retrying after %d seconds: %v", sleepIntervalSecondsFlag, err)
 			time.Sleep(time.Duration(sleepIntervalSecondsFlag) * time.Second)
 			continue
 		}
@@ -809,7 +823,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 		return getDriverInfo(true, hostRootFlag, hostRootFlag, "/host"), nil
 	}
 
-	log.Infof("No pre-installed driver detected on the host: %v", err)
+	log.Infof("No usable pre-installed driver detected on the host: %v", err)
 
 	log.Info("Validating containerized driver installation")
 

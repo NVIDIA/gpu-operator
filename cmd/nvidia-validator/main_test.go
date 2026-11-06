@@ -27,6 +27,7 @@ import (
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -493,4 +494,47 @@ func TestCountNvidiaDevices(t *testing.T) {
 			require.Equal(t, tc.expected, countNvidiaDevices(tc.output))
 		})
 	}
+}
+
+func TestValidateDriverContainerRetryWarningIncludesError(t *testing.T) {
+	driverRoot := t.TempDir()
+	// nvidia-smi exits with status 18 on its first run and succeeds on the
+	// next, so the retry loop logs exactly one warning and then returns.
+	nvidiaSMI := filepath.Join(driverRoot, "usr/bin/nvidia-smi")
+	require.NoError(t, os.MkdirAll(filepath.Dir(nvidiaSMI), 0755))
+	require.NoError(t, os.WriteFile(nvidiaSMI, []byte("#!/bin/sh\nif [ -e \"$0.ran\" ]; then exit 0; fi\ntouch \"$0.ran\"\nexit 18\n"), 0755)) //nolint:gosec // the fake nvidia-smi must be executable
+	driverLibrary := filepath.Join(driverRoot, "usr/lib64/libnvidia-ml.so.1")
+	require.NoError(t, os.MkdirAll(filepath.Dir(driverLibrary), 0755))
+	require.NoError(t, os.WriteFile(driverLibrary, []byte("fake libnvidia-ml"), 0600))
+
+	savedDriverInstallDir, savedWithWait, savedSleepInterval := driverInstallDirCtrPathFlag, withWaitFlag, sleepIntervalSecondsFlag
+	t.Cleanup(func() {
+		driverInstallDirCtrPathFlag, withWaitFlag, sleepIntervalSecondsFlag = savedDriverInstallDir, savedWithWait, savedSleepInterval
+	})
+	driverInstallDirCtrPathFlag, withWaitFlag, sleepIntervalSecondsFlag = driverRoot, true, 0
+
+	warnings := &warningRecorder{}
+	logger := log.StandardLogger()
+	savedHooks := logger.ReplaceHooks(log.LevelHooks{})
+	t.Cleanup(func() { logger.ReplaceHooks(savedHooks) })
+	logger.AddHook(warnings)
+
+	require.NoError(t, validateDriverContainer(true, false))
+
+	require.Len(t, warnings.messages, 1)
+	require.Contains(t, warnings.messages[0], "exit status 18")
+	require.False(t, strings.HasSuffix(warnings.messages[0], "\n"), "warning ends with a newline: %q", warnings.messages[0])
+}
+
+type warningRecorder struct {
+	messages []string
+}
+
+func (r *warningRecorder) Levels() []log.Level {
+	return []log.Level{log.WarnLevel}
+}
+
+func (r *warningRecorder) Fire(entry *log.Entry) error {
+	r.messages = append(r.messages, entry.Message)
+	return nil
 }
