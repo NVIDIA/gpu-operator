@@ -28,7 +28,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +42,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
@@ -114,6 +117,7 @@ func TestReconcile(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	tests := []struct {
@@ -251,6 +255,7 @@ func TestReconcileStandalone(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	cp := &gpuv1.ClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
@@ -334,6 +339,7 @@ func TestReconcileGDSKernelModuleType(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	for name, tc := range map[string]struct {
 		version                string
@@ -510,6 +516,7 @@ func TestReconcileConflictSetsNotReadyState(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	driver := &nvidiav1alpha1.NVIDIADriver{
 		ObjectMeta: metav1.ObjectMeta{
@@ -530,7 +537,11 @@ func TestReconcileConflictSetsNotReadyState(t *testing.T) {
 		},
 	}
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cp, driver).Build()
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(cp, driver).
+		WithStatusSubresource(&nvidiav1alpha1.NVIDIADriver{}).
+		Build()
 	updater := &FakeConditionUpdater{}
 
 	reconciler := &NVIDIADriverReconciler{
@@ -558,6 +569,7 @@ func TestReconcileMultipleDefaultDriversSetsNotReadyState(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	defaultDriver := &nvidiav1alpha1.NVIDIADriver{
 		ObjectMeta: metav1.ObjectMeta{Name: "default-a"},
@@ -677,4 +689,272 @@ func TestEnqueueNVIDIADriverReconcilersDedupesEventDriver(t *testing.T) {
 
 	require.Len(t, requests, 1)
 	require.Equal(t, "default/driver-a", requests[0].String())
+}
+
+func TestReconcileAddsFinalizer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-driver",
+		},
+	}
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{
+				UseNvidiaDriverCRD: new(true),
+			},
+		},
+	}
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(cp, driver).
+		WithStatusSubresource(&nvidiav1alpha1.NVIDIADriver{}).
+		Build()
+	reconciler := &NVIDIADriverReconciler{
+		Client:                client,
+		Scheme:                scheme,
+		conditionUpdater:      &FakeConditionUpdater{},
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+		stateManager:          &fakeStateManager{results: state.Results{Status: state.SyncStateReady}},
+	}
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: driver.Name,
+		},
+	}
+	_, err := reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+
+	updatedDriver := &nvidiav1alpha1.NVIDIADriver{}
+	require.NoError(t, client.Get(context.Background(), req.NamespacedName, updatedDriver))
+	require.Contains(t, updatedDriver.Finalizers, nvidiaDriverFinalizer)
+}
+
+func TestReconcileDeleteCleansUpDaemonSetsAndNodeLabels(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+
+	now := metav1.Now()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test-driver",
+			Namespace:         "default",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{nvidiaDriverFinalizer},
+		},
+	}
+
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-driver-ds",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: nvidiav1alpha1.SchemeGroupVersion.String(),
+					Kind:       nvidiav1alpha1.NVIDIADriverCRDName,
+					Name:       driver.Name,
+					Controller: new(true),
+				},
+			},
+		},
+	}
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node-1",
+			Labels: map[string]string{
+				consts.NVIDIADriverOwnerLabel: driver.Name,
+				consts.DriverReadyLabel:       "true",
+			},
+		},
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(driver, ds, node).
+		WithIndex(&appsv1.DaemonSet{}, consts.NVIDIADriverControllerIndexKey, func(rawObj client.Object) []string {
+			dsObj := rawObj.(*appsv1.DaemonSet)
+			owner := metav1.GetControllerOf(dsObj)
+			if owner == nil || owner.Kind != nvidiav1alpha1.NVIDIADriverCRDName {
+				return nil
+			}
+			return []string{owner.Name}
+		}).
+		Build()
+
+	reconciler := &NVIDIADriverReconciler{
+		Client: client,
+		Scheme: scheme,
+	}
+
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      driver.Name,
+			Namespace: driver.Namespace,
+		},
+	}
+	res, err := reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, ctrl.Result{}, res)
+
+	// Verify DaemonSet was deleted
+	err = client.Get(context.Background(), types.NamespacedName{Name: ds.Name, Namespace: ds.Namespace}, &appsv1.DaemonSet{})
+	require.True(t, apierrors.IsNotFound(err))
+
+	// Verify Node labels were cleaned up
+	updatedNode := &corev1.Node{}
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: node.Name}, updatedNode))
+	require.NotContains(t, updatedNode.Labels, consts.NVIDIADriverOwnerLabel)
+	require.NotContains(t, updatedNode.Labels, consts.DriverReadyLabel)
+
+	// Verify finalizer was removed
+	updatedDriver := &nvidiav1alpha1.NVIDIADriver{}
+	err = client.Get(context.Background(), req.NamespacedName, updatedDriver)
+	if err == nil {
+		require.NotContains(t, updatedDriver.Finalizers, nvidiaDriverFinalizer)
+	} else {
+		require.True(t, apierrors.IsNotFound(err))
+	}
+}
+
+// TestReconcileDeleteCleansUpOrphanedDaemonSetWithoutOwnerReference verifies that when
+// Kubernetes orphan deletion propagation strips ownerReferences from driver DaemonSets,
+// reconcileDelete still discovers and deletes them via driver owner nodeSelector.
+func TestReconcileDeleteCleansUpOrphanedDaemonSetWithoutOwnerReference(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	now := metav1.Now()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test-driver-orphan",
+			Namespace:         "default",
+			Finalizers:        []string{nvidiaDriverFinalizer},
+			DeletionTimestamp: &now,
+		},
+	}
+
+	// DaemonSet has NO OwnerReferences (simulating orphan propagation stripping it),
+	// but retains the driver owner nodeSelector.
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "orphaned-driver-ds",
+			Namespace: "default",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{
+						consts.NVIDIADriverOwnerLabel: driver.Name,
+					},
+				},
+			},
+		},
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(driver, ds).
+		WithIndex(&appsv1.DaemonSet{}, consts.NVIDIADriverControllerIndexKey, func(rawObj client.Object) []string {
+			dsObj := rawObj.(*appsv1.DaemonSet)
+			owner := metav1.GetControllerOf(dsObj)
+			if owner == nil || owner.Kind != nvidiav1alpha1.NVIDIADriverCRDName {
+				return nil
+			}
+			return []string{owner.Name}
+		}).
+		Build()
+
+	reconciler := &NVIDIADriverReconciler{
+		Client:    client,
+		Scheme:    scheme,
+		Namespace: "default",
+	}
+
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      driver.Name,
+			Namespace: driver.Namespace,
+		},
+	}
+	res, err := reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, ctrl.Result{}, res)
+
+	// Verify orphaned DaemonSet was deleted
+	err = client.Get(context.Background(), types.NamespacedName{Name: ds.Name, Namespace: ds.Namespace}, &appsv1.DaemonSet{})
+	require.True(t, apierrors.IsNotFound(err))
+}
+
+func TestCleanupDeselectedNodeLabels(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-driver",
+			Namespace: "default",
+		},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			NodeSelector: map[string]string{"zone": "east"},
+		},
+	}
+
+	matchingNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "matching-node",
+			Labels: map[string]string{
+				consts.GPUPresentLabel:        "true",
+				consts.NVIDIADriverOwnerLabel: driver.Name,
+				consts.DriverReadyLabel:       "true",
+				"zone":                        "east",
+			},
+		},
+	}
+
+	deselectedNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "deselected-node",
+			Labels: map[string]string{
+				consts.GPUPresentLabel:        "true",
+				consts.NVIDIADriverOwnerLabel: driver.Name,
+				consts.DriverReadyLabel:       "true",
+				"zone":                        "west",
+			},
+		},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(driver, matchingNode, deselectedNode).Build()
+	reconciler := &NVIDIADriverReconciler{
+		Client: client,
+		Scheme: scheme,
+	}
+
+	err := reconciler.cleanupDeselectedNodeLabels(context.Background(), driver)
+	require.NoError(t, err)
+
+	// Matching node should retain labels
+	updatedMatching := &corev1.Node{}
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: matchingNode.Name}, updatedMatching))
+	require.Equal(t, driver.Name, updatedMatching.Labels[consts.NVIDIADriverOwnerLabel])
+	require.Equal(t, "true", updatedMatching.Labels[consts.DriverReadyLabel])
+
+	// Deselected node should have driver labels cleaned up
+	updatedDeselected := &corev1.Node{}
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: deselectedNode.Name}, updatedDeselected))
+	require.NotContains(t, updatedDeselected.Labels, consts.NVIDIADriverOwnerLabel)
+	require.NotContains(t, updatedDeselected.Labels, consts.DriverReadyLabel)
 }

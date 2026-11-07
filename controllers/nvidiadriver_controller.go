@@ -26,6 +26,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -45,9 +48,13 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
+	nvidiadriverutil "github.com/NVIDIA/gpu-operator/internal/nvidiadriver"
 	"github.com/NVIDIA/gpu-operator/internal/state"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
+
+const nvidiaDriverFinalizer = "nvidiadriver.nvidia.com/finalizer"
 
 // defaultHostRoot is the host root mounted into the driver daemonset. It is
 // hard-coded to "/" to avoid a cross-CR dependency; only the legacy
@@ -103,7 +110,11 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, wrappedErr
 	}
 	if instance.HasDeletionTimestamp() {
-		return reconcile.Result{}, nil
+		return r.reconcileDelete(ctx, instance)
+	}
+
+	if err := utils.EnsureFinalizer(ctx, r.Client, instance, nvidiaDriverFinalizer); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error adding finalizer to NVIDIADriver %s: %w", req.NamespacedName, err)
 	}
 
 	// Resolve the active cluster configuration (ClusterPolicy, GPUCluster, or both).
@@ -158,6 +169,11 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			logger.Error(condErr, "failed to set condition")
 		}
 		return reconcile.Result{}, nil
+	}
+
+	if err := r.cleanupDeselectedNodeLabels(ctx, instance); err != nil {
+		logger.Error(err, "failed to clean up driver labels on deselected nodes")
+		return reconcile.Result{}, err
 	}
 
 	if instance.Spec.UsePrecompiledDrivers() && (instance.Spec.IsGDSEnabled() || instance.Spec.IsGDRCopyEnabled()) {
@@ -320,6 +336,159 @@ func dedupeReconcileRequests(requests []reconcile.Request) []reconcile.Request {
 		deduped = append(deduped, request)
 	}
 	return deduped
+}
+
+// reconcileDelete cleans up driver DaemonSets, owner and driver readiness node labels,
+// re-evaluates driver ownership across GPU nodes, and removes the finalizer.
+func (r *NVIDIADriverReconciler) reconcileDelete(ctx context.Context, instance *nvidiav1alpha1.NVIDIADriver) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	if !controllerutil.ContainsFinalizer(instance, nvidiaDriverFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
+	logger.Info("Deleting NVIDIADriver, cleaning up DaemonSets and node labels", "name", instance.Name)
+
+	// 1. Delete all DaemonSets owned by this NVIDIADriver instance (handles non-cascading and orphaned deletion)
+	driverDaemonSets, err := r.getOwnedDriverDaemonSets(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	for i := range driverDaemonSets {
+		ds := &driverDaemonSets[i]
+		if ds.DeletionTimestamp.IsZero() {
+			logger.Info("Deleting driver DaemonSet", "name", ds.Name)
+			if err := r.Delete(ctx, ds); err != nil && !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("error deleting DaemonSet %s: %w", ds.Name, err)
+			}
+		}
+	}
+
+	// 2. Clean up driver readiness and owner labels from nodes owned by this driver
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes, client.MatchingLabels{consts.NVIDIADriverOwnerLabel: instance.Name}); err != nil {
+		if !meta.IsNoMatchError(err) && !runtime.IsNotRegisteredError(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to list nodes owned by NVIDIADriver %s: %w", instance.Name, err)
+		}
+	}
+	for _, nodeItem := range nodes.Items {
+		node := nodeItem.DeepCopy()
+		originalNode := node.DeepCopy()
+		modified := false
+
+		if _, ok := node.Labels[consts.DriverReadyLabel]; ok {
+			delete(node.Labels, consts.DriverReadyLabel)
+			modified = true
+		}
+		if _, ok := node.Labels[consts.NVIDIADriverOwnerLabel]; ok {
+			delete(node.Labels, consts.NVIDIADriverOwnerLabel)
+			modified = true
+		}
+
+		if modified {
+			if err := r.Patch(ctx, node, client.MergeFrom(originalNode)); err != nil && !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("failed to remove driver labels from node %s: %w", node.Name, err)
+			}
+		}
+	}
+
+	// 3. Re-assign owners so fallback/remaining drivers can claim eligible nodes.
+	// Only re-assign owners if NVIDIADriver delegation is active in the cluster configuration;
+	// if legacy ClusterPolicy is managing drivers without delegation, AssignOwners should not run.
+	// We log assignment errors rather than blocking finalizer removal to ensure that
+	// persistent conflicts in other CRs (e.g., multiple defaults) cannot block deletion.
+	// NodeLabelingReconciler also watches NVIDIADriver deletion events and will re-run
+	// AssignOwners as part of node label reconciliation.
+	clusterPolicy, gpuCluster, configErr := resolveActiveConfig(ctx, r.Client)
+	if configErr == nil && (gpuCluster != nil || (clusterPolicy != nil && clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType())) {
+		if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client); err != nil {
+			logger.Error(err, "failed to re-assign NVIDIADriver owners after deletion")
+		}
+	}
+
+	// 4. Remove finalizer and update instance
+	controllerutil.RemoveFinalizer(instance, nvidiaDriverFinalizer)
+	if err := r.Update(ctx, instance); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("error removing finalizer: %w", err)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// getOwnedDriverDaemonSets returns all DaemonSets owned by or associated with this NVIDIADriver instance.
+// It checks controller owner references, matching owner labels, and pod template owner nodeSelectors
+// so that orphaned DaemonSets (e.g. following non-cascading deletion where owner references are stripped)
+// are reliably identified and deleted.
+func (r *NVIDIADriverReconciler) getOwnedDriverDaemonSets(ctx context.Context, instance *nvidiav1alpha1.NVIDIADriver) ([]appsv1.DaemonSet, error) {
+	// First query via the field indexer (controller owner reference).
+	indexedList := &appsv1.DaemonSetList{}
+	if err := r.List(ctx, indexedList, client.MatchingFields{consts.NVIDIADriverControllerIndexKey: instance.Name}); err != nil {
+		return nil, fmt.Errorf("failed to list driver DaemonSets: %w", err)
+	}
+
+	foundMap := make(map[types.UID]appsv1.DaemonSet, len(indexedList.Items))
+	for _, ds := range indexedList.Items {
+		foundMap[ds.UID] = ds
+	}
+
+	// Also scan DaemonSets to catch orphaned DaemonSets whose controller owner references
+	// were stripped by Kubernetes orphan deletion propagation.
+	listOpts := []client.ListOption{}
+	if r.Namespace != "" {
+		listOpts = append(listOpts, client.InNamespace(r.Namespace))
+	}
+	allList := &appsv1.DaemonSetList{}
+	if err := r.List(ctx, allList, listOpts...); err != nil {
+		if !meta.IsNoMatchError(err) && !runtime.IsNotRegisteredError(err) {
+			return nil, fmt.Errorf("failed to list DaemonSets: %w", err)
+		}
+	} else {
+		for _, ds := range allList.Items {
+			if _, alreadyFound := foundMap[ds.UID]; alreadyFound {
+				continue
+			}
+			// Identify driver DaemonSets by owner nodeSelector or matching owner label
+			if (ds.Spec.Template.Spec.NodeSelector != nil && ds.Spec.Template.Spec.NodeSelector[consts.NVIDIADriverOwnerLabel] == instance.Name) ||
+				(ds.Labels != nil && ds.Labels[consts.NVIDIADriverOwnerLabel] == instance.Name) {
+				foundMap[ds.UID] = ds
+			}
+		}
+	}
+
+	result := make([]appsv1.DaemonSet, 0, len(foundMap))
+	for _, ds := range foundMap {
+		result = append(result, ds)
+	}
+	return result, nil
+}
+
+// cleanupDeselectedNodeLabels removes driver readiness and owner labels from nodes
+// that were previously owned by this NVIDIADriver but no longer match its nodeSelector.
+func (r *NVIDIADriverReconciler) cleanupDeselectedNodeLabels(ctx context.Context, instance *nvidiav1alpha1.NVIDIADriver) error {
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes, client.MatchingLabels{consts.NVIDIADriverOwnerLabel: instance.Name}); err != nil {
+		if meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to list nodes owned by %s: %w", instance.Name, err)
+	}
+
+	selector := labels.SelectorFromSet(instance.GetNodeSelector())
+	for _, nodeItem := range nodes.Items {
+		if !selector.Matches(labels.Set(nodeItem.Labels)) {
+			node := nodeItem.DeepCopy()
+			originalNode := node.DeepCopy()
+			delete(node.Labels, consts.DriverReadyLabel)
+			delete(node.Labels, consts.NVIDIADriverOwnerLabel)
+			if err := r.Patch(ctx, node, client.MergeFrom(originalNode)); err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to clean up driver labels on deselected node %s: %w", node.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -79,10 +79,16 @@ func AssignOwners(ctx context.Context, c client.Client) (bool, error) {
 
 		originalNode := node.DeepCopy()
 		if desiredOwner == "" {
-			delete(node.Labels, consts.NVIDIADriverOwnerLabel)
+			if _, hasOwner := node.Labels[consts.NVIDIADriverOwnerLabel]; hasOwner {
+				delete(node.Labels, consts.NVIDIADriverOwnerLabel)
+				delete(node.Labels, consts.DriverReadyLabel)
+			}
 		} else {
 			if node.Labels == nil {
 				node.Labels = map[string]string{}
+			}
+			if currentOwner, hasOwner := node.Labels[consts.NVIDIADriverOwnerLabel]; hasOwner && currentOwner != desiredOwner {
+				delete(node.Labels, consts.DriverReadyLabel)
 			}
 			node.Labels[consts.NVIDIADriverOwnerLabel] = desiredOwner
 		}
@@ -149,11 +155,16 @@ func desiredOwnerForNode(
 	return defaultOwner, nil
 }
 
-// ownerLabelNeedsUpdate reports whether the node owner label differs from the desired owner.
+// ownerLabelNeedsUpdate reports whether the node owner label differs from the desired owner,
+// or if stale driver readiness labels need pruning on an owned node.
 func ownerLabelNeedsUpdate(nodeLabels map[string]string, desiredOwner string) bool {
 	currentOwner, hasOwnerLabel := nodeLabels[consts.NVIDIADriverOwnerLabel]
+	_, hasReadyLabel := nodeLabels[consts.DriverReadyLabel]
 	if desiredOwner == "" {
+		// Only nodes currently carrying an NVIDIADriverOwnerLabel should be updated/cleared.
+		// Nodes without NVIDIADriverOwnerLabel (e.g. legacy ClusterPolicy driver nodes)
+		// must preserve their driver readiness.
 		return hasOwnerLabel
 	}
-	return !hasOwnerLabel || (currentOwner != desiredOwner)
+	return !hasOwnerLabel || (currentOwner != desiredOwner) || (currentOwner != desiredOwner && hasReadyLabel)
 }

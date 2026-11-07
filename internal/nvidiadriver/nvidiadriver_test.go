@@ -483,3 +483,98 @@ func TestAssignNVIDIADriverOwnersDoesNotChangeOwnersWhenAnyUserDriverConflicts(t
 	require.Equal(t, "demo-gold", goldNode.Labels[consts.NVIDIADriverOwnerLabel])
 	require.Equal(t, consts.DefaultNVIDIADriverName, defaultNode.Labels[consts.NVIDIADriverOwnerLabel])
 }
+
+func TestAssignOwnersCleansUpDriverReadyLabelWhenUnassigned(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node-1",
+			Labels: map[string]string{
+				consts.GPUPresentLabel:        "true",
+				consts.NVIDIADriverOwnerLabel: "old-driver",
+				consts.DriverReadyLabel:       "true",
+			},
+		},
+	}
+
+	// No NVIDIADriver CRs present. Node should lose owner and driver readiness labels.
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(node).Build()
+
+	changed, err := AssignOwners(context.Background(), k8sClient)
+	require.NoError(t, err)
+	require.True(t, changed)
+
+	updatedNode := &corev1.Node{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gpu-node-1"}, updatedNode))
+	require.NotContains(t, updatedNode.Labels, consts.NVIDIADriverOwnerLabel)
+	require.NotContains(t, updatedNode.Labels, consts.DriverReadyLabel)
+}
+
+func TestAssignOwnersCleansUpDriverReadyLabelWhenOwnerChanges(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	newDriver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "new-driver"},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			NodeSelector: map[string]string{"pool": "compute"},
+		},
+	}
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node-2",
+			Labels: map[string]string{
+				consts.GPUPresentLabel:        "true",
+				consts.NVIDIADriverOwnerLabel: "old-driver",
+				consts.DriverReadyLabel:       "true",
+				"pool":                        "compute",
+			},
+		},
+	}
+
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(newDriver, node).Build()
+
+	changed, err := AssignOwners(context.Background(), k8sClient)
+	require.NoError(t, err)
+	require.True(t, changed)
+
+	updatedNode := &corev1.Node{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "gpu-node-2"}, updatedNode))
+	require.Equal(t, "new-driver", updatedNode.Labels[consts.NVIDIADriverOwnerLabel])
+	require.NotContains(t, updatedNode.Labels, consts.DriverReadyLabel)
+}
+
+func TestAssignOwnersPreservesLegacyDriverReadiness(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	// Node has legacy driver running: gpu.present and driver.ready are true,
+	// but it does not have NVIDIADriverOwnerLabel.
+	legacyNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "legacy-gpu-node",
+			Labels: map[string]string{
+				consts.GPUPresentLabel:  "true",
+				consts.DriverReadyLabel: "true",
+			},
+		},
+	}
+
+	// No NVIDIADrivers configured. AssignOwners must not strip driver.ready from legacy nodes.
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacyNode).Build()
+
+	changed, err := AssignOwners(context.Background(), k8sClient)
+	require.NoError(t, err)
+	require.False(t, changed)
+
+	updatedNode := &corev1.Node{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKey{Name: "legacy-gpu-node"}, updatedNode))
+	require.NotContains(t, updatedNode.Labels, consts.NVIDIADriverOwnerLabel)
+	require.Equal(t, "true", updatedNode.Labels[consts.DriverReadyLabel])
+}
