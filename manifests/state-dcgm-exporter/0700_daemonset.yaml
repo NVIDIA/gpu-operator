@@ -28,11 +28,6 @@ spec:
       labels:
         app: nvidia-dcgm-exporter-dra
         app.kubernetes.io/component: nvidia-dcgm-exporter
-        {{- range $k, $v := .Daemonsets.Labels }}
-        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") (ne $k "app.kubernetes.io/component") }}
-        {{ $k }}: {{ $v | quote }}
-        {{- end }}
-        {{- end }}
       {{- if or .Daemonsets.Annotations .DCGMExporter.Spec.Annotations }}
       annotations:
         {{- range $k, $v := .Daemonsets.Annotations }}

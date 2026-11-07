@@ -17,9 +17,11 @@
 package state
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -28,6 +30,19 @@ import (
 )
 
 // Helpers shared by the GPUCluster operand states (DRA driver, DCGM, ...).
+
+// renderGPUClusterObjects applies common GPUCluster configuration after rendering
+// so operand templates do not need to duplicate the shared policy.
+func (s *stateSkel) renderGPUClusterObjects(ctx context.Context, cr *nvidiav1alpha1.GPUCluster, data any) ([]*unstructured.Unstructured, error) {
+	objs, err := s.renderObjects(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyGPUClusterDaemonSetLabels(objs, cr.Spec.Daemonsets.Labels); err != nil {
+		return nil, err
+	}
+	return objs, nil
+}
 
 // dcgmEnabled reports whether the standalone DCGM hostengine operand is enabled.
 // The DRA stack defaults it to disabled, so it does not use the reused v1
