@@ -114,15 +114,12 @@ func (r nodeLabelUpdateReasons) needsUpdate() bool {
 
 // getNodeLabelUpdateReasons collects changes that can affect GPU labels or driver pool membership.
 func (r *NodeLabelingReconciler) getNodeLabelUpdateReasons(ctx context.Context, nodeName string, oldLabels, newLabels map[string]string) (nodeLabelUpdateReasons, error) {
-	oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
-	newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
-
 	reasons := nodeLabelUpdateReasons{
 		gpuCommonLabelMissing:        hasGPULabels(newLabels) && !hasCommonGPULabel(newLabels),
 		gpuCommonLabelOutdated:       !hasGPULabels(newLabels) && hasCommonGPULabel(newLabels),
 		gpuCommonLabelChanged:        oldLabels[commonGPULabelKey] != newLabels[commonGPULabelKey],
 		commonOperandsLabelChanged:   hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels),
-		gpuWorkloadConfigChanged:     oldGPUWorkloadConfig != newGPUWorkloadConfig,
+		gpuWorkloadConfigChanged:     oldLabels[gpuWorkloadConfigLabelKey] != newLabels[gpuWorkloadConfigLabelKey],
 		migCapableLabelChanged:       hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels),
 		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
 		nvidiaDriverOwnerLabelChange: oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
@@ -334,18 +331,20 @@ func (nlc *nodeLabelingController) updateGPUStateLabels(ctx context.Context, lab
 	cp := nlc.clusterPolicy
 	sandboxEnabled := cp != nil && cp.Spec.SandboxWorkloads.IsEnabled()
 	sandboxMode := ""
+	defaultWorkloadConfig := gpuWorkloadConfigContainer
 	if cp != nil {
 		sandboxMode = cp.Spec.SandboxWorkloads.Mode
+		defaultWorkloadConfig = getDefaultWorkloadConfig(&cp.Spec.SandboxWorkloads)
 	}
 
-	config, err := getWorkloadConfig(labels, sandboxEnabled)
+	workloadConfig, err := getWorkloadConfig(labels, sandboxEnabled, defaultWorkloadConfig)
 	if err != nil {
 		nlc.logger.Info("WARNING: failed to get GPU workload config for node; using default",
 			"NodeName", nodeName, "SandboxEnabled", sandboxEnabled,
-			"Error", err, "defaultGPUWorkloadConfig", defaultGPUWorkloadConfig)
+			"Error", err, "defaultGPUWorkloadConfig", defaultWorkloadConfig)
 	}
 	gpuWorkloadConfig := &gpuWorkloadConfiguration{
-		config:      config,
+		config:      workloadConfig,
 		sandboxMode: sandboxMode,
 		node:        nodeName,
 		log:         nlc.logger,
