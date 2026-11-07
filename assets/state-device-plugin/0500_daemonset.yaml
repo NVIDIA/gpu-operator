@@ -149,7 +149,7 @@ spec:
             type: DirectoryOrCreate
         - name: driver-install-dir
           hostPath:
-            path: "/run/nvidia/driver"
+            path: "/run/nvidia"
             type: DirectoryOrCreate
         - name: host-root
           hostPath:
