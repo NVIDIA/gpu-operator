@@ -41,6 +41,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -65,6 +66,7 @@ const (
 	dcgmExporterAssetsPath        = "assets/state-dcgm-exporter/"
 	migManagerAssetsPath          = "assets/state-mig-manager/"
 	vGPUDeviceManagerAssetsPath   = "assets/state-vgpu-device-manager/"
+	validatorAssetsPath           = "assets/state-operator-validation/"
 	nfdNvidiaPCILabelKey          = "feature.node.kubernetes.io/pci-10de.present"
 	upgradedKernel                = "5.4.135-generic"
 )
@@ -2782,4 +2784,108 @@ func TestDriverPrecompiledLibModulesSuse(t *testing.T) {
 			clusterPolicyController.idx--
 		})
 	}
+}
+
+// versionValidatingClient intercepts Update calls to verify that DaemonSet updates carry
+// a non-empty and matching ResourceVersion, simulating the real Kubernetes API server's
+// optimistic concurrency control which the controller-runtime fake client permits unconditionally.
+type versionValidatingClient struct {
+	client.Client
+}
+
+func (c *versionValidatingClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if ds, ok := obj.(*appsv1.DaemonSet); ok {
+		if ds.ResourceVersion == "" {
+			return apierrors.NewConflict(
+				schema.GroupResource{Group: "apps", Resource: "daemonsets"},
+				ds.Name,
+				errors.New("metadata.resourceVersion: Invalid value: \"\": must be specified for an update"),
+			)
+		}
+		existing := &appsv1.DaemonSet{}
+		if err := c.Client.Get(ctx, types.NamespacedName{Namespace: ds.Namespace, Name: ds.Name}, existing); err == nil {
+			if ds.ResourceVersion != existing.ResourceVersion {
+				return apierrors.NewConflict(
+					schema.GroupResource{Group: "apps", Resource: "daemonsets"},
+					ds.Name,
+					errors.New("Operation cannot be fulfilled on daemonsets: the object has been modified; please apply your changes to the latest version and try again"),
+				)
+			}
+		}
+	}
+	return c.Client.Update(ctx, obj, opts...)
+}
+
+// TestDaemonSetDynamicTolerationUpdate verifies that when tolerations are updated in ClusterPolicy,
+// DaemonSets (such as nvidia-operator-validator) dynamically synchronize the updated tolerations
+// during reconciliation with matching ResourceVersion.
+func TestDaemonSetDynamicTolerationUpdate(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, validatorAssetsPath)
+
+	// Ensure controller has GPU nodes and required validator spec
+	clusterPolicyController.hasGPUNodes = true
+	clusterPolicyController.singleton.Spec.Validator.Repository = "nvcr.io/nvidia/cloud-native"
+	clusterPolicyController.singleton.Spec.Validator.Image = "gpu-operator-validator"
+	clusterPolicyController.singleton.Spec.Validator.Version = "v1.11.0"
+	clusterPolicyController.singleton.Spec.Daemonsets.Tolerations = nil
+
+	// Add state for operator-validation
+	addState(&clusterPolicyController, manifestPath)
+	stateIdx := clusterPolicyController.idx
+
+	// Initial step: create resources including DaemonSet
+	_, err := clusterPolicyController.step()
+	require.NoError(t, err)
+
+	// Retrieve created DaemonSet
+	ds := &appsv1.DaemonSet{}
+	err = clusterPolicyController.client.Get(context.Background(), types.NamespacedName{
+		Name:      "nvidia-operator-validator",
+		Namespace: clusterPolicyController.operatorNamespace,
+	}, ds)
+	require.NoError(t, err)
+	require.NotEmpty(t, ds.ResourceVersion)
+	require.Contains(t, ds.Annotations, NvidiaAnnotationHashKey)
+	// Default toleration from manifest
+	require.Len(t, ds.Spec.Template.Spec.Tolerations, 1)
+	require.Equal(t, "nvidia.com/gpu", ds.Spec.Template.Spec.Tolerations[0].Key)
+
+	// Wrap client with versionValidatingClient that enforces Kubernetes optimistic concurrency control:
+	// rejecting DaemonSet updates if ResourceVersion is empty or mismatched against the cluster state.
+	origClient := clusterPolicyController.client
+	clusterPolicyController.client = &versionValidatingClient{Client: origClient}
+	defer func() {
+		clusterPolicyController.client = origClient
+	}()
+
+	// Update ClusterPolicy with custom tolerations
+	newToleration := corev1.Toleration{
+		Key:      "dedicated",
+		Operator: corev1.TolerationOpEqual,
+		Value:    "gpu",
+		Effect:   corev1.TaintEffectNoSchedule,
+	}
+	clusterPolicyController.singleton.Spec.Daemonsets.Tolerations = []corev1.Toleration{newToleration}
+	clusterPolicyController.idx = stateIdx
+
+	// Reconcile: should detect spec difference and update DaemonSet with matching ResourceVersion
+	_, err = clusterPolicyController.step()
+	require.NoError(t, err)
+
+	// Verify the DaemonSet in Kubernetes client was updated with new toleration
+	updatedDs := &appsv1.DaemonSet{}
+	err = clusterPolicyController.client.Get(context.Background(), types.NamespacedName{
+		Name:      "nvidia-operator-validator",
+		Namespace: clusterPolicyController.operatorNamespace,
+	}, updatedDs)
+	require.NoError(t, err)
+	require.NotEmpty(t, updatedDs.ResourceVersion)
+	require.Len(t, updatedDs.Spec.Template.Spec.Tolerations, 1)
+	require.Equal(t, "dedicated", updatedDs.Spec.Template.Spec.Tolerations[0].Key)
+	require.Equal(t, "gpu", updatedDs.Spec.Template.Spec.Tolerations[0].Value)
+
+	// Cleanup
+	err = removeState(&clusterPolicyController, stateIdx)
+	require.NoError(t, err)
+	clusterPolicyController.idx--
 }

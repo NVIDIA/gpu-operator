@@ -759,6 +759,47 @@ func TestApplyCommonDaemonSetConfig(t *testing.T) {
 	}
 }
 
+func TestIsDaemonsetSpecChangedWithTolerations(t *testing.T) {
+	currentDs := NewDaemonset().WithTolerations([]corev1.Toleration{
+		{
+			Key:      "nvidia.com/gpu",
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	})
+	currentDs.Annotations = make(map[string]string)
+	initialHash := utils.GetObjectHash(currentDs.DaemonSet)
+	currentDs.Annotations[NvidiaAnnotationHashKey] = initialHash
+
+	newDs := NewDaemonset().WithTolerations([]corev1.Toleration{
+		{
+			Key:      "dedicated",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "gpu",
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	})
+	newDs.Annotations = make(map[string]string)
+
+	expectedNewHash := utils.GetObjectHash(newDs.DaemonSet)
+	changed := isDaemonsetSpecChanged(currentDs.DaemonSet, newDs.DaemonSet)
+	require.True(t, changed, "expected daemonset spec to be marked changed when tolerations change")
+	require.Equal(t, expectedNewHash, newDs.Annotations[NvidiaAnnotationHashKey])
+
+	// If no changes, a freshly constructed new daemonset (without hash annotation) compared against newDs (with hash annotation) should return false
+	sameDs := NewDaemonset().WithTolerations([]corev1.Toleration{
+		{
+			Key:      "dedicated",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "gpu",
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	})
+	sameDs.Annotations = make(map[string]string)
+	changedAgain := isDaemonsetSpecChanged(newDs.DaemonSet, sameDs.DaemonSet)
+	require.False(t, changedAgain, "expected daemonset spec to be identical when tolerations match")
+}
+
 func TestApplyHostNetworkConfig(t *testing.T) {
 	tests := []struct {
 		name            string
