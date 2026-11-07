@@ -4823,6 +4823,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	changed := isDaemonsetSpecChanged(found, obj)
 	if changed {
 		logger.Info("DaemonSet is different, updating", "name", obj.Name)
+		obj.ResourceVersion = found.ResourceVersion
 		err = n.client.Update(ctx, obj)
 		if err != nil {
 			return gpuv1.NotReady, err
