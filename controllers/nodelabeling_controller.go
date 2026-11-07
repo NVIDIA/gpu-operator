@@ -125,7 +125,8 @@ func (r *NodeLabelingReconciler) getNodeLabelUpdateReasons(ctx context.Context, 
 		gpuWorkloadConfigChanged:     oldGPUWorkloadConfig != newGPUWorkloadConfig,
 		migCapableLabelChanged:       hasMIGCapableGPU(oldLabels) != hasMIGCapableGPU(newLabels),
 		osTreeLabelChanged:           oldLabels[nfdOSTreeVersionLabelKey] != newLabels[nfdOSTreeVersionLabelKey],
-		nvidiaDriverOwnerLabelChange: oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel],
+		nvidiaDriverOwnerLabelChange: oldLabels[consts.NVIDIADriverOwnerLabel] != newLabels[consts.NVIDIADriverOwnerLabel] ||
+			oldLabels[consts.DriverReadyLabel] != newLabels[consts.DriverReadyLabel],
 	}
 
 	if reasons.needsUpdate() || maps.Equal(oldLabels, newLabels) {
@@ -735,7 +736,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		mgr.GetCache(),
 		&nvidiav1alpha1.NVIDIADriver{},
 		handler.TypedEnqueueRequestsFromMapFunc(nvidiaDriverMapFn),
-		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.NVIDIADriver]{},
+		singletonCRPredicate[*nvidiav1alpha1.NVIDIADriver](),
 	)); err != nil {
 		return fmt.Errorf("error watching NVIDIADriver: %w", err)
 	}

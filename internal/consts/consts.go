@@ -71,6 +71,8 @@ const (
 	DefaultNVIDIADriverName = "default"
 	// NVIDIADriverOwnerLabel is an operator-managed node label used to route each GPU node to one NVIDIADriver.
 	NVIDIADriverOwnerLabel = "nvidia.com/gpu-operator.driver.owner"
+	// DriverReadyLabel indicates that the NVIDIA driver is ready on the node.
+	DriverReadyLabel = "nvidia.com/gpu.driver.ready"
 
 	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
 	MinimumGDSVersionForOpenRM = "v2.17.5"
