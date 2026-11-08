@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -84,8 +85,9 @@ type precompiledSpec struct {
 }
 
 type additionalConfigs struct {
-	VolumeMounts []corev1.VolumeMount
-	Volumes      []corev1.Volume
+	DriverManagerVolumeMounts []corev1.VolumeMount
+	VolumeMounts              []corev1.VolumeMount
+	Volumes                   []corev1.Volume
 }
 
 type driverRenderData struct {
@@ -137,6 +139,24 @@ func (s *stateDriver) Sync(ctx context.Context, customResource any, infoCatalog 
 		return SyncStateError, fmt.Errorf("NVIDIADriver CR not provided as input to Sync()")
 	}
 
+	// Wait for initial ownership assignment before rendering, so missing owner
+	// labels cannot produce an empty desired list and trigger DaemonSet deletion.
+	// Adding the owner selector before node owner labels are assigned could also
+	// cause the DaemonSet controller to delete existing driver pods.
+	hasDaemonSetsWithoutOwnerSelector, err := s.hasDriverDaemonSetsWithoutOwnerSelector(ctx, cr)
+	if err != nil {
+		return SyncStateNotReady, fmt.Errorf("failed to check for driver DaemonSets without an owner selector: %w", err)
+	}
+	if hasDaemonSetsWithoutOwnerSelector {
+		ownershipPending, err := s.driverNodeOwnershipPending(ctx, cr)
+		if err != nil {
+			return SyncStateNotReady, fmt.Errorf("failed to check driver node ownership: %w", err)
+		}
+		if ownershipPending {
+			return SyncStateNotReady, fmt.Errorf("waiting for initial driver ownership assignment for NVIDIADriver %q", cr.Name)
+		}
+	}
+
 	objs, err := s.getManifestObjects(ctx, cr, infoCatalog)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to create k8s objects from manifests: %w", err)
@@ -181,6 +201,39 @@ func (s *stateDriver) GetWatchSources(mgr ctrlManager) map[string]SyncingSource 
 		nvDriverPredicate,
 	)
 	return wr
+}
+
+// hasDriverDaemonSetsWithoutOwnerSelector reports whether the CR owns any DaemonSets
+// whose pod templates lack the driver owner selector.
+func (s *stateDriver) hasDriverDaemonSetsWithoutOwnerSelector(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) (bool, error) {
+	daemonSets := &appsv1.DaemonSetList{}
+	if err := s.client.List(ctx, daemonSets, client.MatchingFields{consts.NVIDIADriverControllerIndexKey: cr.Name}); err != nil {
+		return false, fmt.Errorf("failed to list driver DaemonSets: %w", err)
+	}
+	for _, ds := range daemonSets.Items {
+		if _, hasOwner := ds.Spec.Template.Spec.NodeSelector[consts.NVIDIADriverOwnerLabel]; !hasOwner {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// driverNodeOwnershipPending reports whether any GPU node matching the CR's
+// node selector still lacks a driver owner label.
+func (s *stateDriver) driverNodeOwnershipPending(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver) (bool, error) {
+	// If the CR selector excludes GPU nodes, there is no ownership assignment to wait for.
+	gpuPresent, _ := labels.NewRequirement(consts.GPUPresentLabel, selection.Equals, []string{"true"})
+	nodeSelector := labels.SelectorFromSet(cr.Spec.NodeSelector).Add(*gpuPresent)
+	nodes := &corev1.NodeList{}
+	if err := s.client.List(ctx, nodes, client.MatchingLabelsSelector{Selector: nodeSelector}); err != nil {
+		return false, fmt.Errorf("failed to list nodes for driver ownership migration: %w", err)
+	}
+	for _, node := range nodes.Items {
+		if node.Labels[consts.NVIDIADriverOwnerLabel] == "" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (s *stateDriver) cleanupStaleDriverDaemonsets(ctx context.Context, cr *nvidiav1alpha1.NVIDIADriver, desiredObjs []*unstructured.Unstructured) error {

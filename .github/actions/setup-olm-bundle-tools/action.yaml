@@ -1,0 +1,67 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Set up OLM bundle tools
+description: Install Python 3.12 with PyYAML, and Go, regctl, and Operator SDK at the versions the repository pins
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: "3.12"
+
+    - name: Get Golang version
+      shell: bash
+      run: |
+        GOLANG_VERSION=$(grep "GOLANG_VERSION ?=" versions.mk)
+        echo "GOLANG_VERSION=${GOLANG_VERSION##GOLANG_VERSION ?= }" >> "${GITHUB_ENV}"
+
+    - name: Get regctl version
+      shell: bash
+      run: |
+        REGCTL_VERSION=$(grep "REGCTL_VERSION ?=" versions.mk)
+        echo "REGCTL_VERSION=${REGCTL_VERSION##REGCTL_VERSION ?= }" >> "${GITHUB_ENV}"
+
+    - name: Get Operator SDK version
+      shell: bash
+      run: |
+        OPERATOR_SDK_VERSION=$(grep "OPERATOR_SDK_VERSION ?=" versions.mk)
+        echo "OPERATOR_SDK_VERSION=${OPERATOR_SDK_VERSION##OPERATOR_SDK_VERSION ?= }" >> "${GITHUB_ENV}"
+
+    - name: Install Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      with:
+        go-version: ${{ env.GOLANG_VERSION }}
+
+    - name: Install PyYAML
+      shell: bash
+      run: pip install --quiet pyyaml
+
+    - name: Install regctl
+      uses: regclient/actions/regctl-installer@148669fe4b19151fcab6e00c6df2db43b9e2b097
+      with:
+        release: ${{ env.REGCTL_VERSION }}
+
+    - name: Install Operator SDK
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        curl -fsSLo operator-sdk \
+          "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64"
+        chmod +x operator-sdk
+        sudo mv operator-sdk /usr/local/bin/operator-sdk
+        operator-sdk version

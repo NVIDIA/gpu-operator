@@ -170,8 +170,8 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	if instance.Spec.IsGDSEnabled() && instance.Spec.IsOpenKernelModulesRequired() && !instance.Spec.IsOpenKernelModulesEnabled() {
-		err := fmt.Errorf("GPUDirect Storage driver '%s' is only supported with NVIDIA OpenRM drivers. Please set 'useOpenKernelModules=true' to enable OpenRM mode", instance.Spec.GPUDirectStorage.Version)
+	if instance.Spec.IsOpenKernelModulesRequired() && instance.Spec.KernelModuleType == "proprietary" {
+		err := fmt.Errorf("GPUDirect Storage driver '%s' requires NVIDIA open kernel modules and cannot be used with 'kernelModuleType=proprietary'. Set 'kernelModuleType=open', or use 'kernelModuleType=auto' to let the driver container select the module type based on the GPU and driver branch", instance.Spec.GPUDirectStorage.Version)
 		logger.Error(err, "unsupported driver combination detected")
 		instance.Status.State = nvidiav1alpha1.NotReady
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
@@ -343,7 +343,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 
 	// Create a new NVIDIADriver controller
 	c, err := controller.New("nvidia-driver-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              newLoggingReconciler(r),
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})

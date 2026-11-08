@@ -196,6 +196,13 @@ spec:
             - name: run-mellanox-drivers
               mountPath: /run/mellanox/drivers
               mountPropagation: HostToContainer
+          {{- if and .AdditionalConfigs .AdditionalConfigs.DriverManagerVolumeMounts }}
+          {{- range .AdditionalConfigs.DriverManagerVolumeMounts }}
+            - name: {{ .Name }}
+              mountPath: {{ .MountPath }}
+              readOnly: {{ .ReadOnly }}
+          {{- end }}
+          {{- end }}
       containers:
       - image: {{ .Driver.ImagePath }}
         imagePullPolicy: {{ default "IfNotPresent" .Driver.Spec.ImagePullPolicy }}

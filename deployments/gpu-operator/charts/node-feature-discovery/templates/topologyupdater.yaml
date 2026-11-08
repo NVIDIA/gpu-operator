@@ -13,6 +13,10 @@ metadata:
   {{- end }}
 spec:
   revisionHistoryLimit: {{ .Values.topologyUpdater.revisionHistoryLimit }}
+  {{- with .Values.topologyUpdater.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "node-feature-discovery.selectorLabels" . | nindent 6 }}

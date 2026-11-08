@@ -59,9 +59,10 @@ const draAdminNamespaceLabelKey = "resource.kubernetes.io/admin-access"
 // GPUClusterReconciler reconciles a GPUCluster object
 type GPUClusterReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	ClusterInfo clusterinfo.Interface
-	Namespace   string
+	Scheme          *runtime.Scheme
+	ClusterInfo     clusterinfo.Interface
+	Namespace       string
+	OperatorMetrics *OperatorMetrics
 
 	stateManager     state.Manager
 	conditionUpdater conditions.Updater
@@ -92,6 +93,8 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "error getting GPUCluster object")
 		return ctrl.Result{}, fmt.Errorf("error getting GPUCluster object: %w", err)
 	}
+
+	r.recordGPUNodeCount(ctx)
 
 	if !instance.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, instance)
@@ -154,6 +157,22 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// newly-created ClusterPolicy) are detected and reconciled even while ready;
 	// only DaemonSets are watched, and the ready path is otherwise event-driven.
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
+}
+
+// recordGPUNodeCount sets the gpu_nodes_total gauge from the cached Node list, so the
+// GPUCluster path reports the same count as the ClusterPolicy path. This needs to be
+// called before the prerequisite check, so the count is tracked even if a conflicting
+// ClusterPolicy blocks this GPUCluster.
+func (r *GPUClusterReconciler) recordGPUNodeCount(ctx context.Context) {
+	if r.OperatorMetrics == nil {
+		return
+	}
+	list := &corev1.NodeList{}
+	if err := r.List(ctx, list, client.MatchingLabels{commonGPULabelKey: commonGPULabelValue}); err != nil {
+		log.FromContext(ctx).Error(err, "unable to list nodes for the GPU node count metric")
+		return
+	}
+	r.OperatorMetrics.gpuNodesTotal.Set(float64(len(list.Items)))
 }
 
 // gpuClusterOperandNotReadyMessage builds the OperandNotReady condition message, listing
@@ -318,7 +337,7 @@ func (r *GPUClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	r.recorder = mgr.GetEventRecorder("nvidia-gpu-operator")
 
 	c, err := controller.New("gpu-cluster-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              newLoggingReconciler(r),
 		MaxConcurrentReconciles: 1,
 		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](minDelayCR, maxDelayCR),
 	})

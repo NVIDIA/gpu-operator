@@ -114,7 +114,6 @@ carry.
 | `go.yaml.in/yaml/v2` | Apache-2.0 | `go.yaml.in/yaml/v2` |
 | `go.yaml.in/yaml/v3` | MIT | `go.yaml.in/yaml/v3` |
 | `golang.org/x/crypto` | BSD-3-Clause | `golang.org/x/crypto` |
-| `golang.org/x/mod/semver` | BSD-3-Clause | `golang.org/x/mod` |
 | `golang.org/x/net` | BSD-3-Clause | `golang.org/x/net` |
 | `golang.org/x/oauth2` | BSD-3-Clause | `golang.org/x/oauth2` |
 | `golang.org/x/sync/errgroup` | BSD-3-Clause | `golang.org/x/sync` |
@@ -11271,7 +11270,18 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
    END OF TERMS AND CONDITIONS
 
-   Copyright 2020 The regclient Authors.
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12226,45 +12236,6 @@ limitations under the License.
 
 * License: BSD-3-Clause
 * Module: golang.org/x/crypto
-
-#### LICENSE
-
-```text
-Copyright 2009 The Go Authors.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Google LLC nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-```
-
-
-### golang.org/x/mod/semver
-
-* License: BSD-3-Clause
-* Module: golang.org/x/mod
 
 #### LICENSE
 

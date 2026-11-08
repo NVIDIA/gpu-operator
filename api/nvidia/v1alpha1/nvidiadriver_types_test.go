@@ -416,3 +416,73 @@ func TestGDRCopyGetImagePath(t *testing.T) {
 		})
 	}
 }
+
+func TestIsOpenKernelModulesRequired(t *testing.T) {
+	enabled := true
+	disabled := false
+
+	tests := map[string]struct {
+		gds      *GPUDirectStorageSpec
+		expected bool
+	}{
+		"gds not configured": {
+			gds:      nil,
+			expected: false,
+		},
+		"gds enabled unset": {
+			gds:      &GPUDirectStorageSpec{Version: "2.17.5"},
+			expected: false,
+		},
+		"gds disabled": {
+			gds:      &GPUDirectStorageSpec{Enabled: &disabled, Version: "2.17.5"},
+			expected: false,
+		},
+		"version below minimum": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "2.17.4"},
+			expected: false,
+		},
+		"version equal to minimum": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "2.17.5"},
+			expected: true,
+		},
+		"version equal to minimum with v prefix": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "v2.17.5"},
+			expected: true,
+		},
+		"patch version above minimum": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "2.17.6"},
+			expected: true,
+		},
+		"minor version above minimum": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "2.18.0"},
+			expected: true,
+		},
+		"major version above minimum": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "3.0.0"},
+			expected: true,
+		},
+		"older minor version with larger patch": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "2.16.9"},
+			expected: false,
+		},
+		"image digest": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "sha256:" + testDigest},
+			expected: true,
+		},
+		"invalid version": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled, Version: "not-a-version"},
+			expected: false,
+		},
+		"empty version": {
+			gds:      &GPUDirectStorageSpec{Enabled: &enabled},
+			expected: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := &NVIDIADriverSpec{GPUDirectStorage: tc.gds}
+			require.Equal(t, tc.expected, spec.IsOpenKernelModulesRequired())
+		})
+	}
+}

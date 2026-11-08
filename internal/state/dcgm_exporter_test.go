@@ -104,7 +104,7 @@ func TestDCGMExporterEnabledByDefault(t *testing.T) {
 	assert.Equal(t, "true", env["KUBERNETES_ENABLE_DRA"])
 	assert.NotContains(t, env, "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS")
 	assert.NotContains(t, env, "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID")
-	assert.Equal(t, "/etc/dcgm-exporter/dcp-metrics-included.csv", env["DCGM_EXPORTER_COLLECTORS"])
+	assert.Equal(t, "/etc/dcgm-exporter/default-counters.csv", env["DCGM_EXPORTER_COLLECTORS"])
 	// Embedded engine: no remote host-engine env.
 	_, hasRemote := env["DCGM_REMOTE_HOSTENGINE_INFO"]
 	assert.False(t, hasRemote, "exporter must run embedded when standalone DCGM is disabled")

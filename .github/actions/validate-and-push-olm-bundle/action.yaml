@@ -1,0 +1,84 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Validate and push OLM bundle
+description: Validate the OLM bundle, then build the multi-arch bundle image and push it to GHCR
+
+inputs:
+  release-tag:
+    description: Release tag the CSV release metadata must match; the release metadata is not validated when empty
+    required: false
+    default: ""
+  bundle-image-tag:
+    description: Tag of the pushed bundle image
+    required: true
+  github-token:
+    description: Token used to log in to GHCR
+    required: true
+
+outputs:
+  bundle-image:
+    description: Reference of the pushed bundle image
+    value: ${{ steps.build.outputs.bundle_image }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate OLM release metadata
+      if: ${{ inputs.release-tag != '' }}
+      shell: bash
+      env:
+        RELEASE_TAG: ${{ inputs.release-tag }}
+        CSV: bundle/manifests/gpu-operator-certified.clusterserviceversion.yaml
+      run: |
+        python3 .github/scripts/validate-olm-release-metadata.py \
+          --release-tag "${RELEASE_TAG}" \
+          --csv "${CSV}"
+
+    - name: Validate OLM bundle
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        operator-sdk bundle validate ./bundle
+        make validate-csv
+
+    - name: Login to GitHub Container Registry for Docker
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github-token }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+    - name: Build and push OLM bundle image
+      id: build
+      shell: bash
+      env:
+        BUNDLE_IMAGE_TAG: ${{ inputs.bundle-image-tag }}
+        GH_REPOSITORY: ${{ github.repository }}
+        VERSION: ""
+        DEFAULT_CHANNEL: "stable"
+        CHANNELS: "stable"
+        BUNDLE_IMAGE_BUILD_PLATFORM_OPTIONS: "--platform=linux/amd64,linux/arm64 --push"
+      run: |
+        set -euo pipefail
+
+        repository="$(echo "${GH_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+        bundle_image="ghcr.io/${repository}/gpu-operator-bundle:${BUNDLE_IMAGE_TAG}"
+        make build-bundle-image DOCKER="docker buildx" BUNDLE_IMAGE="${bundle_image}"
+        echo "bundle_image=${bundle_image}" >> "${GITHUB_OUTPUT}"
+        echo "::notice::Published OLM bundle image ${bundle_image}"

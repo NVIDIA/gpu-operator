@@ -76,17 +76,19 @@ RUN curl -L https://codeload.github.com/NVIDIA/cuda-samples/tar.gz/refs/tags/v${
 # Build a static busybox layout: one binary plus applet symlinks (sh, rm,
 # ln, sleep, cat, ...) so PATH-resolved commands in init-container wrappers
 # and lifecycle hooks keep working on the non-*-dev* distroless base.
-FROM debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258 AS shell
-RUN apt-get update \
- && apt-get install -y --no-install-recommends busybox-static \
- && rm -rf /var/lib/apt/lists/* \
- && mkdir /busybox \
+FROM busybox:1.37.0-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092 AS shell
+RUN mkdir /busybox \
  && cp /bin/busybox /busybox/busybox \
  && /busybox/busybox --install -s /busybox
 
+# Fail the build if busybox prefers applets (CONFIG_FEATURE_PREFER_APPLETS=y).
+# See https://github.com/NVIDIA/k8s-driver-manager/issues/299
+COPY hack/check-busybox-prefer-applets.sh /tmp/check-busybox-prefer-applets.sh
+RUN /tmp/check-busybox-prefer-applets.sh /busybox/busybox
+
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v4.1.6@sha256:1c3f23958b14384dd07e57696954c6722861c3ee5de372fdc2af75a8e4b75313
+FROM nvcr.io/nvidia/distroless/cc:v4.2.0@sha256:298fd46ce9c1f90fc0a14d8006f9adc77394f831412c4df10d9e6155cd2adb24
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 

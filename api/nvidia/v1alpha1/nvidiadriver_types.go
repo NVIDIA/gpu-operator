@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/regclient/regclient/types/ref"
-	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -732,14 +732,11 @@ func (d *NVIDIADriverSpec) IsOpenKernelModulesRequired() bool {
 		return true
 	}
 
-	gdsVersion := d.GPUDirectStorage.Version
-	if !strings.HasPrefix(gdsVersion, "v") {
-		gdsVersion = fmt.Sprintf("v%s", gdsVersion)
+	gdsVersion, err := semver.NewVersion(d.GPUDirectStorage.Version)
+	if err != nil {
+		return false
 	}
-	if semver.Compare(gdsVersion, consts.MinimumGDSVersionForOpenRM) >= 0 {
-		return true
-	}
-	return false
+	return gdsVersion.Compare(semver.MustParse(consts.MinimumGDSVersionForOpenRM)) >= 0
 }
 
 // IsVGPULicensingEnabled returns true if the vgpu driver license config is provided

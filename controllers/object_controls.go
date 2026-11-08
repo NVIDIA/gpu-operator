@@ -28,12 +28,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	apiimagev1 "github.com/openshift/api/image/v1"
 	secv1 "github.com/openshift/api/security/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"golang.org/x/mod/semver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
@@ -264,19 +264,27 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: ptr.To(corev1.HostPathFile),
+				Type: new(corev1.HostPathFileOrCreate),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
+			},
+		},
+		// FileOrCreate does not create parents. A separate directory volume
+		// lets kubelet create the repo directory and retry file setup if needed.
+		"/run/secrets/yum.repos.d": corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/etc/yum.repos.d",
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 	},
@@ -284,19 +292,19 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/run/secrets/etc-pki-entitlement": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/pki/entitlement",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectory),
 			},
 		},
 		"/run/secrets/redhat.repo": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/yum.repos.d/redhat.repo",
-				Type: ptr.To(corev1.HostPathFile),
+				Type: new(corev1.HostPathFile),
 			},
 		},
 		"/run/secrets/rhsm": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/rhsm",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectory),
 			},
 		},
 	},
@@ -304,13 +312,13 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: ptr.To(corev1.HostPathFileOrCreate),
+				Type: new(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -318,13 +326,13 @@ var SubscriptionPathMap = map[string](MountPathToVolumeSource){
 		"/etc/zypp/credentials.d": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/zypp/credentials.d",
-				Type: ptr.To(corev1.HostPathDirectory),
+				Type: new(corev1.HostPathDirectoryOrCreate),
 			},
 		},
 		"/etc/SUSEConnect": corev1.VolumeSource{
 			HostPath: &corev1.HostPathVolumeSource{
 				Path: "/etc/SUSEConnect",
-				Type: ptr.To(corev1.HostPathFileOrCreate),
+				Type: new(corev1.HostPathFileOrCreate),
 			},
 		},
 	},
@@ -1295,6 +1303,7 @@ func transformToolkitCtrForCDI(container *corev1.Container, nriPluginEnabled boo
 	setContainerEnv(container, NvidiaRuntimeSetAsDefaultEnvName, "false")
 	setContainerEnv(container, NvidiaCtrRuntimeModeEnvName, "cdi")
 	setContainerEnv(container, CRIOConfigModeEnvName, "config")
+	setContainerEnv(container, NvidiaCtrRuntimeCDIPrefixesEnvName, "cdi.k8s.io/")
 
 	if nriPluginEnabled {
 		setContainerEnv(container, CDIEnableNRIPlugin, "true")
@@ -2380,7 +2389,7 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 	}
 
 	if validatorErr != nil {
-		n.logger.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+		n.logger.Info("WARN: errors transforming the validator containers", "error", validatorErr)
 	}
 
 	// set hostNetwork for validator if specified
@@ -2412,7 +2421,7 @@ func TransformSandboxValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 	}
 
 	if validatorErr != nil {
-		n.logger.Info("WARN: errors transforming the validator containers: %v", validatorErr)
+		n.logger.Info("WARN: errors transforming the validator containers", "error", validatorErr)
 	}
 
 	// set hostNetwork for sandbox-validator if specified
@@ -3786,15 +3795,10 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// set up subscription entitlements for RHEL(using K8s with a non-CRIO runtime) and SLES
 	if (osID == "rhel" && n.openshift == "" && n.runtime != gpuv1.CRIO) || osID == "sles" || osID == "sl-micro" {
-		pathToVolumeSource := MountPathToVolumeSource{}
-		if config.Driver.RepoConfig != nil && config.Driver.RepoConfig.ConfigMapName != "" && osID == "rhel" {
-			n.logger.Info("Skipping host subscription mounts because repoConfig is enabled", "OS", osID)
-		} else {
-			n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
-			pathToVolumeSource, err = n.getSubscriptionPathsToVolumeSources()
-			if err != nil {
-				return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %w", err)
-			}
+		n.logger.Info("Mounting subscriptions into the driver container", "OS", osID)
+		pathToVolumeSource, err := n.getSubscriptionPathsToVolumeSources()
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to get path items for subscription entitlements: %w", err)
 		}
 
 		// sort host path volumes to ensure ordering is preserved when adding to pod spec
@@ -3812,7 +3816,16 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 				MountPath: mountPath,
 				ReadOnly:  true,
 			}
-			driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volMountSubscription)
+			if mountPath == "/run/secrets/yum.repos.d" {
+				// The parent directory is needed only for kubelet's file creation.
+				manager := findContainerByName(podSpec.InitContainers, "k8s-driver-manager")
+				if manager == nil {
+					return fmt.Errorf("k8s-driver-manager initContainer is missing from the driver daemonset manifest")
+				}
+				manager.VolumeMounts = append(manager.VolumeMounts, volMountSubscription)
+			} else {
+				driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volMountSubscription)
+			}
 
 			subscriptionVol := corev1.Volume{Name: volMountSubscriptionName, VolumeSource: pathToVolumeSource[mountPath]}
 			podSpec.Volumes = append(podSpec.Volumes, subscriptionVol)
@@ -4019,7 +4032,7 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 	list := &appsv1.DeploymentList{}
 	err := n.client.List(n.ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get DeploymentList", err)
+		n.logger.Error(err, "Could not get DeploymentList")
 	}
 	n.logger.V(1).Info("Deployment", "NumberOfDeployment", len(list.Items))
 	if len(list.Items) == 0 {
@@ -4075,7 +4088,7 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	list := &corev1.PodList{}
 	err = n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get PodList", err)
+		n.logger.Error(err, "Could not get PodList")
 		return gpuv1.NotReady
 	}
 	n.logger.V(2).Info("Pod", "NumberOfPods", len(list.Items))
@@ -4235,7 +4248,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 func ocpHasDriverToolkitImageStream(n *ClusterPolicyController) (bool, error) {
 	ctx := n.ctx
 	found := &apiimagev1.ImageStream{}
-	name := "driver-toolkit"
+	name := consts.DriverToolkitImageStreamName
 	namespace := consts.OpenshiftNamespace
 	err := n.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, found)
 	if err != nil {
@@ -4866,7 +4879,7 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	list := &corev1.PodList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get PodList", err)
+		n.logger.Error(err, "Could not get PodList")
 	}
 	n.logger.V(1).Info("Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
@@ -5271,7 +5284,7 @@ func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error)
 	list := &nodev1.RuntimeClassList{}
 	err := n.client.List(ctx, list, opts...)
 	if err != nil {
-		n.logger.Info("Could not get Kata RuntimeClassList", err)
+		n.logger.Error(err, "Could not get Kata RuntimeClassList")
 		return gpuv1.NotReady, fmt.Errorf("error getting kata RuntimeClassList: %v", err)
 	}
 	n.logger.V(1).Info("Kata RuntimeClasses", "Number", len(list.Items))
@@ -5308,7 +5321,9 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	createRuntimeClassFunc := transformRuntimeClass
-	if semver.Compare(n.k8sVersion, nodev1MinimumAPIVersion) <= 0 {
+	// An unparseable version is treated as older than the minimum, so fall back to the legacy API.
+	k8sVersion, err := semver.NewVersion(n.k8sVersion)
+	if err != nil || k8sVersion.Compare(semver.MustParse(nodev1MinimumAPIVersion)) <= 0 {
 		createRuntimeClassFunc = transformRuntimeClassLegacy
 	}
 

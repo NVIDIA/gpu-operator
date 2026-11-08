@@ -40,8 +40,8 @@ spec:
         {{- end }}
     spec:
       dnsPolicy: {{ .Values.worker.dnsPolicy }}
-    {{- with .Values.priorityClassName }}
-      priorityClassName: {{ . }}
+    {{- with .Values.worker.priorityClassName | default .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
     {{- end }}
       imagePullSecrets: {{ include "node-feature-discovery.imagePullSecrets" . }}
       serviceAccountName: {{ include "node-feature-discovery.worker.serviceAccountName" . }}
@@ -203,8 +203,5 @@ spec:
     {{- with .Values.worker.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
-    {{- end }}
-    {{- with .Values.worker.priorityClassName }}
-      priorityClassName: {{ . | quote }}
     {{- end }}
 {{- end }}

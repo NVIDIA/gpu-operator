@@ -22,10 +22,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-logr/logr"
 	apiconfigv1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
-	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 )
@@ -767,7 +768,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	n.singleton = clusterPolicy
 	n.ctx = ctx
 	n.idx = 0
-	n.logger = reconciler.Log
+	n.logger = log.FromContext(ctx)
 	n.client = reconciler.Client
 	n.scheme = reconciler.Scheme
 
@@ -784,8 +785,8 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		if err != nil {
 			return err
 		}
-		if !semver.IsValid(k8sVersion) {
-			return fmt.Errorf("k8s version detected '%s' is not a valid semantic version", k8sVersion)
+		if _, err := semver.NewVersion(k8sVersion); err != nil {
+			return fmt.Errorf("k8s version detected '%s' is not a valid semantic version: %w", k8sVersion, err)
 		}
 		n.k8sVersion = k8sVersion
 		n.logger.Info("Kubernetes version detected", "version", k8sVersion)

@@ -26,7 +26,7 @@ fullnameOverride: ""
 namespaceOverride: ""
 
 # @schema patternProperties: {"^[a-zA-Z]$": {type: string}}
-# -- [Feature gates](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/feature-gates) to enable/disable specific features.
+# -- [Feature gates](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/feature-gates) to enable/disable specific features.
 # @section -- General
 featureGates: {}
 
@@ -60,7 +60,7 @@ master:
   # @section -- NFD-Master
   enable: true
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
-  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/master-commandline-reference) to pass to nfd-master.
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/master-commandline-reference) to pass to nfd-master.
   # @section -- NFD-Master
   extraArgs: []
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
@@ -79,7 +79,7 @@ master:
   # @section -- NFD-Master
   dnsPolicy: ClusterFirstWithHostNet
   # @schema type: [object, null]
-  # -- NFD master [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/master-configuration-reference).
+  # -- (object) NFD master [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/master-configuration-reference).
   # @section -- NFD-Master
   config: ### <NFD-MASTER-CONF-START-DO-NOT-REMOVE>
     # noPublish: false
@@ -113,8 +113,6 @@ master:
     #    stderrthreshold: 2
     #    v: 0
     #    vmodule:
-    ##   NOTE: the following options are not dynamically run-time configurable
-    ##         and require a nfd-master restart to take effect after being changed
     #    logDir:
     #    logFile:
     #    logFileMaxSize: 1800
@@ -137,7 +135,7 @@ master:
   # @section -- NFD-Master
   instance:
   # @schema type: [string, null]
-  # -- (int) NFD API controller resync period. Time duration string (e.g. "5m", "1h", "2h45m").
+  # -- (string) NFD API controller resync period. Time duration string (e.g. "5m", "1h", "2h45m").
   # @section -- NFD-Master
   resyncPeriod:
   # @schema item: string
@@ -300,7 +298,7 @@ master:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: In
                 values: [""]
-  # -- Startup probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-startup-probes).
+  # -- Startup probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes).
   # @section -- NFD-Master
   # @default -- -
   startupProbe:
@@ -320,7 +318,7 @@ master:
     # -- (int) The number of consecutive failures for the probe before considering the pod as not ready.
     # @section -- NFD-Master
     failureThreshold: 30
-  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).
   # @section -- NFD-Master
   # @default -- -
   livenessProbe:
@@ -337,10 +335,10 @@ master:
     # @section -- NFD-Master
     periodSeconds:
     # @schema type: [integer, null]; minimum: 1
-    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # -- (int) The number of consecutive failures for the probe before considering the container as failed and restarting it.
     # @section -- NFD-Master
     failureThreshold:
-  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).
   # @section -- NFD-Master
   # @default -- -
   readinessProbe:
@@ -379,7 +377,7 @@ worker:
     - pod
     - ds
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
-  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/worker-commandline-reference) to pass to nfd-worker.
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/worker-commandline-reference) to pass to nfd-worker.
   # @section -- NFD-Worker
   extraArgs: []
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
@@ -394,11 +392,11 @@ worker:
   # @section -- NFD-Worker
   hostUsers: ~  # @schema type: [boolean, null]
   # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
-  # -- NFD worker pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).
+  # -- NFD worker pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).
   # @section -- NFD-Worker
   dnsPolicy: ClusterFirstWithHostNet
   # @schema type: [object, null]
-  # -- NFD worker [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/worker-configuration-reference).
+  # -- (object) NFD worker [configuration](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/worker-configuration-reference).
   # @section -- NFD-Worker
   config: ### <NFD-WORKER-CONF-START-DO-NOT-REMOVE>
     #core:
@@ -423,8 +421,6 @@ worker:
     #    stderrthreshold: 2
     #    v: 0
     #    vmodule:
-    ##   NOTE: the following options are not dynamically run-time configurable
-    ##         and require a nfd-worker restart to take effect after being changed
     #    logDir:
     #    logFile:
     #    logFileMaxSize: 1800
@@ -452,6 +448,7 @@ worker:
     #        - "RDSEED"
     #        - "RDTSCP"
     #        - "SGX"
+    #        - "SGXLC"
     #        - "SSE"
     #        - "SSE2"
     #        - "SSE3"
@@ -682,7 +679,7 @@ worker:
     # @schema hidden
     runAsNonRoot: true
 
-  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).
   # @section -- NFD-Worker
   # @default -- -
   livenessProbe:
@@ -699,10 +696,10 @@ worker:
     # @section -- NFD-Worker
     periodSeconds:
     # @schema type: [integer, null]; minimum: 1
-    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # -- (int) The number of consecutive failures for the probe before considering the container as failed and restarting it.
     # @section -- NFD-Worker
     failureThreshold:
-  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).
   # @section -- NFD-Worker
   # @default -- -
   readinessProbe:
@@ -750,7 +747,7 @@ worker:
 
   # Allow users to mount the hostPath /usr/src, useful for RHCOS on s390x
   # Does not work on systems without /usr/src AND a read-only /usr, such as Talos
-  # -- Mount host path /user/src inside the container. Does not work on systems without /usr/src AND a read-only /usr.
+  # -- Mount host path /usr/src inside the container. Does not work on systems without /usr/src AND a read-only /usr.
   # @section -- NFD-Worker
   mountUsrSrc: false
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.ResourceRequirements
@@ -787,18 +784,14 @@ worker:
   # @section -- NFD-Worker
   affinity: {}
   # @schema type: [string, null]
-  # -- The name of the PriorityClass to be used for the nfd-worker pods.
+  # -- The name of the PriorityClass to be used for the nfd-worker pods. Takes precedence over the top-level `priorityClassName`.
   # @section -- NFD-Worker
   priorityClassName:
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.apps.v1.DaemonSetUpdateStrategy
-  # -- Update strategy for the nfd-worker DaemonSet. Defaults to a rolling
-  # update with `maxUnavailable: "10%"` so upgrades complete in a bounded
-  # number of waves on clusters of any size (the Kubernetes default of
-  # `maxUnavailable: 1` rolls one node at a time and makes Helm wait and
-  # Flux HelmRelease timeouts likely on large clusters). nfd-worker is
-  # stateless and node labels persist while a worker pod restarts, so a
-  # faster roll is safe. Set `maxUnavailable: 1` to restore the Kubernetes
-  # default. To use `type: OnDelete`, also set `rollingUpdate: null`
+  # -- Update strategy for the nfd-worker DaemonSet. The default updates
+  # multiple nodes in parallel on large clusters, so upgrades finish within
+  # Helm and Flux HelmRelease timeouts. Set `maxUnavailable: 1` to update one
+  # node at a time. To use `type: OnDelete`, also set `rollingUpdate: null`
   # (Helm deep-merges maps).
   # [More info](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set)
   # @section -- NFD-Worker
@@ -840,7 +833,7 @@ worker:
 #
 topologyUpdater:
   # @schema type: [object, null]
-  # -- Configuration for the topology updater. See the [configuration reference](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/topology-updater-configuration-reference) for details.
+  # -- (object) Configuration for the topology updater. See the [configuration reference](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/topology-updater-configuration-reference) for details.
   # @section -- NFD-Topology-Updater
   config: ### <NFD-TOPOLOGY-UPDATER-CONF-START-DO-NOT-REMOVE>
     ## key = node name, value = list of resources to be excluded.
@@ -849,7 +842,7 @@ topologyUpdater:
     #excludeList:
     #  node1: [cpu]
     #  node2: [memory, example/deviceA]
-    #  *: [hugepages-2Mi]
+    #  '*': [hugepages-2Mi]
 ### <NFD-TOPOLOGY-UPDATER-CONF-END-DO-NOT-REMOVE>
 
   # -- Specifies whether nfd-topology-updater should be deployed.
@@ -858,11 +851,12 @@ topologyUpdater:
   # -- Create the NodeResourceTopology CRD. This MUST be set to true when
   # 'enable' is true, unless the CRD is installed separately (e.g., by another
   # Helm release or external tool). If the CRD is missing, the topology-updater
-  # pods will fail with "NodeResourceTopology CRD is not installed" error.
+  # pods keep running but publish nothing; they log "waiting for
+  # NodeResourceTopology CRD to be created" and retry indefinitely.
   # @section -- NFD-Topology-Updater
   createCRDs: false
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
-  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/topology-updater-commandline-reference) to pass to nfd-topology-updater.
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/topology-updater-commandline-reference) to pass to nfd-topology-updater.
   # @section -- NFD-Topology-Updater
   extraArgs: []
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
@@ -877,7 +871,7 @@ topologyUpdater:
   # @section -- NFD-Topology-Updater
   hostUsers: ~  # @schema type: [boolean, null]
   # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
-  # -- NFD topology updater pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).
+  # -- NFD topology updater pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).
   # @section -- NFD-Topology-Updater
   dnsPolicy: ClusterFirstWithHostNet
   serviceAccount:
@@ -897,6 +891,18 @@ topologyUpdater:
   # -- (int) Specifies the number of old history for the DaemonSet to retain to allow rollback.
   # @section -- NFD-Topology-Updater
   revisionHistoryLimit:
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.apps.v1.DaemonSetUpdateStrategy
+  # -- Update strategy for the nfd-topology-updater DaemonSet. The default
+  # updates multiple nodes in parallel on large clusters, so upgrades finish
+  # within Helm and Flux HelmRelease timeouts. Set `maxUnavailable: 1` to
+  # update one node at a time. To use `type: OnDelete`, also set
+  # `rollingUpdate: null` (Helm deep-merges maps).
+  # [More info](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set)
+  # @section -- NFD-Topology-Updater
+  updateStrategy:
+    rollingUpdate:
+      # @schema type: [string, integer]
+      maxUnavailable: "10%"
   rbac:
     # -- Create [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) configuration for nfd-topology-updater.
     # @section -- NFD-Topology-Updater
@@ -944,7 +950,7 @@ topologyUpdater:
     # @schema hidden
     runAsUser: 0
 
-  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).
   # @section -- NFD-Topology-Updater
   # @default -- -
   livenessProbe:
@@ -961,10 +967,10 @@ topologyUpdater:
     # @section -- NFD-Topology-Updater
     periodSeconds:
     # @schema type: [integer, null]; minimum: 1
-    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # -- (int) The number of consecutive failures for the probe before considering the container as failed and restarting it.
     # @section -- NFD-Topology-Updater
     failureThreshold:
-  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).
   # @section -- NFD-Topology-Updater
   # @default -- -
   readinessProbe:
@@ -1066,7 +1072,7 @@ gc:
   # @section -- NFD-GC
   enable: true
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/args
-  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.19/reference/gc-commandline-reference) to pass to nfd-gc.
+  # -- Additional [command line arguments](https://kubernetes-sigs.github.io/node-feature-discovery/v0.20/reference/gc-commandline-reference) to pass to nfd-gc.
   # @section -- NFD-GC
   extraArgs: []
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.Container/properties/env
@@ -1084,7 +1090,7 @@ gc:
   # @section -- NFD-GC
   replicaCount: 1
   # @enum: [Default, ClusterFirst, ClusterFirstWithHostNet, None]
-  # -- NFD gc pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-policy).
+  # -- NFD gc pod [dnsPolicy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).
   # @section -- NFD-GC
   dnsPolicy: ClusterFirstWithHostNet
   serviceAccount:
@@ -1114,8 +1120,21 @@ gc:
   # -- [Init containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) to add to the nfd-gc pods.
   # @section -- NFD-GC
   initContainers: []
+  # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.core.v1.SecurityContext
+  # -- [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container) of the nfd-gc container.
+  # @section -- NFD-GC
+  securityContext:
+    # @schema hidden
+    allowPrivilegeEscalation: false
+    # @schema hidden
+    capabilities:
+      drop: [ "ALL" ]
+    # @schema hidden
+    readOnlyRootFilesystem: true
+    # @schema hidden
+    runAsNonRoot: true
 
-  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-liveness-probes).
+  # -- Liveness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request).
   # @section -- NFD-GC
   # @default -- -
   livenessProbe:
@@ -1132,10 +1151,10 @@ gc:
     # @section -- NFD-GC
     periodSeconds:
     # @schema type: [integer, null]; minimum: 1
-    # -- (int) Minimum consecutive successes for the probe before considering the pod as ready.
+    # -- (int) The number of consecutive failures for the probe before considering the container as failed and restarting it.
     # @section -- NFD-GC
     failureThreshold:
-  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-readiness-probes).
+  # -- Readiness probe configuration. [More information](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes).
   # @section -- NFD-GC
   # @default -- -
   readinessProbe:
@@ -1202,7 +1221,7 @@ gc:
   affinity: {}
   # @schema $ref: $k8s/_definitions.json#/definitions/io.k8s.api.policy.v1.PodDisruptionBudgetSpec
   podDisruptionBudget:
-    # -- Configure PodDisruptionBudget for the nfd-master Deployment.
+    # -- Configure PodDisruptionBudget for the nfd-gc Deployment.
     # @section -- NFD-GC
     enable: false
     # @schema hidden

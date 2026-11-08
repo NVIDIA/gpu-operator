@@ -300,7 +300,7 @@ func getOpenshiftDTKImages(ctx context.Context, c *rest.Config) map[string]strin
 	var rhcosDriverToolkitImages map[string]string
 	logger := log.FromContext(ctx)
 
-	name := "driver-toolkit"
+	name := consts.DriverToolkitImageStreamName
 	namespace := consts.OpenshiftNamespace
 
 	ocpImageClient, err := imagesv1.NewForConfig(c)
