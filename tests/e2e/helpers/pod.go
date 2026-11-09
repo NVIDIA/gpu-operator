@@ -17,14 +17,12 @@
 package helpers
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -38,78 +36,79 @@ func NewPodClient(k8sClient corev1client.CoreV1Interface) *PodClient {
 	}
 }
 
-func (c *PodClient) GetPodsByLabel(ctx context.Context, namespace string, labelMap map[string]string) ([]corev1.Pod, error) {
-	podList, err := c.k8sClient.Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labelMap).String(),
+func IsPodReady(pod *corev1.Pod) bool {
+	return slices.ContainsFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
+		return condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue
 	})
+}
+
+func PodStatusSummary(pod *corev1.Pod) string {
+	readyContainerCount := 0
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Ready {
+			readyContainerCount++
+		}
+	}
+	return fmt.Sprintf("%s %d/%d %s", pod.Name, readyContainerCount, len(pod.Spec.Containers), kubectlPodStatus(pod))
+}
+
+func kubectlPodStatus(pod *corev1.Pod) string {
+	if pod.DeletionTimestamp != nil {
+		return "Terminating"
+	}
+
+	for initContainerIndex, initContainerStatus := range pod.Status.InitContainerStatuses {
+		switch {
+		case initContainerStatus.State.Terminated != nil && initContainerStatus.State.Terminated.ExitCode == 0:
+			continue
+		case initContainerStatus.State.Terminated != nil && initContainerStatus.State.Terminated.Reason != "":
+			return "Init:" + initContainerStatus.State.Terminated.Reason
+		case initContainerStatus.State.Terminated != nil:
+			return fmt.Sprintf("Init:ExitCode:%d", initContainerStatus.State.Terminated.ExitCode)
+		case initContainerStatus.State.Waiting != nil && initContainerStatus.State.Waiting.Reason != "" && initContainerStatus.State.Waiting.Reason != "PodInitializing":
+			return "Init:" + initContainerStatus.State.Waiting.Reason
+		default:
+			return fmt.Sprintf("Init:%d/%d", initContainerIndex, len(pod.Spec.InitContainers))
+		}
+	}
+
+	status := string(pod.Status.Phase)
+	if pod.Status.Reason != "" {
+		status = pod.Status.Reason
+	}
+	for _, containerStatus := range slices.Backward(pod.Status.ContainerStatuses) {
+		switch {
+		case containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason != "":
+			status = containerStatus.State.Waiting.Reason
+		case containerStatus.State.Terminated != nil && containerStatus.State.Terminated.Reason != "":
+			status = containerStatus.State.Terminated.Reason
+		case containerStatus.State.Terminated != nil:
+			status = fmt.Sprintf("ExitCode:%d", containerStatus.State.Terminated.ExitCode)
+		}
+	}
+	return status
+}
+
+func (c *PodClient) Logs(ctx context.Context, pod *corev1.Pod, logOptions *corev1.PodLogOptions) (string, error) {
+	logBytes, err := c.k8sClient.Pods(pod.Namespace).GetLogs(pod.Name, logOptions).DoRaw(ctx)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to get logs of pod %s/%s (container %q, previous %t): %w", pod.Namespace, pod.Name, logOptions.Container, logOptions.Previous, err)
+	}
+	return string(logBytes), nil
+}
+
+func (c *PodClient) List(ctx context.Context, namespace, selector string) ([]corev1.Pod, error) {
+	podList, err := c.k8sClient.Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods %q in namespace %s: %w", selector, namespace, err)
 	}
 	return podList.Items, nil
 }
 
-func (c *PodClient) IsPodReady(ctx context.Context, podName, namespace string) (bool, error) {
-	pod, err := c.k8sClient.Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+func (c *PodClient) DeleteCollection(ctx context.Context, namespace, selector string) error {
+	err := c.k8sClient.Pods(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
-		return false, fmt.Errorf("unexpected error getting pod %s: %w", podName, err)
+		return fmt.Errorf("failed to delete pods %q in namespace %s: %w", selector, namespace, err)
 	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type != corev1.PodReady {
-			continue
-		}
-		if condition.Status == corev1.ConditionTrue {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (c *PodClient) EnsureNoPodRestarts(ctx context.Context, podName, namespace string) (bool, error) {
-	pod, err := c.k8sClient.Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
-	if err != nil {
-		return false, fmt.Errorf("unexpected error getting pod %s: %w", podName, err)
-	}
-
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.RestartCount > 0 {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (c *PodClient) GetPodLogs(ctx context.Context, pod corev1.Pod) (string, error) {
-	podLogOpts := corev1.PodLogOptions{}
-	req := c.k8sClient.Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
-	podLogs, err := req.Stream(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to open log stream: %w", err)
-	}
-	defer podLogs.Close()
-
-	buffer := new(bytes.Buffer)
-	_, err = io.Copy(buffer, podLogs)
-	if err != nil {
-		return "", fmt.Errorf("failed to copy log stream: %w", err)
-	}
-
-	return buffer.String(), nil
-}
-
-func (c *PodClient) CreateNamespace(ctx context.Context, namespaceName string, labels map[string]string) (*corev1.Namespace, error) {
-	namespaceObj := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   namespaceName,
-			Labels: labels,
-		},
-		Status: corev1.NamespaceStatus{},
-	}
-
-	return c.k8sClient.Namespaces().Create(ctx, namespaceObj, metav1.CreateOptions{})
-}
-
-func (c *PodClient) DeleteNamespace(ctx context.Context, namespaceName string) error {
-	return c.k8sClient.Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
+	return nil
 }
