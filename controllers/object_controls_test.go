@@ -1443,6 +1443,9 @@ func TestDCGMLivenessProbe(t *testing.T) {
 
 	binDir := t.TempDir()
 	dcgmiStub := `#!/bin/sh
+if [ "$#" -ne 2 ] || [ "$1" != "discovery" ] || [ "$2" != "-l" ]; then
+	exit 64
+fi
 : > "$DCGMI_TEST_MARKER"
 printf '%s\n' "$DCGMI_TEST_OUTPUT"
 `
