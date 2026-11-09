@@ -88,7 +88,7 @@ RUN /tmp/check-busybox-prefer-applets.sh /busybox/busybox
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v4.2.0@sha256:298fd46ce9c1f90fc0a14d8006f9adc77394f831412c4df10d9e6155cd2adb24
+FROM nvcr.io/nvidia/distroless/cc:v4.2.1@sha256:e0190795c9cc8e79c1520b5c3539b16abc5a3dcadf4edf1ddccf24ac71cc84c1
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 
