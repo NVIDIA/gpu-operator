@@ -44,6 +44,7 @@ jobs:
           persist-credentials: false
       - name: Find the full PR comparison base
         id: base
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -56,6 +57,8 @@ jobs:
           echo "base=$merge_base" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
+        if: ${{ steps.base.outcome == 'success' }}
+        continue-on-error: true
         with:
           token: ''
           base: ${{ steps.base.outputs.base }}
