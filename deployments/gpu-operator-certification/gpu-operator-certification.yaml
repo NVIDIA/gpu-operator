@@ -1,50 +1,8 @@
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gpu-operator-certification-config
-  labels:
-    app.kubernetes.io/name: gpu-operator-certification
-    app.kubernetes.io/instance: gpu-operator-certification
-data:
-  TEST_TIMEOUT: "15m"
-  # TestSets to run. Use "all" for all sets, "!name" to exclude.
-  #
-  # Available TestSets:
-  #   TS1000 - Default Settings (operands, allocatable, GFD labels, DCGM metrics, workload)
-  #   TS1001 - GPU Sharing via Timeslicing
-  #   TS1002 - DCGM Standalone
-  #   TS1003 - Driver Update
-  #   TS1004 - MIG mode (single strategy)  — skipped if no MIG-capable GPUs detected
-  #   TS1005 - MIG mode (mixed strategy)   — skipped if no MIG-capable GPUs detected
-  #   TS1006 - GPUDirectRDMA               — skipped if fewer than 2 GPU nodes with RDMA hardware
-  #   TS1007 - GPUDirectRDMA with DMA-BUF   — skipped if fewer than 2 GPU nodes with RDMA hardware
-  #   TS1008 - GDRCopy                      — skipped if no operator-managed driver pods
-  #
-  # Examples:
-  #   "all"                    - run all registered sets
-  #   "all,!TS1003"            - run all except driver update
-  #   "TS1000,TS1003"          - run only default settings and driver update
-  #   ""                       - run nothing (safe default)
-  TEST_SETS: "all"
-
-  # -- TS1000 (Default Settings) --
-  # Container image for the GPU workload validation pod.
-  TEST_WORKLOAD_IMAGE: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04"
-
-  # -- TS1003 (Driver Update) --
-  # Leave empty to skip TS1003.
-  TARGET_DRIVER_REPOSITORY: ""  # e.g., "nvcr.io/nvidia"
-  TARGET_DRIVER_IMAGE: ""       # e.g., "driver"
-  TARGET_DRIVER_VERSION: ""     # e.g., "580.126.16"
-
-  # -- TS1006/TS1007 (RDMA) --
-  # Base CUDA image for RDMA test pods (must have glibc >= host MOFED libs).
-  RDMA_BASE_IMAGE: "nvcr.io/nvidia/cuda:13.1.1-base-ubuntu24.04"
----
-apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gpu-operator-certification
+  namespace: gpu-operator
   labels:
     app.kubernetes.io/name: gpu-operator-certification
     app.kubernetes.io/instance: gpu-operator-certification
@@ -134,6 +92,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: gpu-operator-certification
+  namespace: gpu-operator
   labels:
     app.kubernetes.io/name: gpu-operator-certification
     app.kubernetes.io/instance: gpu-operator-certification

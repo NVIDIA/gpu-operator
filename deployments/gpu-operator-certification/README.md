@@ -5,42 +5,51 @@ A self-certification test suite for ISVs to validate NVIDIA GPU Operator compati
 ## Quick Start
 
 ```bash
-# Namespace the GPU Operator runs in, for example nvidia-gpu-operator on OpenShift
-export NAMESPACE=gpu-operator
-
 # Deploy (GPU Operator must be installed)
-kubectl apply -f deployments/gpu-operator-certification/gpu-operator-certification.yaml -n $NAMESPACE
+kubectl apply -k deployments/gpu-operator-certification/
 
 # View results
-kubectl logs job/gpu-operator-certification -n $NAMESPACE
+kubectl logs job/gpu-operator-certification -n gpu-operator
 
 # Download results.json and report.html
 hack/download-certification-results.sh
 ```
 
-If the GPU Operator runs in a namespace other than `gpu-operator`, change the `namespace` of the ClusterRoleBinding subject in `gpu-operator-certification.yaml` to match before applying. `kubectl apply -n` does not set it.
-
 ## Configuration
 
-Set the configuration in the `gpu-operator-certification-config` ConfigMap in `gpu-operator-certification.yaml` before applying it:
+All settings live in [`kustomization.yaml`](kustomization.yaml), which generates the `gpu-operator-certification-config` ConfigMap. `gpu-operator-certification.yaml` does not need to change.
 
 ```yaml
-TEST_SETS: "all"               # Run all TestSets
-# TEST_SETS: "all,!TS1003"     # Exclude specific sets with "!"
-# TEST_SETS: "TS1000"          # Or list specific sets to run
+# Namespace the GPU Operator runs in, for example nvidia-gpu-operator on OpenShift.
+namespace: gpu-operator
+...
+    literals:
+      - TEST_SETS=all                # Run all TestSets
+      # - TEST_SETS=all,!TS1003      # Exclude specific sets with "!"
+      # - TEST_SETS=TS1000,TS1001    # Or list specific sets to run
 ```
 
-To pick test sets without editing the file:
+`namespace` applies to every object.
+
+Edit `kustomization.yaml` directly, or use these commands.
+
+To change the namespace:
 
 ```bash
-sed 's/^  TEST_SETS: .*/  TEST_SETS: "TS1000,TS1001"/' \
-  deployments/gpu-operator-certification/gpu-operator-certification.yaml \
-  | kubectl apply -n $NAMESPACE -f -
+sed -i.bak 's/^namespace: .*/namespace: nvidia-gpu-operator/' deployments/gpu-operator-certification/kustomization.yaml
 ```
+
+To change the test sets:
+
+```bash
+sed -i.bak 's/- TEST_SETS=.*/- TEST_SETS=TS1000,TS1001/' deployments/gpu-operator-certification/kustomization.yaml
+```
+
+When the namespace is not `gpu-operator`, pass the same namespace to `kubectl logs -n` and run the download script as `NAMESPACE=<namespace> hack/download-certification-results.sh`.
 
 | Key | Default | Description |
 |-------|---------|-------------|
-| `namespace` | `gpu-operator` | GPU Operator namespace, set with `kubectl apply -n` and in the ClusterRoleBinding subject |
+| `namespace` | `gpu-operator` | GPU Operator namespace |
 | `TEST_SETS` | `all` | TestSets to run (use `!` prefix to exclude) |
 | `TARGET_DRIVER_REPOSITORY` | `""` | Driver repository for TS1003 (skipped if any driver key is empty) |
 | `TARGET_DRIVER_IMAGE` | `""` | Driver image for TS1003 |
@@ -48,17 +57,14 @@ sed 's/^  TEST_SETS: .*/  TEST_SETS: "TS1000,TS1001"/' \
 
 ### Rerunning with a different configuration
 
-A Job runs only once. To run it again, for example with different test sets:
-
-1. Edit the ConfigMap in `gpu-operator-certification.yaml`.
-2. Delete the previous run and apply the manifest again:
+A Job runs only once. To run it again, for example with different test sets, edit `kustomization.yaml` directly or use the commands above, then delete the previous run and apply again:
 
 ```bash
-kubectl delete -f deployments/gpu-operator-certification/gpu-operator-certification.yaml -n $NAMESPACE
-kubectl apply -f deployments/gpu-operator-certification/gpu-operator-certification.yaml -n $NAMESPACE
+kubectl delete -k deployments/gpu-operator-certification/
+kubectl apply -k deployments/gpu-operator-certification/
 ```
 
-This recreates the ConfigMap from the file, so changes made directly in the cluster, for example with `kubectl edit configmap`, are lost. Always make changes in the file.
+Changes made directly in the cluster, for example with `kubectl edit configmap`, are lost on a rerun.
 
 ## Test Sets
 
