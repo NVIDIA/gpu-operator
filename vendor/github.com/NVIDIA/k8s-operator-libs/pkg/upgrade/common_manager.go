@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -117,13 +116,11 @@ type CommonUpgradeManagerImpl struct {
 func NewCommonUpgradeStateManager(
 	log logr.Logger,
 	k8sConfig *rest.Config,
-	scheme *runtime.Scheme,
+	k8sClient client.Client,
 	eventRecorder record.EventRecorder) (*CommonUpgradeManagerImpl, error) {
-	k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
-	if err != nil {
-		return &CommonUpgradeManagerImpl{}, fmt.Errorf("error creating k8s client: %v", err)
+	if k8sClient == nil {
+		return &CommonUpgradeManagerImpl{}, fmt.Errorf("k8sClient must not be nil")
 	}
-
 	k8sInterface, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		return &CommonUpgradeManagerImpl{}, fmt.Errorf("error creating k8s interface: %v", err)

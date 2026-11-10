@@ -155,7 +155,8 @@ func (f *fakeUpgradeStateManager) WithRestartOnlyPredicate(upgrade.RestartOnlyPr
 	return f
 }
 
-func (f *fakeUpgradeStateManager) BuildState(_ context.Context, namespace string, driverLabels map[string]string) (*upgrade.ClusterUpgradeState, error) {
+func (f *fakeUpgradeStateManager) BuildState(_ context.Context, namespace string, driverLabels map[string]string,
+	_ ...upgrade.DaemonSetFilter) (*upgrade.ClusterUpgradeState, error) {
 	f.buildCalls++
 	f.buildNamespace = namespace
 	f.buildLabels = driverLabels
