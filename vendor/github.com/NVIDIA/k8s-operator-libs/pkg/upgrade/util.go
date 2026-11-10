@@ -161,7 +161,7 @@ func GetEventReason() string {
 
 // logEventf logs a formatted event for a given kubernetes object
 func logEventf(recorder record.EventRecorder, object runtime.Object, eventType string, reason string, messageFmt string,
-	args ...interface{}) {
+	args ...any) {
 	if recorder != nil {
 		recorder.Eventf(object, eventType, reason, messageFmt, args...)
 	}

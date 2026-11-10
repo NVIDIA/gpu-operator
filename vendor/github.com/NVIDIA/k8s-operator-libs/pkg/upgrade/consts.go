@@ -16,6 +16,8 @@ limitations under the License.
 
 package upgrade
 
+import "k8s.io/apimachinery/pkg/types"
+
 const (
 	// UpgradeStateLabelKeyFmt is the format of the node label key indicating driver upgrade states
 	UpgradeStateLabelKeyFmt = "nvidia.com/%s-driver-upgrade-state"
@@ -83,6 +85,8 @@ const (
 )
 
 const (
+	// NoOwner identifies pods that do not have a controller.
+	NoOwner types.UID = ""
 	// nodeNameFieldSelectorFmt is the format of a field selector that can be used in metav1.ListOptions to filter by
 	// node
 	nodeNameFieldSelectorFmt = "spec.nodeName=%s"

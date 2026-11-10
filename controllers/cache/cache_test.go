@@ -150,10 +150,16 @@ func TestCache(t *testing.T) {
 		},
 		Spec: corev1.NodeSpec{Unschedulable: true},
 		Status: corev1.NodeStatus{
-			Capacity:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8")},
-			Images:     []corev1.ContainerImage{{Names: []string{"example.com/large-image:v1"}, SizeBytes: 1000000}},
-			NodeInfo:   corev1.NodeSystemInfo{ContainerRuntimeVersion: "containerd://2.0.0", KernelVersion: "6.0.0"},
-			Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}},
+			Capacity: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8")},
+			Images:   []corev1.ContainerImage{{Names: []string{"example.com/large-image:v1"}, SizeBytes: 1000000}},
+			NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "containerd://2.0.0", KernelVersion: "6.0.0"},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeMemoryPressure, Status: corev1.ConditionFalse},
+				{
+					Type: corev1.NodeReady, Status: corev1.ConditionTrue, Reason: "KubeletReady",
+					LastHeartbeatTime: metav1.NewTime(time.Unix(1700000000, 0)),
+				},
+			},
 		},
 	}
 	configMap := &corev1.ConfigMap{
@@ -313,9 +319,11 @@ func TestCache(t *testing.T) {
 		require.NoError(t, cachedClient.Get(ctx, client.ObjectKey{Name: node.Name}, gotNode))
 		expectedNode := node.DeepCopy()
 		expectedNode.ManagedFields = nil
-		expectedNode.Spec = corev1.NodeSpec{}
+		// The upgrade library needs Spec.Unschedulable and the Ready condition.
+		expectedNode.Spec = corev1.NodeSpec{Unschedulable: true}
 		expectedNode.Status = corev1.NodeStatus{
-			NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: node.Status.NodeInfo.ContainerRuntimeVersion},
+			NodeInfo:   corev1.NodeSystemInfo{ContainerRuntimeVersion: node.Status.NodeInfo.ContainerRuntimeVersion},
+			Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}},
 		}
 		require.Equal(t, expectedNode.ObjectMeta, gotNode.ObjectMeta)
 		require.Equal(t, expectedNode.Spec, gotNode.Spec)
