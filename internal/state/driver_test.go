@@ -497,6 +497,65 @@ func TestDriverGDS(t *testing.T) {
 	require.Equal(t, string(o), actual)
 }
 
+func TestDriverGDSImagePullPolicy(t *testing.T) {
+	testCases := []struct {
+		description     string
+		imagePullPolicy string
+		expected        corev1.PullPolicy
+	}{
+		{
+			description: "omitted defaults to IfNotPresent",
+			expected:    corev1.PullIfNotPresent,
+		},
+		{
+			description:     "IfNotPresent",
+			imagePullPolicy: "IfNotPresent",
+			expected:        corev1.PullIfNotPresent,
+		},
+		{
+			description:     "Always",
+			imagePullPolicy: "Always",
+			expected:        corev1.PullAlways,
+		},
+		{
+			description:     "Never",
+			imagePullPolicy: "Never",
+			expected:        corev1.PullNever,
+		},
+	}
+
+	state, err := NewStateDriver(nil, "", nil, manifestDir)
+	require.NoError(t, err)
+	stateDriver, ok := state.(*stateDriver)
+	require.True(t, ok)
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			renderData := getMinimalDriverRenderData()
+			renderData.GDS = &gdsDriverSpec{
+				ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
+				Spec: &nvidiav1alpha1.GPUDirectStorageSpec{
+					Enabled:         new(true),
+					ImagePullPolicy: tc.imagePullPolicy,
+				},
+			}
+
+			objs, err := stateDriver.renderer.RenderObjects(
+				&render.TemplatingData{
+					Data: renderData,
+				})
+			require.NoError(t, err)
+
+			ds, err := getDaemonsetFromObjects(objs)
+			require.NoError(t, err)
+
+			gdsContainer := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-fs-ctr")
+			require.NotNil(t, gdsContainer)
+			require.Equal(t, tc.expected, gdsContainer.ImagePullPolicy)
+		})
+	}
+}
+
 func TestDriverGDRCopy(t *testing.T) {
 	const (
 		testName = "driver-gdrcopy"
