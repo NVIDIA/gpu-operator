@@ -17,6 +17,9 @@ name: E2E Tests
 on:
   workflow_call:
     inputs:
+      skip_e2e:
+        type: boolean
+        default: false
       operator_image:
         required: true
         type: string
@@ -77,7 +80,7 @@ jobs:
 
   publish-helm-oci-chart:
     needs: [variables]
-    if: ${{ !inputs.chart_reference }}
+    if: ${{ !inputs.skip_e2e && !inputs.chart_reference }}
     permissions:
       contents: read
       packages: write
@@ -88,7 +91,7 @@ jobs:
 
   e2e-tests-containerd:
     needs: [variables, publish-helm-oci-chart]
-    if: ${{ !cancelled() && needs.variables.result == 'success' && (needs.publish-helm-oci-chart.result == 'success' || needs.publish-helm-oci-chart.result == 'skipped') }}
+    if: ${{ !cancelled() && !inputs.skip_e2e && needs.variables.result == 'success' && (needs.publish-helm-oci-chart.result == 'success' || needs.publish-helm-oci-chart.result == 'skipped') }}
     runs-on: linux-amd64-cpu4
     timeout-minutes: 90
     permissions:
@@ -170,7 +173,7 @@ jobs:
 
   e2e-tests-nvidiadriver:
     needs: [variables, publish-helm-oci-chart]
-    if: ${{ !cancelled() && needs.variables.result == 'success' && (needs.publish-helm-oci-chart.result == 'success' || needs.publish-helm-oci-chart.result == 'skipped') }}
+    if: ${{ !cancelled() && !inputs.skip_e2e && needs.variables.result == 'success' && (needs.publish-helm-oci-chart.result == 'success' || needs.publish-helm-oci-chart.result == 'skipped') }}
     runs-on: linux-amd64-cpu4
     timeout-minutes: 90
     permissions:
