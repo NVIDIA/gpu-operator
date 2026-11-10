@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-operator-certification-config
+  labels:
+    app.kubernetes.io/name: gpu-operator-certification
+    app.kubernetes.io/instance: gpu-operator-certification
+data:
+  TEST_TIMEOUT: "15m"
+  # TestSets to run. Use "all" for all sets, "!name" to exclude.
+  #
+  # Available TestSets:
+  #   TS1000 - Default Settings (operands, allocatable, GFD labels, DCGM metrics, workload)
+  #   TS1001 - GPU Sharing via Timeslicing
+  #   TS1002 - DCGM Standalone
+  #   TS1003 - Driver Update
+  #   TS1004 - MIG mode (single strategy)  — skipped if no MIG-capable GPUs detected
+  #   TS1005 - MIG mode (mixed strategy)   — skipped if no MIG-capable GPUs detected
+  #   TS1006 - GPUDirectRDMA               — skipped if fewer than 2 GPU nodes with RDMA hardware
+  #   TS1007 - GPUDirectRDMA with DMA-BUF   — skipped if fewer than 2 GPU nodes with RDMA hardware
+  #   TS1008 - GDRCopy                      — skipped if no operator-managed driver pods
+  #
+  # Examples:
+  #   "all"                    - run all registered sets
+  #   "all,!TS1003"            - run all except driver update
+  #   "TS1000,TS1003"          - run only default settings and driver update
+  #   ""                       - run nothing (safe default)
+  TEST_SETS: "all"
+
+  # -- TS1000 (Default Settings) --
+  # Container image for the GPU workload validation pod.
+  TEST_WORKLOAD_IMAGE: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04"
+
+  # -- TS1003 (Driver Update) --
+  # Leave empty to skip TS1003.
+  TARGET_DRIVER_REPOSITORY: ""  # e.g., "nvcr.io/nvidia"
+  TARGET_DRIVER_IMAGE: ""       # e.g., "driver"
+  TARGET_DRIVER_VERSION: ""     # e.g., "580.126.16"
+
+  # -- TS1006/TS1007 (RDMA) --
+  # Base CUDA image for RDMA test pods (must have glibc >= host MOFED libs).
+  RDMA_BASE_IMAGE: "nvcr.io/nvidia/cuda:13.1.1-base-ubuntu24.04"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gpu-operator-certification
+  labels:
+    app.kubernetes.io/name: gpu-operator-certification
+    app.kubernetes.io/instance: gpu-operator-certification
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gpu-operator-certification
+  labels:
+    app.kubernetes.io/name: gpu-operator-certification
+    app.kubernetes.io/instance: gpu-operator-certification
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete", "deletecollection"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]
+  # Apps resources
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "create", "delete"]
+  # GPU Operator
+  - apiGroups: ["nvidia.com"]
+    resources: ["clusterpolicies"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["nvidia.com"]
+    resources: ["nvidiadrivers"]
+    verbs: ["list", "patch"]
+  # KubeVirt (optional, for virtualization detection)
+  - apiGroups: ["kubevirt.io"]
+    resources: ["kubevirts"]
+    verbs: ["list"]
+  - apiGroups: ["hco.kubevirt.io"]
+    resources: ["hyperconvergeds"]
+    verbs: ["list"]
+  # OpenShift (optional, for platform detection)
+  - apiGroups: ["config.openshift.io"]
+    resources: ["clusterversions", "proxies", "images"]
+    verbs: ["get"]
+  - apiGroups: ["machine.openshift.io"]
+    resources: ["machines"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gpu-operator-certification
+  labels:
+    app.kubernetes.io/name: gpu-operator-certification
+    app.kubernetes.io/instance: gpu-operator-certification
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gpu-operator-certification
+subjects:
+  - kind: ServiceAccount
+    name: gpu-operator-certification
+    namespace: gpu-operator
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-operator-certification
+  labels:
+    app.kubernetes.io/name: gpu-operator-certification
+    app.kubernetes.io/instance: gpu-operator-certification
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gpu-operator-certification
+        app.kubernetes.io/instance: gpu-operator-certification
+    spec:
+      serviceAccountName: gpu-operator-certification
+      restartPolicy: Never
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: certification
+          image: "ghcr.io/nvidia/gpu-operator:main-latest"
+          imagePullPolicy: Always
+          command: ["gpu-operator-certification"]
+          envFrom:
+            - configMapRef:
+                name: gpu-operator-certification-config
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: RESULTS_CONFIGMAP_NAME
+              value: "gpu-operator-certification-results"
