@@ -20,7 +20,7 @@ hack/download-certification-results.sh
 All settings live in [`kustomization.yaml`](kustomization.yaml), which generates the `gpu-operator-certification-config` ConfigMap. `gpu-operator-certification.yaml` does not need to change.
 
 ```yaml
-# Namespace the GPU Operator runs in, for example nvidia-gpu-operator on OpenShift.
+# Namespace the GPU Operator runs in.
 namespace: gpu-operator
 ...
     literals:

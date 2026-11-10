@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Namespace the GPU Operator runs in, for example nvidia-gpu-operator on OpenShift.
+# Namespace the GPU Operator runs in.
 namespace: gpu-operator
 
 resources:
