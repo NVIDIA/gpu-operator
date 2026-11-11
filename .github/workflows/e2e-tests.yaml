@@ -126,7 +126,7 @@ jobs:
             exit 1
           fi
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
+        uses: NVIDIA/holodeck@8cd286c867a2be37c73a905123e6a689c084243c # v0.6.0
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -134,7 +134,7 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4
+        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
@@ -162,7 +162,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: containerd-e2e-test-logs
           path: ./logs/
@@ -208,7 +208,7 @@ jobs:
             exit 1
           fi
       - name: Set up Holodeck
-        uses: NVIDIA/holodeck@e0f3932cf284d92421a55536839fa821a14116aa # v0.3.7
+        uses: NVIDIA/holodeck@8cd286c867a2be37c73a905123e6a689c084243c # v0.6.0
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -216,7 +216,7 @@ jobs:
           holodeck_config: "tests/holodeck.yaml"
       - name: Get public dns name
         id: get_public_dns_name
-        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4
+        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4
         with:
           cmd: yq '.status.properties[] | select(.name == "public-dns-name") | .value' /github/workspace/.cache/holodeck.yaml
       - name: Set test environment
@@ -244,7 +244,7 @@ jobs:
           exit $rc
       - name: Archive test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nvidiadriver-e2e-test-logs
           path: ./logs/

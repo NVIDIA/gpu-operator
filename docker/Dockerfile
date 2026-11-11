@@ -17,7 +17,7 @@
 # CUDA SAMPLES v12.9 is used as that is the latest version with Maxwell support.
 ARG CUDA_SAMPLES_VERSION=12.9
 
-FROM golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd AS builder
+FROM golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c AS builder
 
 ARG GOPROXY="https://proxy.golang.org,direct"
 ENV GOPROXY=$GOPROXY
@@ -88,7 +88,7 @@ RUN /tmp/check-busybox-prefer-applets.sh /busybox/busybox
 
 # The C/C++ distroless image is used as a base since the CUDA vectorAdd
 # sample application depends on C/C++ libraries.
-FROM nvcr.io/nvidia/distroless/cc:v4.1.8@sha256:6578cff0c733f579a3d3dcc9134b7d65fb414dd0b13490d56e2546291222b203
+FROM nvcr.io/nvidia/distroless/cc:v4.2.1@sha256:e0190795c9cc8e79c1520b5c3539b16abc5a3dcadf4edf1ddccf24ac71cc84c1
 
 ENV NVIDIA_VISIBLE_DEVICES=void
 

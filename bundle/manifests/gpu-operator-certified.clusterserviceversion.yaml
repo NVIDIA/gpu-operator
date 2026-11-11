@@ -247,11 +247,11 @@ spec:
     - name: nvidia-dra-driver-image
       image: nvcr.io/nvidia/dra-driver-nvidia-gpu:v0.5.1@sha256:ae591dbc8e630b49181b40dfddf8f0a3f0890b883acb7b2b420f5b207fda253e
     - name: dcgm-exporter-image
-      image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:4.7.0-4.9.0-distroless@sha256:2490e1dfb5baaee6765ef2841813af7d978bb459a566c22c326a8fc27c64eea9
     - name: dcgm-image
-      image: nvcr.io/nvidia/cloud-native/dcgm:4.6.1-1-ubi10@sha256:e27d66b5b7a7a56a95fc7fe8538fadd73122aa22cbec02ab1543f1d5d01b48a1
+      image: nvcr.io/nvidia/cloud-native/dcgm:4.7.0-ubi10@sha256:63b6ed736cb7f7f3683b704aa99b3d719fe10da8ae152981466116f83b2ad136
     - name: container-toolkit-image
-      image: nvcr.io/nvidia/k8s/container-toolkit:v1.20.1@sha256:00a422252dd875b112f5974321c2feebbdf11c338f8ad131e5ce18e5b3a3bfac
+      image: nvcr.io/nvidia/k8s/container-toolkit:v1.20.2@sha256:58b5a82a618b531747e7c287c91a6c9f346de108fb935050ce356acdacbbc57d
     - name: driver-image
       image: nvcr.io/nvidia/driver@sha256:e243d778bd83de47668e7629d78f673317a130fedc99941be12aad7fc6bdfa85
     - name: driver-image-580
@@ -273,7 +273,7 @@ spec:
     - name: vfio-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8
     - name: cc-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-cc-manager:v0.4.4@sha256:09b376f2bb829819549a4b27086b532047ec51ea5585ca22b96c26c2939e92bd
+      image: nvcr.io/nvidia/cloud-native/k8s-cc-manager:v0.4.5@sha256:9cf906a498585f10de919d75b7d0ef5ea6094844ba37f4649b2d8ed225a76047
     - name: sandbox-device-plugin-image
       image: nvcr.io/nvidia/kubevirt-gpu-device-plugin:v1.6.0@sha256:367c597799aa6925f5bd2bc4bcdc45c26f018d13cdc2ce9aaf1ca07c492c6d9e
     - name: kata-sandbox-device-plugin-image
@@ -1120,11 +1120,11 @@ spec:
                   - name: "GFD_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.20.1@sha256:27c1b2553a690ca3d29889dcd61df97525d46f58272c0be8dc63c2b18f120075"
                   - name: "CONTAINER_TOOLKIT_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/container-toolkit:v1.20.1@sha256:00a422252dd875b112f5974321c2feebbdf11c338f8ad131e5ce18e5b3a3bfac"
+                    value: "nvcr.io/nvidia/k8s/container-toolkit:v1.20.2@sha256:58b5a82a618b531747e7c287c91a6c9f346de108fb935050ce356acdacbbc57d"
                   - name: "DCGM_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/dcgm:4.6.1-1-ubi10@sha256:e27d66b5b7a7a56a95fc7fe8538fadd73122aa22cbec02ab1543f1d5d01b48a1"
+                    value: "nvcr.io/nvidia/cloud-native/dcgm:4.7.0-ubi10@sha256:63b6ed736cb7f7f3683b704aa99b3d719fe10da8ae152981466116f83b2ad136"
                   - name: "DCGM_EXPORTER_IMAGE"
-                    value: "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003"
+                    value: "nvcr.io/nvidia/k8s/dcgm-exporter:4.7.0-4.9.0-distroless@sha256:2490e1dfb5baaee6765ef2841813af7d978bb459a566c22c326a8fc27c64eea9"
                   - name: "DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/k8s-device-plugin:v0.20.1@sha256:27c1b2553a690ca3d29889dcd61df97525d46f58272c0be8dc63c2b18f120075"
                   - name: "DRIVER_IMAGE"
@@ -1142,7 +1142,7 @@ spec:
                   - name: "VFIO_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8"
                   - name: "CC_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-cc-manager:v0.4.4@sha256:09b376f2bb829819549a4b27086b532047ec51ea5585ca22b96c26c2939e92bd"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-cc-manager:v0.4.5@sha256:9cf906a498585f10de919d75b7d0ef5ea6094844ba37f4649b2d8ed225a76047"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
                     value: "nvcr.io/nvidia/kubevirt-gpu-device-plugin:v1.6.0@sha256:367c597799aa6925f5bd2bc4bcdc45c26f018d13cdc2ce9aaf1ca07c492c6d9e"
                   - name: "KATA_SANDBOX_DEVICE_PLUGIN_IMAGE"
