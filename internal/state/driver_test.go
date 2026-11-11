@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -619,6 +620,54 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(o), actual)
+}
+
+func TestDriverConfigMapVolumeNames(t *testing.T) {
+	configMaps := map[string]string{"driver.repo": "custom.list", "driver.cert": "custom.crt", "driver.kernel": "custom.conf"}
+	builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+	for name, filename := range configMaps {
+		builder.WithObjects(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns"},
+			Data:       map[string]string{filename: "configuration"},
+		})
+	}
+	state := &stateDriver{stateSkel: stateSkel{client: builder.Build(), namespace: "test-ns"}}
+	driver := &nvidiav1alpha1.NVIDIADriver{Spec: nvidiav1alpha1.NVIDIADriverSpec{
+		RepoConfig:         &nvidiav1alpha1.DriverRepoConfigSpec{Name: "driver.repo"},
+		CertConfig:         &nvidiav1alpha1.DriverCertConfigSpec{Name: "driver.cert"},
+		KernelModuleConfig: &nvidiav1alpha1.KernelModuleConfigSpec{Name: "driver.kernel"},
+	}}
+	configs, err := state.getDriverAdditionalConfigs(context.Background(), driver,
+		testClusterInfo{runtime: "containerd"}, nodePool{osRelease: "ubuntu", osVersion: "ubuntu22.04"})
+	require.NoError(t, err)
+	require.Len(t, configs.Volumes, 3)
+	require.Len(t, configs.VolumeMounts, 3)
+	renderData := getMinimalDriverRenderData()
+	renderData.AdditionalConfigs = configs
+	ds, err := getDaemonsetFromObjects(renderDriverObjects(t, scheme.Scheme, renderData))
+	require.NoError(t, err)
+	container := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	require.NotNil(t, container)
+	seen := make(map[string]bool)
+	found := make(map[string]bool)
+	for _, volume := range ds.Spec.Template.Spec.Volumes {
+		require.Empty(t, validation.IsDNS1123Label(volume.Name))
+		require.False(t, seen[volume.Name], "duplicate volume name")
+		seen[volume.Name] = true
+		if volume.ConfigMap == nil {
+			continue
+		}
+		filename, ok := configMaps[volume.ConfigMap.Name]
+		if !ok {
+			continue
+		}
+		found[volume.ConfigMap.Name] = true
+		require.Equal(t, []corev1.KeyToPath{{Key: filename, Path: filename}}, volume.ConfigMap.Items)
+		mount := findVolumeMountByName(container.VolumeMounts, volume.Name)
+		require.NotNil(t, mount)
+		require.Equal(t, filename, mount.SubPath)
+	}
+	require.Len(t, found, len(configMaps))
 }
 
 func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {

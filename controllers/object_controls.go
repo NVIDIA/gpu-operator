@@ -2860,7 +2860,7 @@ func isCustomPluginConfigSet(pluginConfig *gpuv1.DevicePluginConfig) bool {
 // adds shared volume mounts required for custom plugin config provided via a ConfigMap
 func addSharedMountsForPluginConfig(container *corev1.Container, config *gpuv1.DevicePluginConfig) {
 	emptyDirMount := corev1.VolumeMount{Name: "config", MountPath: "/config"}
-	configVolMount := corev1.VolumeMount{Name: config.Name, MountPath: "/available-configs"}
+	configVolMount := corev1.VolumeMount{Name: utils.ConfigMapVolumeName(config.Name), MountPath: "/available-configs"}
 
 	container.VolumeMounts = append(container.VolumeMounts, emptyDirMount)
 	container.VolumeMounts = append(container.VolumeMounts, configVolMount)
@@ -3532,7 +3532,7 @@ func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string
 	var volumeMounts []corev1.VolumeMount
 	for _, filename := range filenames {
 		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{Name: configMapName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
+			corev1.VolumeMount{Name: utils.ConfigMapVolumeName(configMapName), ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
 		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
 			Key:  filename,
 			Path: filename,
@@ -3550,7 +3550,7 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 			Items: itemsToInclude,
 		},
 	}
-	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
+	return corev1.Volume{Name: utils.ConfigMapVolumeName(configMapName), VolumeSource: volumeSource}
 }
 
 func createEmptyDirVolume(volumeName string) corev1.Volume {
