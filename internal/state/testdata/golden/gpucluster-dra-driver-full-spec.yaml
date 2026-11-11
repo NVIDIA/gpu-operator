@@ -776,6 +776,8 @@ spec:
               fieldPath: metadata.namespace
         - name: IMAGE_NAME
           value: nvcr.io/nvidia/k8s-dra-driver-gpu:v0.1.0
+        - name: CD_DAEMON_IMAGE_PULL_SECRET_NAMES
+          value: registry-secret,other-secret
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
         - name: LEADER_ELECTION_ENABLED
