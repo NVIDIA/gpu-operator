@@ -1,0 +1,10 @@
+suite: role
+templates:
+  - role.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

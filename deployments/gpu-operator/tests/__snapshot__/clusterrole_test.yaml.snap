@@ -1,0 +1,485 @@
+should match snapshot:
+  1: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app.kubernetes.io/component: gpu-operator
+        app.kubernetes.io/instance: gpu-operator
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gpu-operator
+        app.kubernetes.io/version: main-latest
+        helm.sh/chart: gpu-operator-v1.0.0-devel
+      name: gpu-operator
+    rules:
+      - apiGroups:
+          - config.openshift.io
+        resources:
+          - clusterversions
+          - proxies
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - image.openshift.io
+        resources:
+          - imagestreams
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - security.openshift.io
+        resources:
+          - securitycontextconstraints
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+          - use
+      - apiGroups:
+          - rbac.authorization.k8s.io
+        resources:
+          - clusterroles
+          - clusterrolebindings
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - ""
+        resources:
+          - nodes
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - namespaces
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - events
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - delete
+          - patch
+      - apiGroups:
+          - events.k8s.io
+        resources:
+          - events
+        verbs:
+          - create
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - ""
+        resources:
+          - pods/eviction
+        verbs:
+          - create
+      - apiGroups:
+          - apps
+        resources:
+          - daemonsets
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - nvidia.com
+        resources:
+          - clusterpolicies
+          - clusterpolicies/finalizers
+          - clusterpolicies/status
+          - gpuclusters
+          - gpuclusters/finalizers
+          - gpuclusters/status
+          - nvidiadrivers
+          - nvidiadrivers/finalizers
+          - nvidiadrivers/status
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+          - deletecollection
+      - apiGroups:
+          - scheduling.k8s.io
+        resources:
+          - priorityclasses
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+      - apiGroups:
+          - node.k8s.io
+        resources:
+          - runtimeclasses
+        verbs:
+          - get
+          - list
+          - create
+          - update
+          - watch
+          - delete
+      - apiGroups:
+          - apiextensions.k8s.io
+        resources:
+          - customresourcedefinitions
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - create
+      - apiGroups:
+          - resource.nvidia.com
+        resources:
+          - computedomains
+          - computedomains/status
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - resource.nvidia.com
+        resources:
+          - computedomaincliques
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - coordination.k8s.io
+        resources:
+          - leases
+        verbs:
+          - get
+          - create
+          - update
+      - apiGroups:
+          - resource.k8s.io
+        resources:
+          - resourceclaims
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - resource.k8s.io
+        resources:
+          - resourceclaimtemplates
+          - deviceclasses
+          - resourceslices
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - delete
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        verbs:
+          - get
+          - list
+          - watch
+          - patch
+      - apiGroups:
+          - admissionregistration.k8s.io
+        resources:
+          - validatingadmissionpolicies
+          - validatingadmissionpolicybindings
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - delete
+should match snapshot when cleanupCRD is enabled:
+  1: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app.kubernetes.io/component: gpu-operator
+        app.kubernetes.io/instance: gpu-operator
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: gpu-operator
+        app.kubernetes.io/version: main-latest
+        helm.sh/chart: gpu-operator-v1.0.0-devel
+      name: gpu-operator
+    rules:
+      - apiGroups:
+          - config.openshift.io
+        resources:
+          - clusterversions
+          - proxies
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - image.openshift.io
+        resources:
+          - imagestreams
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - security.openshift.io
+        resources:
+          - securitycontextconstraints
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+          - use
+      - apiGroups:
+          - rbac.authorization.k8s.io
+        resources:
+          - clusterroles
+          - clusterrolebindings
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - ""
+        resources:
+          - nodes
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - namespaces
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - events
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - delete
+          - patch
+      - apiGroups:
+          - events.k8s.io
+        resources:
+          - events
+        verbs:
+          - create
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - ""
+        resources:
+          - pods/eviction
+        verbs:
+          - create
+      - apiGroups:
+          - apps
+        resources:
+          - daemonsets
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - nvidia.com
+        resources:
+          - clusterpolicies
+          - clusterpolicies/finalizers
+          - clusterpolicies/status
+          - gpuclusters
+          - gpuclusters/finalizers
+          - gpuclusters/status
+          - nvidiadrivers
+          - nvidiadrivers/finalizers
+          - nvidiadrivers/status
+        verbs:
+          - create
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - delete
+          - deletecollection
+      - apiGroups:
+          - scheduling.k8s.io
+        resources:
+          - priorityclasses
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+      - apiGroups:
+          - node.k8s.io
+        resources:
+          - runtimeclasses
+        verbs:
+          - get
+          - list
+          - create
+          - update
+          - watch
+          - delete
+      - apiGroups:
+          - apiextensions.k8s.io
+        resources:
+          - customresourcedefinitions
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+          - create
+          - delete
+      - apiGroups:
+          - resource.nvidia.com
+        resources:
+          - computedomains
+          - computedomains/status
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - resource.nvidia.com
+        resources:
+          - computedomaincliques
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - coordination.k8s.io
+        resources:
+          - leases
+        verbs:
+          - get
+          - create
+          - update
+      - apiGroups:
+          - resource.k8s.io
+        resources:
+          - resourceclaims
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - resource.k8s.io
+        resources:
+          - resourceclaimtemplates
+          - deviceclasses
+          - resourceslices
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - delete
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        verbs:
+          - get
+          - list
+          - watch
+          - patch
+      - apiGroups:
+          - admissionregistration.k8s.io
+        resources:
+          - validatingadmissionpolicies
+          - validatingadmissionpolicybindings
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - delete
