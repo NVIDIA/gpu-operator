@@ -378,7 +378,7 @@ func TestSyncCreatesObjects(t *testing.T) {
 	assert.True(t, *ownerRef.Controller)
 }
 
-func TestSyncSecondSyncWritesOnlyServiceAccount(t *testing.T) {
+func TestSyncSecondSyncSendsNoWrites(t *testing.T) {
 	scheme := driverTestScheme(t)
 	var writes []string
 	recordWrite := func(verb string, object client.Object) {
@@ -427,8 +427,7 @@ func TestSyncSecondSyncWritesOnlyServiceAccount(t *testing.T) {
 	writes = nil
 	_, err = driverState.Sync(context.Background(), driverCR, catalog)
 	require.NoError(t, err)
-	// The ServiceAccount is not compared before an update, so only it is written again.
-	assert.Equal(t, []string{"update ServiceAccount"}, writes)
+	assert.Empty(t, writes, "the second sync must not write objects that did not change")
 }
 
 func TestGetDriverName(t *testing.T) {

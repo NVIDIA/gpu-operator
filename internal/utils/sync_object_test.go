@@ -24,7 +24,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -81,6 +86,54 @@ func TestContentEqual(t *testing.T) {
 	ownedRole := newLiveRole("get")
 	ownedRole.OwnerReferences = []metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: "owner", UID: "uid-owner"}}
 	service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc-a", Namespace: "test-ns"}}
+	newRuntimeClass := func(handler string) *nodev1.RuntimeClass {
+		return &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "nvidia", Labels: map[string]string{"app": "test"}}, Handler: handler}
+	}
+	liveRuntimeClass := newRuntimeClass("nvidia")
+	liveRuntimeClass.ResourceVersion = "3"
+	newLegacyRuntimeClass := func() *nodev1beta1.RuntimeClass {
+		return &nodev1beta1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "nvidia"}, Handler: "nvidia"}
+	}
+	liveLegacyRuntimeClass := newLegacyRuntimeClass()
+	liveLegacyRuntimeClass.ResourceVersion = "3"
+	newServiceAccount := func() *corev1.ServiceAccount {
+		return &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "sa-a", Namespace: "test-ns"}}
+	}
+	liveServiceAccount := newServiceAccount()
+	liveServiceAccount.ResourceVersion = "3"
+	liveServiceAccountWithSecrets := liveServiceAccount.DeepCopy()
+	liveServiceAccountWithSecrets.Secrets = []corev1.ObjectReference{{Name: "sa-token"}}
+	const gpuSelector = "device.driver == 'gpu.nvidia.com'"
+	newDeviceClass := func(expression string) *resourcev1.DeviceClass {
+		return &resourcev1.DeviceClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "gpu.nvidia.com"},
+			Spec: resourcev1.DeviceClassSpec{Selectors: []resourcev1.DeviceSelector{
+				{CEL: &resourcev1.CELDeviceSelector{Expression: expression}},
+			}},
+		}
+	}
+	liveDeviceClass := newDeviceClass(gpuSelector)
+	liveDeviceClass.ResourceVersion = "3"
+	newV1beta2DeviceClass := func() *resourcev1beta2.DeviceClass {
+		return &resourcev1beta2.DeviceClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "gpu.nvidia.com"},
+			Spec: resourcev1beta2.DeviceClassSpec{Selectors: []resourcev1beta2.DeviceSelector{
+				{CEL: &resourcev1beta2.CELDeviceSelector{Expression: gpuSelector}},
+			}},
+		}
+	}
+	liveV1beta2DeviceClass := newV1beta2DeviceClass()
+	liveV1beta2DeviceClass.ResourceVersion = "3"
+	newV1beta1DeviceClass := func() *resourcev1beta1.DeviceClass {
+		return &resourcev1beta1.DeviceClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "gpu.nvidia.com"},
+			Spec: resourcev1beta1.DeviceClassSpec{Selectors: []resourcev1beta1.DeviceSelector{
+				{CEL: &resourcev1beta1.CELDeviceSelector{Expression: gpuSelector}},
+			}},
+		}
+	}
+	liveV1beta1DeviceClass := newV1beta1DeviceClass()
+	liveV1beta1DeviceClass.ResourceVersion = "3"
 
 	testCases := map[string]struct {
 		// scheme defaults to the client-go scheme.
@@ -133,6 +186,51 @@ func TestContentEqual(t *testing.T) {
 			desired: newRenderedConfigMap(map[string]any{}),
 			live:    liveConfigMapWithData,
 			want:    false,
+		},
+		"RuntimeClass with the same content": {
+			desired: newRuntimeClass("nvidia"),
+			live:    liveRuntimeClass,
+			want:    true,
+		},
+		"RuntimeClass with a different handler": {
+			desired: newRuntimeClass("nvidia-cdi"),
+			live:    liveRuntimeClass,
+			want:    false,
+		},
+		"legacy RuntimeClass with the same content": {
+			desired: newLegacyRuntimeClass(),
+			live:    liveLegacyRuntimeClass,
+			want:    true,
+		},
+		"ServiceAccount with the same content": {
+			desired: newServiceAccount(),
+			live:    liveServiceAccount,
+			want:    true,
+		},
+		"ServiceAccount with secrets only on live": {
+			desired: newServiceAccount(),
+			live:    liveServiceAccountWithSecrets,
+			want:    false,
+		},
+		"DeviceClass with the same content": {
+			desired: toUnstructured(t, newDeviceClass(gpuSelector)),
+			live:    liveDeviceClass,
+			want:    true,
+		},
+		"DeviceClass with a different selector": {
+			desired: toUnstructured(t, newDeviceClass("device.driver == 'mig.nvidia.com'")),
+			live:    liveDeviceClass,
+			want:    false,
+		},
+		"v1beta2 DeviceClass with the same content": {
+			desired: toUnstructured(t, newV1beta2DeviceClass()),
+			live:    liveV1beta2DeviceClass,
+			want:    true,
+		},
+		"v1beta1 DeviceClass with the same content": {
+			desired: toUnstructured(t, newV1beta1DeviceClass()),
+			live:    liveV1beta1DeviceClass,
+			want:    true,
 		},
 		"kind that the API server defaults": {
 			desired: service,

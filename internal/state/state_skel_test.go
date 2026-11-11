@@ -379,6 +379,29 @@ func TestCreateOrUpdateObjsUpdatesOnlyChangedObject(t *testing.T) {
 	}
 }
 
+func TestCreateOrUpdateObjsSkipsServiceAccountWithLiveSecrets(t *testing.T) {
+	// Other controllers add secrets to a ServiceAccount, and the rendered ServiceAccount has
+	// none. The merge copies them into the desired object, so the two still compare equal.
+	existingServiceAccount := newServiceAccountUnstructured("sa-a", "test-ns")
+	existingServiceAccount.SetLabels(map[string]string{consts.StateLabel: "test-state"})
+	require.NoError(t, unstructured.SetNestedSlice(existingServiceAccount.Object,
+		[]any{map[string]any{"name": "sa-token"}}, "secrets"))
+	require.NoError(t, unstructured.SetNestedSlice(existingServiceAccount.Object,
+		[]any{map[string]any{"name": "pull-secret"}}, "imagePullSecrets"))
+	updates := 0
+	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(existingServiceAccount).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+				updates++
+				return wrappedClient.Update(ctx, object, opts...)
+			},
+		}).Build()
+
+	require.NoError(t, newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newServiceAccountUnstructured("sa-a", "test-ns")}))
+	assert.Zero(t, updates)
+}
+
 func TestCreateOrUpdateObjsSetControllerReferenceError(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).Build()
 	skel := newTestSkel(t, fakeClient)

@@ -466,7 +466,8 @@ func TestDRADriverSecondSyncSkipsUnchangedObjects(t *testing.T) {
 	// every sync, so their writes are not counted.
 	countedKinds := map[string]bool{
 		"Role": true, "RoleBinding": true, "ClusterRole": true, "ClusterRoleBinding": true,
-		"ConfigMap": true, "DaemonSet": true,
+		"ConfigMap": true, "RuntimeClass": true, "ServiceAccount": true, "DeviceClass": true,
+		"DaemonSet": true,
 	}
 	var writes []string
 	recordWrite := func(verb string, object client.Object) {
@@ -498,7 +499,7 @@ func TestDRADriverSecondSyncSkipsUnchangedObjects(t *testing.T) {
 
 	_, err := state.Sync(t.Context(), cluster, draSupportedCatalog())
 	require.NoError(t, err)
-	require.NotEmpty(t, writes, "the first sync creates the RBAC objects and the DaemonSet")
+	require.NotEmpty(t, writes, "the first sync creates the counted objects")
 
 	writes = nil
 	_, err = state.Sync(t.Context(), cluster, draSupportedCatalog())

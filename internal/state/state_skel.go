@@ -378,14 +378,16 @@ func (s *stateSkel) createOrUpdateObjs(
 			}
 		}
 
+		// Merge before the comparison, so that the live fields the merge keeps, such as the
+		// secrets of a ServiceAccount, do not count as a change.
+		if err := s.mergeObjects(desiredObj, currentObj); err != nil {
+			return err
+		}
+
 		if utils.ContentEqual(s.client.Scheme(), desiredObj, currentObj) {
 			reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
 				"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
 			continue
-		}
-
-		if err := s.mergeObjects(desiredObj, currentObj); err != nil {
-			return err
 		}
 
 		// Object found, Update it

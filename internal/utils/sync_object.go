@@ -21,7 +21,9 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -130,6 +132,12 @@ var contentEqualKinds = map[schema.GroupKind]bool{
 	{Group: rbacv1.GroupName, Kind: "RoleBinding"}:        true,
 	{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}: true,
 	{Group: corev1.GroupName, Kind: "ConfigMap"}:          true,
+	// ServiceAccount matches only because createOrUpdateObjs merges the live secrets first.
+	{Group: corev1.GroupName, Kind: "ServiceAccount"}: true,
+	{Group: nodev1.GroupName, Kind: "RuntimeClass"}:   true,
+	// Note: DRA API is still gaining fields: a DeviceClass field newer than the vendored
+	// k8s.io/api is dropped before comparison.
+	{Group: resourcev1.GroupName, Kind: "DeviceClass"}: true,
 	// ServiceMonitor and PrometheusRule are left out because their CRDs come from the
 	// Prometheus installation, so live objects can have fields and defaults that the
 	// vendored types do not.

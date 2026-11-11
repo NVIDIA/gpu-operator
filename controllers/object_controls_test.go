@@ -2608,6 +2608,63 @@ func TestRuntimeClasses(t *testing.T) {
 	}
 }
 
+func TestRuntimeClassesSecondCallSendsNoWrites(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nodev1.AddToScheme(scheme))
+	require.NoError(t, nodev1beta1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	runtimeClasses := []nodev1.RuntimeClass{
+		{ObjectMeta: metav1.ObjectMeta{Name: "FILLED_BY_OPERATOR"}, Handler: "FILLED_BY_OPERATOR"},
+		{ObjectMeta: metav1.ObjectMeta{Name: "nvidia-cdi"}, Handler: "nvidia-cdi"},
+		{ObjectMeta: metav1.ObjectMeta{Name: "nvidia-legacy"}, Handler: "nvidia-legacy"},
+	}
+
+	testCases := map[string]struct {
+		k8sVersion string
+	}{
+		"node.k8s.io/v1 RuntimeClasses":      {k8sVersion: "v1.33.0"},
+		"node.k8s.io/v1beta1 RuntimeClasses": {k8sVersion: "v1.19.0"},
+	}
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			writes := 0
+			countingClient := interceptor.NewClient(fake.NewClientBuilder().WithScheme(scheme).Build(), interceptor.Funcs{
+				Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+					writes++
+					return wrappedClient.Create(ctx, object, opts...)
+				},
+				Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+					writes++
+					return wrappedClient.Update(ctx, object, opts...)
+				},
+				Delete: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.DeleteOption) error {
+					writes++
+					return wrappedClient.Delete(ctx, object, opts...)
+				},
+			})
+			controller := ClusterPolicyController{
+				client:     countingClient,
+				ctx:        t.Context(),
+				singleton:  &gpuv1.ClusterPolicy{Spec: gpuv1.ClusterPolicySpec{CDI: gpuv1.CDIConfigSpec{Enabled: new(true)}}},
+				scheme:     scheme,
+				resources:  []Resources{{RuntimeClasses: runtimeClasses}},
+				stateNames: []string{"pre-requisites"},
+				k8sVersion: testCase.k8sVersion,
+				logger:     ctrl.Log.WithName("test"),
+			}
+
+			_, err := RuntimeClasses(controller)
+			require.NoError(t, err)
+			require.Equal(t, 3, writes, "the first call creates each RuntimeClass")
+
+			writes = 0
+			_, err = RuntimeClasses(controller)
+			require.NoError(t, err)
+			require.Zero(t, writes, "the second call must not write RuntimeClasses that did not change")
+		})
+	}
+}
+
 // getMIGManagerTestInput returns a ClusterPolicy instance for a given MIG Manager test case
 func getMIGManagerTestInput(testCase string) *gpuv1.ClusterPolicy {
 	cp := clusterPolicy.DeepCopy()
