@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
 )
 
 const (
@@ -560,23 +561,6 @@ func (n *ClusterPolicyController) discoverGPUNodes() (bool, int, error) {
 	return clusterHasNFDLabels, gpuNodesTotal, nil
 }
 
-func getRuntimeString(node corev1.Node) (gpuv1.Runtime, error) {
-	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
-	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
-	var runtime gpuv1.Runtime
-	switch {
-	case strings.HasPrefix(runtimeVer, "docker"):
-		runtime = gpuv1.Docker
-	case strings.HasPrefix(runtimeVer, "containerd"):
-		runtime = gpuv1.Containerd
-	case strings.HasPrefix(runtimeVer, "cri-o"):
-		runtime = gpuv1.CRIO
-	default:
-		return "", fmt.Errorf("runtime not recognized: %s", runtimeVer)
-	}
-	return runtime, nil
-}
-
 func (n *ClusterPolicyController) getGPUNodeOSInfo() (string, string, error) {
 	ctx := n.ctx
 	opts := []client.ListOption{
@@ -744,12 +728,12 @@ func (n *ClusterPolicyController) getRuntime() error {
 
 	var runtime gpuv1.Runtime
 	for _, node := range list.Items {
-		rt, err := getRuntimeString(node)
+		rtStr, err := clusterinfo.GetRuntimeString(node)
 		if err != nil {
 			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
 			continue
 		}
-		runtime = rt
+		runtime = gpuv1.Runtime(rtStr)
 		if runtime == gpuv1.Containerd {
 			// default to containerd if >=1 node running containerd
 			break
