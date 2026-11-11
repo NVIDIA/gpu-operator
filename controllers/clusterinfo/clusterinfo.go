@@ -247,7 +247,7 @@ func getContainerRuntime(ctx context.Context, config *rest.Config) (string, erro
 
 	var runtime string
 	for _, node := range list.Items {
-		rt, err := getRuntimeString(node)
+		rt, err := GetRuntimeString(node)
 		if err != nil {
 			logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
 			continue
@@ -359,7 +359,7 @@ func getOpenshiftProxySpec(ctx context.Context, cfg *rest.Config) (*configv1.Pro
 	return &proxy.Spec, nil
 }
 
-func getRuntimeString(node corev1.Node) (string, error) {
+func GetRuntimeString(node corev1.Node) (string, error) {
 	// ContainerRuntimeVersion string will look like <runtime>://<x.y.z>
 	runtimeVer := node.Status.NodeInfo.ContainerRuntimeVersion
 	var runtime string
