@@ -450,6 +450,34 @@ func TestDRADriverRenderComputeDomains(t *testing.T) {
 	assert.ElementsMatch(t, []string{"gpus", "compute-domains"}, cnames)
 }
 
+func TestDRADriverComputeDomainDaemonImagePullSecrets(t *testing.T) {
+	for name, tc := range map[string]struct {
+		secrets []string
+		value   string
+	}{
+		"unset":    {},
+		"empty":    {secrets: []string{}},
+		"single":   {secrets: []string{"registry-secret"}, value: "registry-secret"},
+		"multiple": {secrets: []string{"registry-secret", "other-secret"}, value: "registry-secret,other-secret"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+			cr.Spec.DRADriver.ImagePullSecrets = tc.secrets
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			require.NoError(t, err)
+			dep := findDeployment(t, objs)
+			env := envMap(dep.Spec.Template.Spec.Containers[0].Env)
+			// The controller renders the ComputeDomain daemon DaemonSets itself, so it
+			// needs the secret names to set on those pods.
+			value, found := env["CD_DAEMON_IMAGE_PULL_SECRET_NAMES"]
+			require.Equal(t, len(tc.secrets) > 0, found)
+			require.Equal(t, tc.value, value)
+		})
+	}
+}
+
 func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()
