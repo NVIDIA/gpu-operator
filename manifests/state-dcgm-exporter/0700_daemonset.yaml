@@ -69,6 +69,10 @@ spec:
       - {{ . | toJson }}
       {{- end }}
       {{- end }}
+      {{- if .Daemonsets.PodSecurityContext }}
+      securityContext:
+        {{- .Daemonsets.PodSecurityContext | yaml | nindent 8 }}
+      {{- end }}
       resourceClaims:
       - name: admin-gpus
         resourceClaimTemplateName: nvidia-dcgm-exporter-admin
