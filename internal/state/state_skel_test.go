@@ -248,6 +248,101 @@ func TestMergeServiceAccount(t *testing.T) {
 	assert.Equal(t, []any{map[string]any{"name": "pull-secret"}}, pullSecrets)
 }
 
+func TestMergeServicePreservesAPIAllocatedFields(t *testing.T) {
+	skel := newTestSkel(t, fake.NewClientBuilder().WithScheme(skelTestScheme(t)).Build())
+
+	updatedService := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service",
+			Namespace: "test-ns",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                  corev1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+			Ports: []corev1.ServicePort{{
+				Name:     "metrics",
+				Protocol: corev1.ProtocolTCP,
+				Port:     9400,
+			}},
+		},
+	}
+	currentService := updatedService.DeepCopy()
+	currentService.ResourceVersion = "42"
+	currentService.Spec.ClusterIP = "10.96.0.10"
+	currentService.Spec.ClusterIPs = []string{"10.96.0.10", "fd00::10"}
+	currentService.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
+	currentService.Spec.IPFamilyPolicy = ptr.To(corev1.IPFamilyPolicyRequireDualStack)
+	currentService.Spec.Ports[0].NodePort = 30400
+	currentService.Spec.HealthCheckNodePort = 30900
+
+	updatedMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(updatedService)
+	require.NoError(t, err)
+	currentMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentService)
+	require.NoError(t, err)
+	updated := &unstructured.Unstructured{Object: updatedMap}
+	current := &unstructured.Unstructured{Object: currentMap}
+
+	require.NoError(t, skel.mergeObjects(updated, current))
+
+	merged := &corev1.Service{}
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updated.Object, merged))
+	assert.Equal(t, currentService.ResourceVersion, merged.ResourceVersion)
+	assert.Equal(t, currentService.Spec.ClusterIP, merged.Spec.ClusterIP)
+	assert.Equal(t, currentService.Spec.ClusterIPs, merged.Spec.ClusterIPs)
+	assert.Equal(t, currentService.Spec.IPFamilies, merged.Spec.IPFamilies)
+	assert.Equal(t, currentService.Spec.IPFamilyPolicy, merged.Spec.IPFamilyPolicy)
+	assert.Equal(t, currentService.Spec.Ports[0].NodePort, merged.Spec.Ports[0].NodePort)
+	assert.Equal(t, currentService.Spec.HealthCheckNodePort, merged.Spec.HealthCheckNodePort)
+}
+
+func TestMergeServiceKeepsManifestAllocatedFields(t *testing.T) {
+	skel := newTestSkel(t, fake.NewClientBuilder().WithScheme(skelTestScheme(t)).Build())
+
+	updatedService := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service",
+			Namespace: "test-ns",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                  corev1.ServiceTypeLoadBalancer,
+			ClusterIP:             "10.96.0.20",
+			ClusterIPs:            []string{"10.96.0.20"},
+			IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
+			IPFamilyPolicy:        ptr.To(corev1.IPFamilyPolicySingleStack),
+			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+			HealthCheckNodePort:   30901,
+			Ports: []corev1.ServicePort{{
+				Name:     "metrics",
+				Protocol: corev1.ProtocolTCP,
+				Port:     9400,
+				NodePort: 30401,
+			}},
+		},
+	}
+	currentService := updatedService.DeepCopy()
+	currentService.Spec.ClusterIP = "10.96.0.10"
+	currentService.Spec.ClusterIPs = []string{"10.96.0.10", "fd00::10"}
+	currentService.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
+	currentService.Spec.IPFamilyPolicy = ptr.To(corev1.IPFamilyPolicyRequireDualStack)
+	currentService.Spec.Ports[0].NodePort = 30400
+	currentService.Spec.HealthCheckNodePort = 30900
+
+	updatedMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(updatedService)
+	require.NoError(t, err)
+	currentMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentService)
+	require.NoError(t, err)
+	updated := &unstructured.Unstructured{Object: updatedMap}
+	current := &unstructured.Unstructured{Object: currentMap}
+
+	require.NoError(t, skel.mergeObjects(updated, current))
+
+	merged := &corev1.Service{}
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updated.Object, merged))
+	assert.Equal(t, updatedService.Spec, merged.Spec)
+}
+
 func TestCreateOrUpdateObjsCreatesNewObject(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).Build()
 	skel := newTestSkel(t, fakeClient)
