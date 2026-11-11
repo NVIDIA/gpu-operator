@@ -69,11 +69,7 @@ jobs:
               - '**'
             src:
               - '!docs/**'
-              - '!README.md'
-              - '!CONTRIBUTING.md'
-              - '!CODE_OF_CONDUCT.md'
-              - '!SECURITY.md'
-              - '!GOVERNANCE.md'
+              - '!**/*.md'
               - '!.github/renovate.json'
       - name: Summarize E2E decision
         if: ${{ always() }}
