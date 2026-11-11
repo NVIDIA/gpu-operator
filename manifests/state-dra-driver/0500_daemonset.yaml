@@ -82,6 +82,10 @@ spec:
       - {{ . | toJson }}
       {{- end }}
       {{- end }}
+      {{- if .Daemonsets.PodSecurityContext }}
+      securityContext:
+        {{- .Daemonsets.PodSecurityContext | yaml | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: driver-validation
         image: {{ .DRADriver.InitImagePath }}
