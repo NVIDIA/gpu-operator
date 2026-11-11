@@ -682,11 +682,20 @@ func TestSyncCreateOrUpdateError(t *testing.T) {
 
 func TestSyncGetSyncStateError(t *testing.T) {
 	scheme := driverTestScheme(t)
-	// getSyncState reads back the applied objects as unstructured, so failing only
-	// those Gets leaves the earlier Sync steps working.
-	fakeClient := newDriverClientWithInterceptors(scheme,
-		failingGetInterceptor[*unstructured.Unstructured](errors.New("injected get error")),
-		newGPUNode("gpu-node", "driver-a"))
+	// createOrUpdateObjs reads the ServiceAccount once before creating it, and getSyncState
+	// reads it back next, so failing only the second read leaves the earlier Sync steps working.
+	serviceAccountReads := 0
+	fakeClient := newDriverClientWithInterceptors(scheme, interceptor.Funcs{
+		Get: func(ctx context.Context, wrappedClient client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
+			if _, ok := object.(*corev1.ServiceAccount); ok {
+				serviceAccountReads++
+				if serviceAccountReads == 2 {
+					return errors.New("injected get error")
+				}
+			}
+			return wrappedClient.Get(ctx, key, object, opts...)
+		},
+	}, newGPUNode("gpu-node", "driver-a"))
 	driverState := newTestStateDriver(t, fakeClient, scheme)
 
 	syncState, err := driverState.Sync(context.Background(), newDriverCR("driver-a"), driverInfoCatalog(fakeClusterInfo{}))

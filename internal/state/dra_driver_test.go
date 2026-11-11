@@ -23,15 +23,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
@@ -448,6 +452,58 @@ func TestDRADriverRenderComputeDomains(t *testing.T) {
 		cnames = append(cnames, c.Name)
 	}
 	assert.ElementsMatch(t, []string{"gpus", "compute-domains"}, cnames)
+}
+
+func TestDRADriverSecondSyncSkipsUnchangedObjects(t *testing.T) {
+	scheme := driverTestScheme(t)
+	require.NoError(t, admissionv1.AddToScheme(scheme))
+	require.NoError(t, resourcev1.AddToScheme(scheme))
+	cluster := sampleGPUCluster()
+	cluster.UID = "cluster-uid"
+	cluster.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+
+	// Only these kinds skip an unchanged object; the other kinds are still updated on
+	// every sync, so their writes are not counted.
+	countedKinds := map[string]bool{
+		"Role": true, "RoleBinding": true, "ClusterRole": true, "ClusterRoleBinding": true,
+		"ConfigMap": true, "DaemonSet": true,
+	}
+	var writes []string
+	recordWrite := func(verb string, object client.Object) {
+		if kind := object.GetObjectKind().GroupVersionKind().Kind; countedKinds[kind] {
+			writes = append(writes, verb+" "+kind+"/"+object.GetName())
+		}
+	}
+	fakeClient := newDriverClientWithInterceptors(scheme, interceptor.Funcs{
+		Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+			recordWrite("create", object)
+			return wrappedClient.Create(ctx, object, opts...)
+		},
+		Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+			recordWrite("update", object)
+			return wrappedClient.Update(ctx, object, opts...)
+		},
+		Patch: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			recordWrite("patch", object)
+			return wrappedClient.Patch(ctx, object, patch, opts...)
+		},
+		Delete: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.DeleteOption) error {
+			recordWrite("delete", object)
+			return wrappedClient.Delete(ctx, object, opts...)
+		},
+	}, cluster, newGPUNode("node", ""))
+	state := newTestDRAState(t)
+	state.client = fakeClient
+	state.scheme = scheme
+
+	_, err := state.Sync(t.Context(), cluster, draSupportedCatalog())
+	require.NoError(t, err)
+	require.NotEmpty(t, writes, "the first sync creates the RBAC objects and the DaemonSet")
+
+	writes = nil
+	_, err = state.Sync(t.Context(), cluster, draSupportedCatalog())
+	require.NoError(t, err)
+	assert.Empty(t, writes, "the second sync must not write objects that did not change")
 }
 
 func TestDRADriverComputeDomainsContainerAndController(t *testing.T) {
