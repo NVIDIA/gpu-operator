@@ -60,8 +60,12 @@ func TestCreateOrUpdateObjsGetError(t *testing.T) {
 }
 
 func TestCreateOrUpdateObjsMergeError(t *testing.T) {
+	// Without ServiceAccount in the scheme, getObj reads it as unstructured, so the
+	// interceptor can return a ServiceAccount with a malformed secrets field.
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
 	existingServiceAccount := newServiceAccountUnstructured("sa-a", "test-ns")
-	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(existingServiceAccount).
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existingServiceAccount).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, object client.Object, _ ...client.GetOption) error {
 				serviceAccount, ok := object.(*unstructured.Unstructured)
@@ -81,6 +85,58 @@ func TestCreateOrUpdateObjsMergeError(t *testing.T) {
 	err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
 		[]*unstructured.Unstructured{desiredServiceAccount})
 	require.ErrorContains(t, err, ".secrets accessor error")
+}
+
+func TestGetObjReadType(t *testing.T) {
+	testCases := map[string]struct {
+		gvk      schema.GroupVersionKind
+		wantType client.Object
+	}{
+		"kind in scheme is read as typed object": {
+			gvk:      corev1.SchemeGroupVersion.WithKind("ConfigMap"),
+			wantType: &corev1.ConfigMap{},
+		},
+		"kind not in scheme is read as unstructured object": {
+			gvk:      schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Widget"},
+			wantType: &unstructured.Unstructured{},
+		},
+	}
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var gotObject client.Object
+			fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(_ context.Context, _ client.WithWatch, key client.ObjectKey, object client.Object, _ ...client.GetOption) error {
+						gotObject = object
+						return apierrors.NewNotFound(schema.GroupResource{}, key.Name)
+					},
+				}).Build()
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(testCase.gvk)
+			obj.SetName("obj-a")
+			obj.SetNamespace("test-ns")
+
+			err := newTestSkel(t, fakeClient).getObj(context.Background(), obj)
+			require.True(t, apierrors.IsNotFound(err))
+			assert.IsType(t, testCase.wantType, gotObject)
+		})
+	}
+}
+
+func TestGetObjCopiesTypedResult(t *testing.T) {
+	existingConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "cm-a", Namespace: "test-ns"},
+		Data:       map[string]string{"key": "live-value"},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(existingConfigMap).Build()
+	obj := newConfigMapUnstructured("cm-a", "test-ns")
+
+	require.NoError(t, newTestSkel(t, fakeClient).getObj(context.Background(), obj))
+	assert.Equal(t, corev1.SchemeGroupVersion.WithKind("ConfigMap"), obj.GroupVersionKind())
+	value, _, err := unstructured.NestedString(obj.Object, "data", "key")
+	require.NoError(t, err)
+	assert.Equal(t, "live-value", value)
+	assert.NotEmpty(t, obj.GetResourceVersion())
 }
 
 func TestCreateOrUpdateObjsUpdateError(t *testing.T) {
