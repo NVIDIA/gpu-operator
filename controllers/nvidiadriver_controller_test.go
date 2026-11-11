@@ -633,6 +633,63 @@ func TestReconcileMissingSecretEnvSetsNotReadyState(t *testing.T) {
 	require.Contains(t, updater.LastErrorMessage, "driver-env-secret")
 }
 
+func TestReconcileMissingSecretEnvPersistsNotReady(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			SecretEnv: "driver-env-secret",
+		},
+		Status: nvidiav1alpha1.NVIDIADriverStatus{
+			State: nvidiav1alpha1.Ready,
+		},
+	}
+	cp := &gpuv1.ClusterPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Spec: gpuv1.ClusterPolicySpec{
+			Driver: gpuv1.DriverSpec{UseNvidiaDriverCRD: new(true)},
+		},
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(cp, driver).
+		WithStatusSubresource(&nvidiav1alpha1.NVIDIADriver{}).
+		Build()
+
+	reconciler := &NVIDIADriverReconciler{
+		Client:                client,
+		Scheme:                scheme,
+		Namespace:             "gpu-operator",
+		conditionUpdater:      conditions.NewNvDriverUpdater(client),
+		nodeSelectorValidator: &FakeNodeSelectorValidator{},
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+	require.NoError(t, err)
+
+	persisted := &nvidiav1alpha1.NVIDIADriver{}
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: driver.Name}, persisted))
+	require.Equal(t, nvidiav1alpha1.NotReady, persisted.Status.State)
+
+	errorCondition := meta.FindStatusCondition(persisted.Status.Conditions, conditions.Error)
+	require.NotNil(t, errorCondition)
+	require.Equal(t, metav1.ConditionTrue, errorCondition.Status)
+	require.Equal(t, conditions.ReconcileFailed, errorCondition.Reason)
+	require.Contains(t, errorCondition.Message, "driver-env-secret")
+
+	readyCondition := meta.FindStatusCondition(persisted.Status.Conditions, conditions.Ready)
+	require.NotNil(t, readyCondition)
+	require.Equal(t, metav1.ConditionFalse, readyCondition.Status)
+	require.Equal(t, conditions.Error, readyCondition.Reason)
+}
+
 func TestReconcileSecretEnvReadsOnlySecretMetadata(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
