@@ -139,9 +139,16 @@ func getNodePools(ctx context.Context, k8sClient client.Client, cr *nvidiav1alph
 			nodePool.name = rhcosVersion
 		}
 
-		if _, exists := nodePoolMap[nodePool.name]; !exists {
+		// Pool names drop arch and _64k. The node selector and the
+		// precompiled image tag keep the raw kernel, so x86_64 and
+		// aarch64 (or 4k and 64k) stay separate pools when those names match.
+		poolKey := nodePool.name
+		if nodePool.kernel != "" {
+			poolKey = nodePool.name + "/" + nodePool.kernel
+		}
+		if _, exists := nodePoolMap[poolKey]; !exists {
 			logger.Info("Detected new node pool", "NodePool", nodePool)
-			nodePoolMap[nodePool.name] = nodePool
+			nodePoolMap[poolKey] = nodePool
 		}
 	}
 
@@ -154,7 +161,10 @@ func sortedNodePools(nodePoolMap map[string]nodePool) []nodePool {
 		nodePools = append(nodePools, nodePool)
 	}
 	sort.Slice(nodePools, func(i, j int) bool {
-		return nodePools[i].name < nodePools[j].name
+		if nodePools[i].name != nodePools[j].name {
+			return nodePools[i].name < nodePools[j].name
+		}
+		return nodePools[i].kernel < nodePools[j].kernel
 	})
 	return nodePools
 }
