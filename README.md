@@ -64,3 +64,8 @@ Contributions must adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Support and Getting Help
 Please start [a discussion on the GitHub project](https://github.com/NVIDIA/gpu-operator/discussions) for any questions. You can also join our [community Slack](https://inviter.co/dsx-ai-factory). Your feedback is appreciated.
+
+- **Slack channel:** `#gpu-operator` in the DSX AI Factory workspace
+- **Mailing list:** [gpu-operator@dsxaifactory.com](https://groups.google.com/a/dsxaifactory.com/g/gpu-operator) for announcements and meeting invites
+- **Community meeting:** every 4 weeks on Mondays, public and recorded. Dates are on the [DSX AI Factory public calendar](https://calendar.google.com/calendar/embed?src=c_d83d62cba35a7b67c739c701dd77122feefff93389c4cc83b5c2b1d224c07c75%40group.calendar.google.com)
+- **Meeting notes and recordings:** [meeting notes](https://docs.google.com/document/d/1rHtnDgfv1IRiFmGpOrc7v1MGVfeCo2ASzWZOmKscyyg/edit), [recordings](https://drive.google.com/drive/folders/1w1JYjq4u5csDa24IGCoZfIdgAFoREAKT)
