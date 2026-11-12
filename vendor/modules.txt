@@ -36,7 +36,7 @@ github.com/NVIDIA/go-nvlib/pkg/pciids
 # github.com/NVIDIA/k8s-kata-manager v0.2.3
 ## explicit; go 1.23.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
-# github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494
+# github.com/NVIDIA/k8s-operator-libs v0.0.0-20260629200812-d720f2557494 => github.com/aryangorwade/k8s-operator-libs v0.0.0-20261112194603-b18c7f7c5168
 ## explicit; go 1.26.0
 github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1
 github.com/NVIDIA/k8s-operator-libs/pkg/consts
@@ -1238,3 +1238,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# github.com/NVIDIA/k8s-operator-libs => github.com/aryangorwade/k8s-operator-libs v0.0.0-20261112194603-b18c7f7c5168

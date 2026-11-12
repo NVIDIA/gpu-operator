@@ -131,12 +131,17 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	driverLabel := map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}
 	reqLogger.Info("Using label selector", "selector", driverLabel)
 
-	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace, driverLabel)
+	// Leftover NVIDIADriver DaemonSets share this label. Exclude them before
+	// pod-count validation, since their terminating pods can outlive the desired count.
+	state, err := r.StateManager.BuildState(ctx, r.OperatorNamespace, driverLabel,
+		func(ds *appsv1.DaemonSet) bool {
+			return !isOwnedByNVIDIADriver(ds)
+		},
+	)
 	if err != nil {
 		reqLogger.Error(err, "Failed to build cluster upgrade state")
 		return ctrl.Result{}, err
 	}
-	excludeNVIDIADriverNodeStates(state)
 
 	reqLogger.Info("Propagate state to state manager")
 	reqLogger.V(consts.LogLevelDebug).Info("Current cluster upgrade state", "state", state)
@@ -183,21 +188,6 @@ func (r *UpgradeReconciler) reconcileClusterPolicyDriverUpgrades(ctx context.Con
 	// Since node/ds/clusterpolicy updates from outside of the upgrade flow
 	// are not guaranteed, for safety reconcile loop should be requeued every few minutes.
 	return ctrl.Result{RequeueAfter: plannedRequeueInterval}, nil
-}
-
-// excludeNVIDIADriverNodeStates drops nodes whose driver DaemonSet is owned by an NVIDIADriver.
-// Those DaemonSets share the driver component label and are left in place when ClusterPolicy
-// stops delegating via useNvidiaDriverCRD, but ClusterPolicy must not drive their upgrades.
-func excludeNVIDIADriverNodeStates(state *upgrade.ClusterUpgradeState) {
-	for stateKey, nodeStates := range state.NodeStates {
-		kept := make([]*upgrade.NodeUpgradeState, 0, len(nodeStates))
-		for _, nodeState := range nodeStates {
-			if !isOwnedByNVIDIADriver(nodeState.DriverDaemonSet) {
-				kept = append(kept, nodeState)
-			}
-		}
-		state.NodeStates[stateKey] = kept
-	}
 }
 
 func isOwnedByNVIDIADriver(ds *appsv1.DaemonSet) bool {

@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,8 +45,10 @@ type ClusterUpgradeStateManager interface {
 	// a nil predicate, the default, keeps the full upgrade flow for every out-of-sync node.
 	WithRestartOnlyPredicate(predicate RestartOnlyPredicate) ClusterUpgradeStateManager
 	// BuildState builds a point-in-time snapshot of the driver upgrade state in the cluster.
+	// Non-nil filters must all accept a DaemonSet before its pod counts are validated.
+	// Omitted or nil filters preserve existing behavior, including orphaned pods.
 	BuildState(ctx context.Context, namespace string,
-		driverLabels map[string]string) (*ClusterUpgradeState, error)
+		driverLabels map[string]string, filters ...DaemonSetFilter) (*ClusterUpgradeState, error)
 	// ApplyState receives a complete cluster upgrade state and, based on upgrade policy, processes each node's state.
 	// Based on the current state of the node, it is calculated if the node can be moved to the next state right now
 	// or whether any actions need to be scheduled for the node to move to the next state.
@@ -98,9 +101,12 @@ type StateOptions struct {
 	Requestor RequestorOptions
 }
 
+// DaemonSetFilter returns whether a matching DaemonSet should be included in the upgrade state.
+type DaemonSetFilter func(*appsv1.DaemonSet) bool
+
 // BuildState builds a point-in-time snapshot of the driver upgrade state in the cluster.
 func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespace string,
-	driverLabels map[string]string) (*ClusterUpgradeState, error) {
+	driverLabels map[string]string, filters ...DaemonSetFilter) (*ClusterUpgradeState, error) {
 	m.Log.V(consts.LogLevelInfo).Info("Building state")
 
 	upgradeState := NewClusterUpgradeState()
@@ -109,6 +115,17 @@ func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespa
 	if err != nil {
 		m.Log.V(consts.LogLevelError).Error(err, "Failed to get driver DaemonSet list")
 		return nil, err
+	}
+
+	// Unrelated DaemonSets may be scaling down or terminating. Exclude them before
+	// comparing desired pod counts so they cannot block the caller's upgrades.
+	for uid, ds := range daemonSets {
+		for _, filter := range filters {
+			if filter != nil && !filter(ds) {
+				delete(daemonSets, uid)
+				break
+			}
+		}
 	}
 
 	m.Log.V(consts.LogLevelDebug).Info("Got driver DaemonSets", "length", len(daemonSets))
@@ -125,9 +142,10 @@ func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespa
 		return nil, err
 	}
 
+	podsByOwner := m.GetPodsByDSOwner(daemonSets, podList.Items)
 	filteredPodList := []corev1.Pod{}
 	for _, ds := range daemonSets {
-		dsPods := m.GetPodsOwnedbyDs(ds, podList.Items)
+		dsPods := podsByOwner[ds.UID]
 		if int(ds.Status.DesiredNumberScheduled) != len(dsPods) {
 			m.Log.V(consts.LogLevelInfo).Info("Driver DaemonSet has Unscheduled pods", "name", ds.Name)
 			return nil, fmt.Errorf("driver DaemonSet should not have Unscheduled pods")
@@ -136,17 +154,16 @@ func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespa
 	}
 
 	// Collect also orphaned driver pods
-	filteredPodList = append(filteredPodList, m.GetOrphanedPods(podList.Items)...)
+	filteredPodList = append(filteredPodList, podsByOwner[NoOwner]...)
 
 	upgradeStateLabel := GetUpgradeStateLabelKey()
 
 	for i := range filteredPodList {
 		pod := &filteredPodList[i]
 		var ownerDaemonSet *appsv1.DaemonSet
-		if IsOrphanedPod(pod) {
-			ownerDaemonSet = nil
-		} else {
-			ownerDaemonSet = daemonSets[pod.OwnerReferences[0].UID]
+		owner := metav1.GetControllerOfNoCopy(pod)
+		if owner != nil {
+			ownerDaemonSet = daemonSets[owner.UID]
 		}
 		// Check if pod is already scheduled to a Node
 		if pod.Spec.NodeName == "" && pod.Status.Phase == corev1.PodPending {

@@ -127,6 +127,7 @@ type fakeUpgradeStateManager struct {
 	buildCalls      int
 	buildNamespace  string
 	buildLabels     map[string]string
+	buildFilters    []upgrade.DaemonSetFilter
 	applyCalls      int
 	appliedState    *upgrade.ClusterUpgradeState
 	appliedPolicies []*upgrade_v1alpha1.DriverUpgradePolicySpec
@@ -157,10 +158,11 @@ func (f *fakeUpgradeStateManager) WithRestartOnlyPredicate(upgrade.RestartOnlyPr
 	return f
 }
 
-func (f *fakeUpgradeStateManager) BuildState(_ context.Context, namespace string, driverLabels map[string]string) (*upgrade.ClusterUpgradeState, error) {
+func (f *fakeUpgradeStateManager) BuildState(_ context.Context, namespace string, driverLabels map[string]string, filters ...upgrade.DaemonSetFilter) (*upgrade.ClusterUpgradeState, error) {
 	f.buildCalls++
 	f.buildNamespace = namespace
 	f.buildLabels = driverLabels
+	f.buildFilters = filters
 	return &f.state, nil
 }
 
@@ -273,6 +275,7 @@ func TestUpgradeReconcileNVIDIADriverWithoutClusterPolicy(t *testing.T) {
 	assert.Equal(t, 1, stateManager.buildCalls)
 	assert.Equal(t, testOperatorNamespace, stateManager.buildNamespace)
 	assert.Equal(t, map[string]string{AppComponentLabelKey: DriverAppComponentLabelValue}, stateManager.buildLabels)
+	assert.Empty(t, stateManager.buildFilters)
 
 	require.Len(t, stateManager.appliedPolicies, 1)
 	assert.True(t, stateManager.appliedPolicies[0].AutoUpgrade, "nil upgradePolicy must default to autoUpgrade enabled")
@@ -380,31 +383,28 @@ func TestUpgradeReconcileClusterPolicyPaths(t *testing.T) {
 	}
 }
 
-func TestUpgradeReconcileClusterPolicyExcludesNVIDIADriverNodes(t *testing.T) {
+func TestUpgradeReconcileClusterPolicyFiltersNVIDIADriverDaemonSets(t *testing.T) {
 	ownedDaemonSet := func(apiVersion, kind string) *appsv1.DaemonSet {
 		isController := true
 		return &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: apiVersion, Kind: kind, Name: "owner", Controller: &isController}},
 		}}
 	}
-	clusterPolicyNode := &upgrade.NodeUpgradeState{
-		Node:            nodeWithUpgradeState("node-clusterpolicy", ""),
-		DriverDaemonSet: ownedDaemonSet(gpuv1.SchemeGroupVersion.String(), "ClusterPolicy"),
-	}
-	nvidiaDriverNode := &upgrade.NodeUpgradeState{
-		Node:            nodeWithUpgradeState("node-nvidiadriver", "gpu-driver"),
-		DriverDaemonSet: ownedDaemonSet(nvidiav1alpha1.SchemeGroupVersion.String(), "NVIDIADriver"),
-	}
-	orphanedNode := &upgrade.NodeUpgradeState{Node: nodeWithUpgradeState("node-orphaned", "")}
-
 	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
 	cp.Spec.Driver.UpgradePolicy = &upgrade_v1alpha1.DriverUpgradePolicySpec{AutoUpgrade: true}
 	r, stateManager := newTestUpgradeReconciler(t, cp)
-	stateManager.state.NodeStates["upgrade-required"] = []*upgrade.NodeUpgradeState{clusterPolicyNode, nvidiaDriverNode, orphanedNode}
 
 	_, err := r.Reconcile(context.Background(), upgradeSingletonRequest())
 	require.NoError(t, err)
 	require.Equal(t, 1, stateManager.applyCalls)
-	assert.ElementsMatch(t, []*upgrade.NodeUpgradeState{clusterPolicyNode, orphanedNode},
-		stateManager.appliedState.NodeStates["upgrade-required"])
+	require.Len(t, stateManager.buildFilters, 1)
+	filter := stateManager.buildFilters[0]
+	assert.True(t, filter(ownedDaemonSet(gpuv1.SchemeGroupVersion.String(), "ClusterPolicy")))
+	assert.False(t, filter(ownedDaemonSet(nvidiav1alpha1.SchemeGroupVersion.String(), "NVIDIADriver")))
+	assert.True(t, filter(&appsv1.DaemonSet{}))
+	assert.True(t, filter(ownedDaemonSet("other.example.com/v1alpha1", "NVIDIADriver")))
+
+	nonController := ownedDaemonSet(nvidiav1alpha1.SchemeGroupVersion.String(), "NVIDIADriver")
+	nonController.OwnerReferences[0].Controller = nil
+	assert.True(t, filter(nonController))
 }
