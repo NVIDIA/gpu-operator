@@ -45,23 +45,8 @@ func (h *WorkloadClient) DeployPod(ctx context.Context, namespace string, podSpe
 	return h.client.CoreV1().Pods(namespace).Create(ctx, podSpec, metav1.CreateOptions{})
 }
 
-func (h *WorkloadClient) WaitForCompletion(ctx context.Context, namespace, name string, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, defaultPollingInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		workloadPod, err := h.client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if workloadPod.Status.Phase == corev1.PodSucceeded {
-			return true, nil
-		}
-
-		if workloadPod.Status.Phase == corev1.PodFailed {
-			return false, fmt.Errorf("pod %s/%s failed", namespace, name)
-		}
-
-		return false, nil
-	})
+func (h *WorkloadClient) Get(ctx context.Context, namespace, name string) (*corev1.Pod, error) {
+	return h.client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 func (h *WorkloadClient) WaitForRunning(ctx context.Context, namespace, name string, timeout time.Duration) error {

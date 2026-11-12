@@ -21,7 +21,4 @@ import "time"
 const (
 	// defaultPollingInterval is the default interval for polling operations
 	defaultPollingInterval = 5 * time.Second
-
-	// upgradeDoneState represents the state when a driver upgrade is complete
-	upgradeDoneState = "upgrade-done"
 )
