@@ -117,7 +117,7 @@
       "matchPackageNames": [
         "nvcr.io/nvidia/k8s/dcgm-exporter"
       ],
-      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-\\d+\\.\\d+\\.\\d+-distroless$",
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "separateMajorMinor": false
     },
     {
