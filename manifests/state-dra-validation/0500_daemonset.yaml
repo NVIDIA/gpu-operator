@@ -86,6 +86,10 @@ spec:
       - {{ . | toJson }}
       {{- end }}
       {{- end }}
+      {{- if .Daemonsets.PodSecurityContext }}
+      securityContext:
+        {{- .Daemonsets.PodSecurityContext | yaml | nindent 8 }}
+      {{- end }}
       resourceClaims:
       - name: validation-gpu
         resourceClaimTemplateName: nvidia-dra-validator-gpu
