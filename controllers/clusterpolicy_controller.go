@@ -45,6 +45,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	operatorpredicate "github.com/NVIDIA/gpu-operator/controllers/predicate"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
@@ -483,13 +484,15 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Daemonsets and requeue the owner ClusterPolicy
+	// Watch owned DaemonSets and requeue the owner ClusterPolicy. The predicate drops
+	// status updates that do not change the readiness result the reconciler computes,
+	// so one pod becoming ready on one node does not enqueue a full pass.
 	err = c.Watch(
 		source.Kind(mgr.GetCache(),
 			&appsv1.DaemonSet{},
 			handler.TypedEnqueueRequestForOwner[*appsv1.DaemonSet](mgr.GetScheme(), mgr.GetRESTMapper(), &gpuv1.ClusterPolicy{},
 				handler.OnlyControllerOwner()),
+			operatorpredicate.DaemonSetWatchPredicate(),
 		),
 	)
 	if err != nil {
