@@ -69,7 +69,7 @@ func TestGetRuntimeString(t *testing.T) {
 				},
 			}
 
-			result, err := getRuntimeString(node)
+			result, err := GetRuntimeString(node)
 
 			if tc.expectError {
 				require.Error(t, err)
