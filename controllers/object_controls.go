@@ -38,6 +38,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -342,98 +343,27 @@ type controlFunc []func(n ClusterPolicyController) (gpuv1.State, error)
 
 // ServiceAccount creates ServiceAccount resource
 func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.logger.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, skipping update")
-			return gpuv1.Ready, nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &corev1.ServiceAccount{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{CreateOnly: true})
 }
 
 // Role creates Role resource
 func Role(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].Role.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.logger.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return gpuv1.Ready, nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &rbacv1.Role{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{})
 }
 
 // RoleBinding creates RoleBinding resource
 func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].RoleBinding.DeepCopy()
 	obj.Namespace = n.operatorNamespace
-
-	logger := n.logger.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
 
 	for idx := range obj.Subjects {
 		// we don't want to update ALL the Subjects[].Namespace, eg we need to keep 'openshift-monitoring'
@@ -445,26 +375,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return gpuv1.Ready, nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &rbacv1.RoleBinding{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{})
 }
 
 var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
@@ -484,111 +395,30 @@ func isRBACEnabled(name string, config *gpuv1.ClusterPolicySpec) bool {
 
 // ClusterRole creates ClusterRole resource
 func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ClusterRole.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.logger.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if !isRBACEnabled(obj.Name, &n.singleton.Spec) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Error(err, "Couldn't delete")
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return gpuv1.Ready, nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
-	return gpuv1.Ready, nil
+	shouldExist := n.isStateEnabled(n.stateNames[n.idx]) && isRBACEnabled(obj.Name, &n.singleton.Spec)
+	return n.syncObjectState(obj, &rbacv1.ClusterRole{}, shouldExist, utils.SyncOptions{})
 }
 
 // ClusterRoleBinding creates ClusterRoleBinding resource
 func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
 	obj.Namespace = n.operatorNamespace
-
-	logger := n.logger.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if !isRBACEnabled(obj.Name, &n.singleton.Spec) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Error(err, "Couldn't delete")
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
 
 	for idx := range obj.Subjects {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return gpuv1.Ready, nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
-	}
-
-	return gpuv1.Ready, nil
+	shouldExist := n.isStateEnabled(n.stateNames[n.idx]) && isRBACEnabled(obj.Name, &n.singleton.Spec)
+	return n.syncObjectState(obj, &rbacv1.ClusterRoleBinding{}, shouldExist, utils.SyncOptions{})
 }
 
 // createConfigMap creates a ConfigMap resource
 func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	config := n.singleton.Spec
 	obj := n.resources[state].ConfigMaps[configMapIdx].DeepCopy()
@@ -598,12 +428,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
+		return n.syncObjectState(obj, &corev1.ConfigMap{}, false, utils.SyncOptions{})
 	}
 
 	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
@@ -630,25 +455,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		}
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-
-		logger.Info("Found Resource, updating...")
-		err = n.client.Update(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't update", "Error", err)
-			return gpuv1.NotReady, err
-		}
-	}
-
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &corev1.ConfigMap{}, true, utils.SyncOptions{})
 }
 
 // ConfigMaps creates ConfigMap resource(s)
@@ -4206,40 +4013,13 @@ func getDaemonsetControllerRevisionHash(ctx context.Context, daemonset *appsv1.D
 
 // Deployment creates Deployment resource
 func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].Deployment.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.logger.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	if err := n.client.Create(ctx, obj); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			logger.Info("Found Resource, updating...")
-			err = n.client.Update(ctx, obj)
-			if err != nil {
-				logger.Info("Couldn't update", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return isDeploymentReady(obj.Name, n), nil
-		}
-
-		logger.Info("Couldn't create", "Error", err)
-		return gpuv1.NotReady, err
+	shouldExist := n.isStateEnabled(n.stateNames[n.idx])
+	if syncState, err := n.syncObjectState(obj, &appsv1.Deployment{}, shouldExist, utils.SyncOptions{}); err != nil || !shouldExist {
+		return syncState, err
 	}
 
 	return isDeploymentReady(obj.Name, n), nil
@@ -4708,12 +4488,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
+		return n.syncObjectState(obj, &appsv1.DaemonSet{}, false, utils.SyncOptions{})
 	}
 
 	if !n.hasGPUNodes {
@@ -4898,22 +4673,9 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 
 // SecurityContextConstraints creates SCC resources
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].SecurityContextConstraints.DeepCopy()
 	obj.Namespace = n.operatorNamespace
-
-	logger := n.logger.WithValues("SecurityContextConstraints", obj.Name, "Namespace", "default")
-
-	// Check if state is disabled and cleanup resource if exists
-	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
 
 	for idx := range obj.Users {
 		if obj.Users[idx] != "FILLED BY THE OPERATOR" {
@@ -4922,38 +4684,11 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	found := &secv1.SecurityContextConstraints{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-
-	err = n.client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &secv1.SecurityContextConstraints{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{})
 }
 
 // Service creates Service object
 func Service(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].Service.DeepCopy()
 
@@ -4963,16 +4698,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
-	}
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
+		return n.syncObjectState(obj, &corev1.Service{}, false, utils.SyncOptions{})
 	}
 
 	err := preprocessService(obj, n)
@@ -4981,30 +4707,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	found := &corev1.Service{}
-	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-	obj.Spec.ClusterIP = found.Spec.ClusterIP
-
-	err = n.client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &corev1.Service{}, true, utils.SyncOptions{PreserveLiveFields: utils.PreserveServiceClusterIP})
 }
 
 func crdExists(n ClusterPolicyController, name string) (bool, error) {
@@ -5070,7 +4773,6 @@ func derefRelabelConfigs(in []*promv1.RelabelConfig) []promv1.RelabelConfig {
 
 // ServiceMonitor creates ServiceMonitor object
 func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
 	obj.Namespace = n.operatorNamespace
@@ -5088,12 +4790,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		if !serviceMonitorCRDExists {
 			return gpuv1.Ready, nil
 		}
-		err := n.client.Delete(ctx, obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Disabled, nil
+		return n.syncObjectState(obj, &promv1.ServiceMonitor{}, false, utils.SyncOptions{})
 	}
 
 	if n.stateNames[state] == "state-dcgm-exporter" {
@@ -5103,12 +4800,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			if !serviceMonitorCRDExists {
 				return gpuv1.Ready, nil
 			}
-			err := n.client.Delete(ctx, obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				logger.Info("Couldn't delete", "Error", err)
-				return gpuv1.NotReady, err
-			}
-			return gpuv1.Disabled, nil
+			return n.syncObjectState(obj, &promv1.ServiceMonitor{}, false, utils.SyncOptions{})
 		}
 
 		// If Prometheus CRD is missing, skip gracefully
@@ -5153,37 +4845,10 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Spec.NamespaceSelector.MatchNames[idx] = obj.Namespace
 	}
 
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	found := &promv1.ServiceMonitor{}
-	err = n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-
-	err = n.client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &promv1.ServiceMonitor{}, true, utils.SyncOptions{})
 }
 
 func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeClass) (gpuv1.State, error) {
-	ctx := n.ctx
 	obj := &nodev1beta1.RuntimeClass{}
 
 	obj.Name = spec.Name
@@ -5198,39 +4863,10 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 
 	obj.Labels = spec.Labels
 
-	logger := n.logger.WithValues("RuntimeClass", obj.Name)
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	found := &nodev1beta1.RuntimeClass{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-
-	err = n.client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &nodev1beta1.RuntimeClass{}, true, utils.SyncOptions{})
 }
 
 func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) (gpuv1.State, error) {
-	ctx := n.ctx
 	obj := &nodev1.RuntimeClass{}
 
 	obj.Name = spec.Name
@@ -5245,35 +4881,7 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 
 	obj.Labels = spec.Labels
 
-	logger := n.logger.WithValues("RuntimeClass", obj.Name)
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	found := &nodev1.RuntimeClass{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: "", Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-
-	err = n.client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &nodev1.RuntimeClass{}, true, utils.SyncOptions{})
 }
 
 func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
@@ -5332,9 +4940,7 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
 		// previously created.
 		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
-			err := n.client.Delete(n.ctx, &obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				n.logger.Info("Couldn't delete", "RuntimeClass", obj.Name, "Error", err)
+			if _, err := n.syncObjectState(&obj, &nodev1.RuntimeClass{}, false, utils.SyncOptions{}); err != nil {
 				return gpuv1.NotReady, err
 			}
 			continue
@@ -5352,40 +4958,11 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 
 // PrometheusRule creates PrometheusRule object
 func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
-	ctx := n.ctx
 	state := n.idx
 	obj := n.resources[state].PrometheusRule.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	logger := n.logger.WithValues("PrometheusRule", obj.Name)
-
-	if err := controllerutil.SetControllerReference(n.singleton, obj, n.scheme); err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	found := &promv1.PrometheusRule{}
-	err := n.client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Name}, found)
-	if err != nil && apierrors.IsNotFound(err) {
-		logger.Info("Not found, creating...")
-		err = n.client.Create(ctx, obj)
-		if err != nil {
-			logger.Info("Couldn't create", "Error", err)
-			return gpuv1.NotReady, err
-		}
-		return gpuv1.Ready, nil
-	} else if err != nil {
-		return gpuv1.NotReady, err
-	}
-
-	logger.Info("Found Resource, updating...")
-	obj.ResourceVersion = found.ResourceVersion
-
-	err = n.client.Update(ctx, obj)
-	if err != nil {
-		logger.Info("Couldn't update", "Error", err)
-		return gpuv1.NotReady, err
-	}
-	return gpuv1.Ready, nil
+	return n.syncObjectState(obj, &promv1.PrometheusRule{}, true, utils.SyncOptions{})
 }
 
 func clearRuntimeClasses(n ClusterPolicyController, runtimeClasses []nodev1.RuntimeClass) error {
@@ -5394,10 +4971,7 @@ func clearRuntimeClasses(n ClusterPolicyController, runtimeClasses []nodev1.Runt
 		if obj.Name == "FILLED_BY_OPERATOR" {
 			obj.Name = getRuntimeClassName(&n.singleton.Spec)
 		}
-		logger := n.logger.WithValues("RuntimeClass", obj.Name)
-		err := n.client.Delete(n.ctx, &obj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Info("Couldn't delete", "Error", err)
+		if _, err := n.syncObjectState(&obj, &nodev1.RuntimeClass{}, false, utils.SyncOptions{}); err != nil {
 			return err
 		}
 	}
@@ -5416,4 +4990,16 @@ func validateCDIDeviceListStrategy(container *corev1.Container) error {
 	}
 	return fmt.Errorf("%s %q must include \"cdi-annotations\" or \"cdi-cri\" when CDI is enabled",
 		DeviceListStrategyEnvName, value)
+}
+
+// syncObjectState calls utils.SyncObject with the ClusterPolicy as the owner of desired,
+// for an object that is ready as soon as it is written.
+func (n ClusterPolicyController) syncObjectState(desired, live client.Object, shouldExist bool, opts utils.SyncOptions) (gpuv1.State, error) {
+	if err := utils.SyncObject(n.ctx, n.client, n.singleton, desired, live, shouldExist, opts); err != nil {
+		return gpuv1.NotReady, err
+	}
+	if !shouldExist {
+		return gpuv1.Disabled, nil
+	}
+	return gpuv1.Ready, nil
 }

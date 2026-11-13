@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -307,6 +308,100 @@ func TestCreateOrUpdateObjsSkipsUnchangedDaemonSet(t *testing.T) {
 		[]*unstructured.Unstructured{desiredDaemonSet}))
 }
 
+func TestCreateOrUpdateObjsDoesNotCreateExistingObject(t *testing.T) {
+	existingConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
+	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(existingConfigMap).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Create: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.CreateOption) error {
+				return fmt.Errorf("unexpected create of an existing object")
+			},
+		}).Build()
+	skel := newTestSkel(t, fakeClient)
+
+	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")}))
+}
+
+func TestCreateOrUpdateObjsIgnoresAlreadyExistsAfterStaleRead(t *testing.T) {
+	// The read reports the object missing while the create reports it present, as when the
+	// cache has not yet seen an object that an earlier reconcile created.
+	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(_ context.Context, _ client.WithWatch, key client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
+				return apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, key.Name)
+			},
+			Create: func(_ context.Context, _ client.WithWatch, object client.Object, _ ...client.CreateOption) error {
+				return apierrors.NewAlreadyExists(schema.GroupResource{Resource: "configmaps"}, object.GetName())
+			},
+			Update: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.UpdateOption) error {
+				return fmt.Errorf("unexpected update")
+			},
+		}).Build()
+	skel := newTestSkel(t, fakeClient)
+
+	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")}))
+}
+
+func TestCreateOrUpdateObjsUpdatesOnlyChangedObject(t *testing.T) {
+	testCases := map[string]struct {
+		desiredData map[string]string
+		wantUpdates int
+	}{
+		"unchanged object is not updated": {
+			desiredData: map[string]string{"key": "value"},
+			wantUpdates: 0,
+		},
+		"changed object is updated": {
+			desiredData: map[string]string{"key": "new"},
+			wantUpdates: 1,
+		},
+	}
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			existingConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
+			existingConfigMap.SetLabels(map[string]string{consts.StateLabel: "test-state"})
+			updates := 0
+			fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(existingConfigMap).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+						updates++
+						return wrappedClient.Update(ctx, object, opts...)
+					},
+				}).Build()
+			desiredConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
+			require.NoError(t, unstructured.SetNestedStringMap(desiredConfigMap.Object, testCase.desiredData, "data"))
+
+			require.NoError(t, newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
+				[]*unstructured.Unstructured{desiredConfigMap}))
+			assert.Equal(t, testCase.wantUpdates, updates)
+		})
+	}
+}
+
+func TestCreateOrUpdateObjsSkipsServiceAccountWithLiveSecrets(t *testing.T) {
+	// Other controllers add secrets to a ServiceAccount, and the rendered ServiceAccount has
+	// none. The merge copies them into the desired object, so the two still compare equal.
+	existingServiceAccount := newServiceAccountUnstructured("sa-a", "test-ns")
+	existingServiceAccount.SetLabels(map[string]string{consts.StateLabel: "test-state"})
+	require.NoError(t, unstructured.SetNestedSlice(existingServiceAccount.Object,
+		[]any{map[string]any{"name": "sa-token"}}, "secrets"))
+	require.NoError(t, unstructured.SetNestedSlice(existingServiceAccount.Object,
+		[]any{map[string]any{"name": "pull-secret"}}, "imagePullSecrets"))
+	updates := 0
+	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(existingServiceAccount).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+				updates++
+				return wrappedClient.Update(ctx, object, opts...)
+			},
+		}).Build()
+
+	require.NoError(t, newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newServiceAccountUnstructured("sa-a", "test-ns")}))
+	assert.Zero(t, updates)
+}
+
 func TestCreateOrUpdateObjsSetControllerReferenceError(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).Build()
 	skel := newTestSkel(t, fakeClient)
@@ -429,6 +524,47 @@ func TestSyncObjects(t *testing.T) {
 		require.Len(t, daemonSetList.Items, 1)
 		require.Len(t, daemonSetList.Items[0].OwnerReferences, 1)
 		assert.Equal(t, "driver-a", daemonSetList.Items[0].OwnerReferences[0].Name)
+	})
+
+	t.Run("second sync of unchanged objects sends no writes", func(t *testing.T) {
+		scheme := driverTestScheme(t)
+		writes := 0
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+					writes++
+					return wrappedClient.Create(ctx, object, opts...)
+				},
+				Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+					writes++
+					return wrappedClient.Update(ctx, object, opts...)
+				},
+			}).Build()
+		skel := &stateSkel{name: "state-driver", namespace: "test-ns", client: fakeClient, scheme: scheme}
+		// syncObjects changes the objects it is given, so each sync gets new copies.
+		desiredObjects := func() []*unstructured.Unstructured {
+			role := &unstructured.Unstructured{}
+			role.SetGroupVersionKind(rbacv1.SchemeGroupVersion.WithKind("Role"))
+			role.SetName("role-a")
+			role.SetNamespace("test-ns")
+			require.NoError(t, unstructured.SetNestedSlice(role.Object, []any{map[string]any{
+				"apiGroups": []any{""}, "resources": []any{"configmaps"}, "verbs": []any{"get"},
+			}}, "rules"))
+			return []*unstructured.Unstructured{
+				newConfigMapUnstructured("cm-a", "test-ns"),
+				role,
+				newDaemonSetUnstructured("ds-a", "test-ns"),
+			}
+		}
+
+		_, err := skel.syncObjects(context.Background(), ownerDriverCR, desiredObjects())
+		require.NoError(t, err)
+		require.Equal(t, 3, writes, "the first sync creates each object")
+
+		writes = 0
+		_, err = skel.syncObjects(context.Background(), ownerDriverCR, desiredObjects())
+		require.NoError(t, err)
+		assert.Zero(t, writes, "the second sync must not write objects that did not change")
 	})
 
 	t.Run("set controller reference error", func(t *testing.T) {
