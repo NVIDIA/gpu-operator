@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -4640,6 +4642,76 @@ func TestTransformVGPUManager(t *testing.T) {
 			require.NotNil(t, driverManager)
 			require.EqualValues(t, resources, driverManager.Resources)
 		})
+	}
+}
+
+func TestTransformDriverConfigMapVolumeNames(t *testing.T) {
+	configMaps := map[string]string{"driver.repo": "custom.list", "driver.cert": "custom.crt", "driver.kernel": "custom.conf"}
+	builder := fake.NewClientBuilder()
+	for name, filename := range configMaps {
+		builder.WithObjects(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns"},
+			Data:       map[string]string{filename: "configuration"},
+		})
+	}
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	config := &gpuv1.ClusterPolicySpec{Driver: gpuv1.DriverSpec{
+		Image:              "nvcr.io/nvidia/driver:580.126.16",
+		Manager:            gpuv1.DriverManagerSpec{Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0"},
+		RepoConfig:         &gpuv1.DriverRepoConfigSpec{ConfigMapName: "driver.repo"},
+		CertConfig:         &gpuv1.DriverCertConfigSpec{Name: "driver.cert"},
+		KernelModuleConfig: &gpuv1.KernelModuleConfigSpec{Name: "driver.kernel"},
+	}}
+	err := TransformDriver(ds.DaemonSet, config, ClusterPolicyController{
+		ctx: context.Background(), client: builder.Build(), runtime: gpuv1.Containerd,
+		operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"),
+		gpuNodeOSRelease: "ubuntu", gpuNodeOSTag: "ubuntu24.04",
+	})
+	require.NoError(t, err)
+	container := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+	require.NotNil(t, container)
+	mounts := container.VolumeMounts
+	require.Len(t, ds.Spec.Template.Spec.Volumes, 3)
+	require.Len(t, mounts, 3)
+	seen := make(map[string]bool)
+	for _, volume := range ds.Spec.Template.Spec.Volumes {
+		require.Empty(t, validation.IsDNS1123Label(volume.Name))
+		require.NotNil(t, volume.ConfigMap)
+		require.Contains(t, configMaps, volume.ConfigMap.Name)
+		require.False(t, seen[volume.Name], "duplicate volume name")
+		seen[volume.Name] = true
+		filename := configMaps[volume.ConfigMap.Name]
+		require.Equal(t, []corev1.KeyToPath{{Key: filename, Path: filename}}, volume.ConfigMap.Items)
+		mount := findVolumeMountByName(mounts, volume.Name)
+		require.NotNil(t, mount)
+		require.Equal(t, filename, mount.SubPath)
+	}
+}
+
+func TestDevicePluginConfigMapVolumeNames(t *testing.T) {
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-device-plugin"}).
+		WithContainer(corev1.Container{Name: "config-manager"}).
+		WithInitContainer(corev1.Container{Name: "config-manager-init"})
+	config := &gpuv1.ClusterPolicySpec{DevicePlugin: gpuv1.DevicePluginSpec{
+		Image:  "nvcr.io/nvidia/k8s-device-plugin:v0.17.3",
+		Config: &gpuv1.DevicePluginConfig{Name: "plugin.config"},
+	}}
+	require.NoError(t, handleDevicePluginConfig(ds.DaemonSet, config))
+	var configVolumes []corev1.Volume
+	for _, volume := range ds.Spec.Template.Spec.Volumes {
+		if volume.ConfigMap != nil {
+			configVolumes = append(configVolumes, volume)
+		}
+	}
+	require.Len(t, configVolumes, 1)
+	volume := configVolumes[0]
+	require.Equal(t, "plugin.config", volume.ConfigMap.Name)
+	require.Empty(t, validation.IsDNS1123Label(volume.Name))
+	for _, containers := range [][]corev1.Container{ds.Spec.Template.Spec.Containers, ds.Spec.Template.Spec.InitContainers} {
+		for _, container := range containers {
+			require.Contains(t, container.VolumeMounts, corev1.VolumeMount{Name: volume.Name, MountPath: "/available-configs"})
+		}
 	}
 }
 

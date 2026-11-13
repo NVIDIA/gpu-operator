@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"hash"
 	"hash/fnv"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -129,6 +131,22 @@ func GetStringHash(s string) string {
 		panic(err)
 	}
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
+}
+
+// ConfigMapVolumeName returns a DNS label for a valid ConfigMap name.
+// Preserve names that already satisfy volume naming rules to avoid changing
+// existing Pod templates. Hash the full name to distinguish names whose dots
+// or truncated suffixes would otherwise produce the same volume name.
+func ConfigMapVolumeName(name string) string {
+	if len(validation.IsDNS1123Label(name)) == 0 {
+		return name
+	}
+
+	digest := sha256.Sum256([]byte(name))
+	suffix := fmt.Sprintf("-%x", digest[:8])
+	prefix := strings.ReplaceAll(name, ".", "-")
+	prefix = prefix[:min(len(prefix), validation.DNS1123LabelMaxLength-len(suffix))]
+	return prefix + suffix
 }
 
 // PrependPathListEnvvar prepends a specified list of strings to a specified envvar and returns its value.

@@ -19,15 +19,43 @@ package utils
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+func TestConfigMapVolumeName(t *testing.T) {
+	// Pin the generated name so future changes do not silently rename volumes.
+	assert.Equal(t, "driver-config-e20cc82b99b676ad", ConfigMapVolumeName("driver.config"))
+	tests := map[string]string{
+		"simple":                        "driver-config",
+		"numeric":                       "123",
+		"63 characters":                 strings.Repeat("a", 63),
+		"dotted":                        "driver.config",
+		"64 characters":                 strings.Repeat("a", 64),
+		"253 characters":                strings.Repeat("a", 253),
+		"hyphen at truncation boundary": strings.Repeat("a", 45) + "-" + strings.Repeat("b", 20),
+	}
+	for name, configMapName := range tests {
+		t.Run(name, func(t *testing.T) {
+			volumeName := ConfigMapVolumeName(configMapName)
+			assert.Empty(t, validation.IsDNS1123Label(volumeName))
+			if len(validation.IsDNS1123Label(configMapName)) == 0 {
+				assert.Equal(t, configMapName, volumeName)
+			}
+		})
+	}
+	assert.NotEqual(t, ConfigMapVolumeName("a.b"), ConfigMapVolumeName("a-b"))
+	assert.NotEqual(t, ConfigMapVolumeName("a.b-c"), ConfigMapVolumeName("a-b.c"))
+	assert.NotEqual(t, ConfigMapVolumeName(strings.Repeat("a", 64)+"b"), ConfigMapVolumeName(strings.Repeat("a", 64)+"c"))
+}
 
 func TestGetObjectHash(t *testing.T) {
 	type simple struct {

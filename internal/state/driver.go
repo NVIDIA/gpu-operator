@@ -756,7 +756,7 @@ func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace
 	var volumeMounts []corev1.VolumeMount
 	for _, filename := range filenames {
 		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{Name: configMapName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename),
+			corev1.VolumeMount{Name: utils.ConfigMapVolumeName(configMapName), ReadOnly: true, MountPath: filepath.Join(destinationDir, filename),
 				SubPath: filename})
 		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
 			Key:  filename,
@@ -775,7 +775,7 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 			Items: itemsToInclude,
 		},
 	}
-	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
+	return corev1.Volume{Name: utils.ConfigMapVolumeName(configMapName), VolumeSource: volumeSource}
 }
 
 // toConfigEnvVars converts API EnvVar slices to the config package's EnvVar type.
