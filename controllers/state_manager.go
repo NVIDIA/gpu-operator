@@ -92,8 +92,7 @@ const (
 )
 
 var (
-	defaultGPUWorkloadConfig = gpuWorkloadConfigContainer
-	podSecurityModes         = []string{"enforce", "audit", "warn"}
+	podSecurityModes = []string{"enforce", "audit", "warn"}
 )
 
 var gpuStateLabels = map[string]map[string]string{
@@ -384,10 +383,17 @@ func isValidWorkloadConfig(workloadConfig string) bool {
 	return ok
 }
 
+func getDefaultWorkloadConfig(sandboxWorkloads *gpuv1.SandboxWorkloadsSpec) string {
+	if sandboxWorkloads.IsEnabled() && isValidWorkloadConfig(sandboxWorkloads.DefaultWorkload) {
+		return sandboxWorkloads.DefaultWorkload
+	}
+	return gpuWorkloadConfigContainer
+}
+
 // getWorkloadConfig returns the GPU workload configured for the node.
 // If an error occurs when searching for the workload config,
-// return defaultGPUWorkloadConfig.
-func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, error) {
+// return defaultWorkloadConfig.
+func getWorkloadConfig(labels map[string]string, sandboxEnabled bool, defaultWorkloadConfig string) (string, error) {
 	if !sandboxEnabled {
 		return gpuWorkloadConfigContainer, nil
 	}
@@ -395,9 +401,30 @@ func getWorkloadConfig(labels map[string]string, sandboxEnabled bool) (string, e
 		if isValidWorkloadConfig(workloadConfig) {
 			return workloadConfig, nil
 		}
-		return defaultGPUWorkloadConfig, fmt.Errorf("invalid GPU workload config: %v", workloadConfig)
+		return defaultWorkloadConfig, fmt.Errorf("invalid GPU workload config: %v", workloadConfig)
 	}
-	return defaultGPUWorkloadConfig, fmt.Errorf("no GPU workload config found")
+	return defaultWorkloadConfig, fmt.Errorf("no GPU workload config found")
+}
+
+// gpuWorkloadConfigChanged reports whether a node label change alters the node's resolved
+// GPU workload config. A missing or invalid label resolves to the ClusterPolicy's
+// defaultWorkload, which must be read from the ClusterPolicy rather than assumed to be
+// container, or a change between the default and an explicit label would be missed.
+func gpuWorkloadConfigChanged(ctx context.Context, c client.Reader, oldLabels, newLabels map[string]string) (bool, error) {
+	if oldLabels[gpuWorkloadConfigLabelKey] == newLabels[gpuWorkloadConfigLabelKey] {
+		return false, nil
+	}
+	clusterPolicies := &gpuv1.ClusterPolicyList{}
+	if err := c.List(ctx, clusterPolicies); err != nil {
+		return true, fmt.Errorf("failed to list ClusterPolicy: %w", err)
+	}
+	defaultWorkloadConfig := gpuWorkloadConfigContainer
+	if cp := getSingletonClusterPolicy(clusterPolicies.Items); cp != nil {
+		defaultWorkloadConfig = getDefaultWorkloadConfig(&cp.Spec.SandboxWorkloads)
+	}
+	oldWorkloadConfig, _ := getWorkloadConfig(oldLabels, true, defaultWorkloadConfig)
+	newWorkloadConfig, _ := getWorkloadConfig(newLabels, true, defaultWorkloadConfig)
+	return oldWorkloadConfig != newWorkloadConfig, nil
 }
 
 // getEffectiveStateLabels returns the state labels to apply for the given workload config and sandbox mode.
@@ -819,20 +846,12 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-cc-manager")
 	}
 
-	if clusterPolicy.Spec.SandboxWorkloads.IsEnabled() {
-		n.sandboxEnabled = true
-		// defaultGPUWorkloadConfig is container, unless
-		// user overrides in ClusterPolicy with a valid GPU
-		// workload configuration
-		defaultWorkload := clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload
-		if isValidWorkloadConfig(defaultWorkload) {
-			n.logger.Info("Default GPU workload is overridden in ClusterPolicy", "DefaultWorkload", defaultWorkload)
-			defaultGPUWorkloadConfig = defaultWorkload
-		}
-	} else {
-		n.sandboxEnabled = false
+	n.sandboxEnabled = clusterPolicy.Spec.SandboxWorkloads.IsEnabled()
+	if n.sandboxEnabled && isValidWorkloadConfig(clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload) {
+		n.logger.Info("Default GPU workload is overridden in ClusterPolicy", "DefaultWorkload", clusterPolicy.Spec.SandboxWorkloads.DefaultWorkload)
 	}
-	n.logger.Info("Sandbox workloads", "Enabled", n.sandboxEnabled, "DefaultWorkload", defaultGPUWorkloadConfig)
+	n.logger.Info("Sandbox workloads", "Enabled", n.sandboxEnabled,
+		"DefaultWorkload", getDefaultWorkloadConfig(&clusterPolicy.Spec.SandboxWorkloads))
 
 	if n.openshift != "" && (n.singleton.Spec.Operator.UseOpenShiftDriverToolkit == nil ||
 		*n.singleton.Spec.Operator.UseOpenShiftDriverToolkit) {

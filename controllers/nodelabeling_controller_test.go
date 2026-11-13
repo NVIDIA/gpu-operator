@@ -193,16 +193,72 @@ func TestNodeLabelUpdateReasonsDetectsLabelChanges(t *testing.T) {
 				assert.True(t, reasons.migCapableLabelChanged)
 			},
 		},
+		{
+			name: "GPU workload config label added",
+			old:  map[string]string{},
+			new: map[string]string{
+				gpuWorkloadConfigLabelKey: gpuWorkloadConfigVMPassthrough,
+			},
+			assert: func(t *testing.T, reasons nodeLabelUpdateReasons) {
+				assert.True(t, reasons.gpuWorkloadConfigChanged)
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := &NodeLabelingReconciler{}
+			scheme := runtime.NewScheme()
+			require.NoError(t, gpuv1.AddToScheme(scheme))
+			r := &NodeLabelingReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).Build(), Log: logr.Discard()}
 			reasons, err := r.getNodeLabelUpdateReasons(context.Background(), "gpu-node", tc.old, tc.new)
 			require.NoError(t, err)
 
 			tc.assert(t, reasons)
 			assert.True(t, reasons.needsUpdate())
+		})
+	}
+}
+
+func TestNodeLabelUpdateReasonsUsesClusterPolicyDefaultWorkload(t *testing.T) {
+	tests := map[string]struct {
+		defaultWorkload string
+		newLabel        string
+		wantChanged     bool
+	}{
+		"vm-passthrough label added when default is vm-passthrough": {
+			defaultWorkload: gpuWorkloadConfigVMPassthrough,
+			newLabel:        gpuWorkloadConfigVMPassthrough,
+		},
+		"container label added when default is vm-passthrough": {
+			defaultWorkload: gpuWorkloadConfigVMPassthrough,
+			newLabel:        gpuWorkloadConfigContainer,
+			wantChanged:     true,
+		},
+		"container label added when default is container": {
+			defaultWorkload: gpuWorkloadConfigContainer,
+			newLabel:        gpuWorkloadConfigContainer,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, gpuv1.AddToScheme(scheme))
+			require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+			clusterPolicy := &gpuv1.ClusterPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+				Spec: gpuv1.ClusterPolicySpec{
+					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{Enabled: new(true), DefaultWorkload: tc.defaultWorkload},
+				},
+			}
+			r := &NodeLabelingReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(clusterPolicy).Build(),
+				Log:    logr.Discard(),
+			}
+
+			reasons, err := r.getNodeLabelUpdateReasons(context.Background(), "gpu-node",
+				map[string]string{}, map[string]string{gpuWorkloadConfigLabelKey: tc.newLabel})
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantChanged, reasons.gpuWorkloadConfigChanged)
 		})
 	}
 }
@@ -631,6 +687,83 @@ func TestUpdateGPUStateLabels(t *testing.T) {
 					gpuWorkloadConfigLabelKey: gpuWorkloadConfigVMPassthrough,
 				},
 				getEffectiveStateLabels(gpuWorkloadConfigVMPassthrough, string(gpuv1.KubeVirt)),
+			),
+		},
+		{
+			name: "sandboxWorkloads enabled, defaultWorkload=vm-passthrough, no workloadConfig label",
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+						Enabled:         new(true),
+						Mode:            string(gpuv1.KubeVirt),
+						DefaultWorkload: gpuWorkloadConfigVMPassthrough,
+					},
+				},
+			},
+			initialLabels: map[string]string{commonGPULabelKey: commonGPULabelValue},
+			expectedLabels: mergeLabels(
+				map[string]string{commonGPULabelKey: commonGPULabelValue},
+				getEffectiveStateLabels(gpuWorkloadConfigVMPassthrough, string(gpuv1.KubeVirt)),
+			),
+		},
+		{
+			name: "sandboxWorkloads enabled, defaultWorkload=vm-passthrough, existing passthrough labels kept",
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+						Enabled:         new(true),
+						Mode:            string(gpuv1.KubeVirt),
+						DefaultWorkload: gpuWorkloadConfigVMPassthrough,
+					},
+				},
+			},
+			initialLabels: mergeLabels(
+				map[string]string{commonGPULabelKey: commonGPULabelValue},
+				getEffectiveStateLabels(gpuWorkloadConfigVMPassthrough, string(gpuv1.KubeVirt)),
+			),
+			expectedLabels: mergeLabels(
+				map[string]string{commonGPULabelKey: commonGPULabelValue},
+				getEffectiveStateLabels(gpuWorkloadConfigVMPassthrough, string(gpuv1.KubeVirt)),
+			),
+		},
+		{
+			name: "sandboxWorkloads enabled, defaultWorkload=vm-passthrough, workloadConfig label overrides default",
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+						Enabled:         new(true),
+						Mode:            string(gpuv1.KubeVirt),
+						DefaultWorkload: gpuWorkloadConfigVMPassthrough,
+					},
+				},
+			},
+			initialLabels: map[string]string{
+				commonGPULabelKey:         commonGPULabelValue,
+				gpuWorkloadConfigLabelKey: gpuWorkloadConfigContainer,
+			},
+			expectedLabels: mergeLabels(
+				map[string]string{
+					commonGPULabelKey:         commonGPULabelValue,
+					gpuWorkloadConfigLabelKey: gpuWorkloadConfigContainer,
+				},
+				gpuStateLabels[gpuWorkloadConfigContainer],
+			),
+		},
+		{
+			name: "sandboxWorkloads enabled, invalid defaultWorkload falls back to container",
+			clusterPolicy: &gpuv1.ClusterPolicy{
+				Spec: gpuv1.ClusterPolicySpec{
+					SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+						Enabled:         new(true),
+						Mode:            string(gpuv1.KubeVirt),
+						DefaultWorkload: "invalid",
+					},
+				},
+			},
+			initialLabels: map[string]string{commonGPULabelKey: commonGPULabelValue},
+			expectedLabels: mergeLabels(
+				map[string]string{commonGPULabelKey: commonGPULabelValue},
+				gpuStateLabels[gpuWorkloadConfigContainer],
 			),
 		},
 		{
