@@ -33,7 +33,7 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:{{ .Namespace }}:nvidia-dcgm-exporter-dra
+- system:serviceaccount:{{ .Namespace }}:{{ .ServiceAccountName }}
 volumes:
 - '*'
 {{end}}
