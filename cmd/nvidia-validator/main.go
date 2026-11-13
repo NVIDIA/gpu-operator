@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -43,6 +44,7 @@ import (
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -75,8 +77,9 @@ type NvidiaPeermem struct{}
 
 // CUDA represents spec to run cuda workload
 type CUDA struct {
-	ctx        context.Context
-	kubeClient kubernetes.Interface
+	ctx            context.Context
+	kubeClient     kubernetes.Interface
+	metadataClient metadata.Interface
 }
 
 // Plugin component
@@ -233,6 +236,10 @@ const (
 	gpuWorkloadConfigVMVgpu        = "vm-vgpu"
 	// CCCapableLabelKey represents NFD label name to indicate if the node is capable to run CC workloads
 	CCCapableLabelKey = "nvidia.com/cc.capable"
+	// migConfigStateLabelKey represents the label MIG Manager uses to report MIG reconfiguration progress
+	migConfigStateLabelKey  = "nvidia.com/mig.config.state"
+	migConfigStatePending   = "pending"
+	migConfigStateRebooting = "rebooting"
 	// appComponentLabelKey indicates the label key of the component
 	appComponentLabelKey = "app.kubernetes.io/component"
 	// wslNvidiaSMIPath indicates the path to the nvidia-smi binary on WSL
@@ -241,6 +248,8 @@ const (
 	shell = "sh"
 	// defaultVGPUReadinessTimeout is the default timeout for waiting for the vGPU stack to be ready
 	defaultVGPUReadinessTimeout = 5 * time.Minute
+	// migReconfigurationWaitTimeout is the maximum time to wait for MIG Manager to finish a MIG reconfiguration
+	migReconfigurationWaitTimeout = 30 * time.Minute
 	// constants for driver components
 	GDRCOPY       = "gdrcopy"
 	NVIDIAFS      = "nvidia-fs"
@@ -427,8 +436,13 @@ func validateFlags(ctx context.Context, cli *cli.Command) (context.Context, erro
 			return ctx, fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for plugin validation")
 		}
 	}
-	if componentFlag == "cuda" && namespaceFlag == "" {
-		return ctx, fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for cuda validation")
+	if componentFlag == "cuda" {
+		if namespaceFlag == "" {
+			return ctx, fmt.Errorf("invalid -ns <namespace> flag: must not be empty string for cuda validation")
+		}
+		if withWorkloadFlag && nodeNameFlag == "" {
+			return ctx, fmt.Errorf("invalid -n <node-name> flag: must not be empty string for cuda validation with workload")
+		}
 	}
 	if componentFlag == "metrics" {
 		if metricsPort == defaultMetricsPort {
@@ -1514,6 +1528,13 @@ func (c *CUDA) validate() error {
 	// update k8s client for the plugin
 	c.setKubeClient(kubeClient)
 
+	metadataClient, err := metadata.NewForConfig(kubeConfig)
+	if err != nil {
+		log.Errorf("Error getting k8s metadata client - %s\n", err.Error())
+		return err
+	}
+	c.metadataClient = metadataClient
+
 	if withWorkloadFlag {
 		// workload test
 		err = c.runWorkload()
@@ -1534,8 +1555,43 @@ func (c *CUDA) setKubeClient(kubeClient kubernetes.Interface) {
 	c.kubeClient = kubeClient
 }
 
+func (c *CUDA) getNodeLabels(ctx context.Context) (map[string]string, error) {
+	node, err := c.metadataClient.Resource(corev1.SchemeGroupVersion.WithResource("nodes")).Get(ctx, nodeNameFlag, meta_v1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch metadata of node %s: %w", nodeNameFlag, err)
+	}
+	return node.GetLabels(), nil
+}
+
+// waitForMIGReconfiguration blocks while MIG Manager reconfigures MIG on the node.
+// A CUDA workload started during reconfiguration holds every MIG device open, and
+// MIG Manager then fails to destroy them with ERROR_IN_USE.
+func waitForMIGReconfiguration(ctx context.Context, interval, timeout time.Duration, getNodeLabels func(context.Context) (map[string]string, error)) error {
+	var state string
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		nodeLabels, err := getNodeLabels(ctx)
+		if err != nil {
+			return false, err
+		}
+		state = nodeLabels[migConfigStateLabelKey]
+		if state == migConfigStatePending || state == migConfigStateRebooting {
+			log.Infof("MIG reconfiguration in progress (%s=%s), waiting before running the CUDA workload", migConfigStateLabelKey, state)
+			return false, nil
+		}
+		return true, nil
+	})
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("MIG reconfiguration did not complete within %s (%s=%s): %w", timeout, migConfigStateLabelKey, state, err)
+	}
+	return err
+}
+
 func (c *CUDA) runWorkload() error {
 	ctx := c.ctx
+
+	if err := waitForMIGReconfiguration(ctx, time.Duration(sleepIntervalSecondsFlag)*time.Second, migReconfigurationWaitTimeout, c.getNodeLabels); err != nil {
+		return fmt.Errorf("error waiting for MIG reconfiguration to complete: %w", err)
+	}
 
 	// load podSpec
 	pod, err := loadPodSpec(cudaWorkloadPodSpecPath)
