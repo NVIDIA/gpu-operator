@@ -167,6 +167,93 @@ func TestDRADriverRenderGPUsCut(t *testing.T) {
 	assert.Equal(t, "nvidia.com/gpu", podSpec.Tolerations[0].Key)
 }
 
+func TestDRADriverDriverRootParentMount(t *testing.T) {
+	tests := map[string]struct {
+		driverInstallDir string
+		wantDriverRoot   string
+		wantParent       string
+		wantCtrRoot      string
+	}{
+		"default": {
+			wantDriverRoot: "/run/nvidia/driver",
+			wantParent:     "/run/nvidia",
+			wantCtrRoot:    "/driver-root/driver",
+		},
+		"explicit default": {
+			driverInstallDir: "/run/nvidia/driver",
+			wantDriverRoot:   "/run/nvidia/driver",
+			wantParent:       "/run/nvidia",
+			wantCtrRoot:      "/driver-root/driver",
+		},
+		"custom basename": {
+			driverInstallDir: "/opt/nvidia/releases/rootfs-v2",
+			wantDriverRoot:   "/opt/nvidia/releases/rootfs-v2",
+			wantParent:       "/opt/nvidia/releases",
+			wantCtrRoot:      "/driver-root/rootfs-v2",
+		},
+		"trailing slash": {
+			driverInstallDir: "/opt/nvidia/releases/rootfs-v2/",
+			wantDriverRoot:   "/opt/nvidia/releases/rootfs-v2",
+			wantParent:       "/opt/nvidia/releases",
+			wantCtrRoot:      "/driver-root/rootfs-v2",
+		},
+		"root directory": {
+			driverInstallDir: "/",
+			wantDriverRoot:   "/",
+			wantParent:       "/",
+			wantCtrRoot:      "/driver-root",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			for capability, allCapabilities := range map[string]bool{"gpus": false, "all capabilities": true} {
+				t.Run(capability, func(t *testing.T) {
+					s := newTestDRAState(t)
+					cr := sampleGPUCluster()
+					if allCapabilities {
+						cr = fullSpecGPUCluster()
+						cr.Spec.DRADriver.FeatureGates["PassthroughSupport"] = true
+					}
+					cr.Spec.HostPaths.DriverInstallDir = tc.driverInstallDir
+
+					objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+					require.NoError(t, err)
+					ds := findDaemonSet(t, objs)
+					parentVolume := findVolume(t, ds, "driver-install-dir")
+					require.NotNil(t, parentVolume.HostPath)
+					assert.Equal(t, tc.wantParent, parentVolume.HostPath.Path)
+					hostVolume := findVolume(t, ds, "host-root")
+					require.NotNil(t, hostVolume.HostPath)
+					assert.Equal(t, "/", hostVolume.HostPath.Path)
+
+					validatorEnv := envMap(ds.Spec.Template.Spec.InitContainers[0].Env)
+					assert.Equal(t, tc.wantDriverRoot, validatorEnv["DRIVER_INSTALL_DIR"])
+					assert.Equal(t, tc.wantCtrRoot, validatorEnv["DRIVER_INSTALL_DIR_CTR_PATH"])
+
+					// Every consumer must resolve the driver below the parent bind. A subPath
+					// would pin the leaf again even with the correct hostPath source.
+					for _, containers := range [][]corev1.Container{ds.Spec.Template.Spec.InitContainers, ds.Spec.Template.Spec.Containers} {
+						for _, ctr := range containers {
+							t.Run(ctr.Name, func(t *testing.T) {
+								parentMount := findVolumeMountByName(ctr.VolumeMounts, "driver-install-dir")
+								require.NotNil(t, parentMount)
+								assert.Equal(t, "/driver-root", parentMount.MountPath)
+								require.NotNil(t, parentMount.MountPropagation)
+								assert.Equal(t, corev1.MountPropagationHostToContainer, *parentMount.MountPropagation)
+								assert.Empty(t, parentMount.SubPath)
+								assert.Empty(t, parentMount.SubPathExpr)
+								hostMount := findVolumeMountByName(ctr.VolumeMounts, "host-root")
+								require.NotNil(t, hostMount)
+								assert.Equal(t, "/host", hostMount.MountPath)
+							})
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestDRADriverHealthcheckPortOverride(t *testing.T) {
 	s := newTestDRAState(t)
 	cr := sampleGPUCluster()

@@ -1,3 +1,4 @@
+{{- $driverInstallDir := .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | clean -}}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -116,9 +117,9 @@ spec:
         - name: HOST_ROOT
           value: "/"
         - name: DRIVER_INSTALL_DIR
-          value: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
+          value: {{ $driverInstallDir | quote }}
         - name: DRIVER_INSTALL_DIR_CTR_PATH
-          value: /driver-root
+          value: {{ printf "/driver-root/%s" (base $driverInstallDir) | clean | quote }}
         volumeMounts:
         - name: host-root
           mountPath: /host
@@ -371,7 +372,8 @@ spec:
           path: "/"
       - name: driver-install-dir
         hostPath:
-          path: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
+          # Bind the stable parent so replacement driver mounts propagate into the pod.
+          path: {{ dir $driverInstallDir | quote }}
           type: DirectoryOrCreate
       # hostPath so the validator can see the driver container's .driver-ctr-ready.
       - name: validations
