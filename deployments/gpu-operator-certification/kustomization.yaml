@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace the GPU Operator runs in.
+namespace: gpu-operator
+
+resources:
+  - gpu-operator-certification.yaml
+
+configMapGenerator:
+  - name: gpu-operator-certification-config
+    options:
+      # A stable name lets kubectl delete -k find the ConfigMap after its values change.
+      disableNameSuffixHash: true
+      labels:
+        app.kubernetes.io/name: gpu-operator-certification
+        app.kubernetes.io/instance: gpu-operator-certification
+    literals:
+      # TestSets to run. Use "all" for all sets, "!name" to exclude.
+      #
+      # Available TestSets:
+      #   TS1000 - Default Settings (operands, allocatable, GFD labels, DCGM metrics, workload)
+      #   TS1001 - GPU Sharing via Timeslicing
+      #   TS1002 - DCGM Standalone
+      #   TS1003 - Driver Update
+      #   TS1004 - MIG mode (single strategy)  — skipped if no MIG-capable GPUs detected
+      #   TS1005 - MIG mode (mixed strategy)   — skipped if no MIG-capable GPUs detected
+      #   TS1006 - GPUDirectRDMA               — skipped if fewer than 2 GPU nodes with RDMA hardware
+      #   TS1007 - GPUDirectRDMA with DMA-BUF  — skipped if fewer than 2 GPU nodes with RDMA hardware
+      #   TS1008 - GDRCopy                     — skipped if no operator-managed driver pods
+      #
+      # Examples:
+      #   all              - run all registered sets
+      #   all,!TS1003      - run all except driver update
+      #   TS1000,TS1003    - run only default settings and driver update
+      #   (empty)          - run nothing
+      - TEST_SETS=all
+      - TEST_TIMEOUT=15m
+
+      # -- TS1000 (Default Settings) --
+      # Container image for the GPU workload validation pod.
+      - TEST_WORKLOAD_IMAGE=nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04
+
+      # -- TS1003 (Driver Update) --
+      # Leave empty to skip TS1003, for example nvcr.io/nvidia, driver and 580.126.16.
+      - TARGET_DRIVER_REPOSITORY=
+      - TARGET_DRIVER_IMAGE=
+      - TARGET_DRIVER_VERSION=
+
+      # -- TS1006/TS1007 (RDMA) --
+      # Base CUDA image for RDMA test pods (must have glibc >= host MOFED libs).
+      - RDMA_BASE_IMAGE=nvcr.io/nvidia/cuda:13.1.1-base-ubuntu24.04
