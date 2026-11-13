@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -1051,6 +1052,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 	const namespace = "test-ns"
 	const driverName = "gpu-driver"
 
+	upgrade.SetDriverName("gpu")
 	upgradeStateLabel := upgrade.GetUpgradeStateLabelKey()
 
 	// liveDriver returns a NVIDIADriver with no deletion timestamp.
@@ -1171,6 +1173,18 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			expectedUpgradeState: map[string]string{"node-1": ""},
 		},
 		{
+			name: "orphaned pod on node with auto-upgrade disabled → not labeled",
+			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: nvidiav1alpha1.NVIDIADriverSpec{
+					UpgradePolicy: &nvidiav1alpha1.DriverUpgradePolicySpec{AutoUpgrade: false},
+				},
+			}},
+			nodes:                []*corev1.Node{ownedNode("node-1", "")},
+			pods:                 []*corev1.Pod{orphanedPod("pod-1", "node-1")},
+			expectedUpgradeState: map[string]string{"node-1": ""},
+		},
+		{
 			name: "NVIDIADriver with deletion timestamp → node treated as unowned, not labeled",
 			nvidiaDrivers: []*nvidiav1alpha1.NVIDIADriver{{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1207,6 +1221,7 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 				client:    fakeClient,
 				namespace: namespace,
 				logger:    logr.Discard(),
+				recorder:  events.NewFakeRecorder(10),
 			}
 
 			require.NoError(t, nlc.labelNodesWithOrphanedDriverPods(context.Background()))
@@ -1214,6 +1229,10 @@ func TestLabelNodesWithOrphanedDriverPods(t *testing.T) {
 			for nodeName, expectedUpgradeState := range tc.expectedUpgradeState {
 				node := &corev1.Node{}
 				require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: nodeName}, node))
+				if expectedUpgradeState == "" {
+					assert.NotContains(t, node.Labels, upgradeStateLabel, "node %q upgrade state label", nodeName)
+					continue
+				}
 				assert.Equal(t, expectedUpgradeState, node.Labels[upgradeStateLabel], "node %q upgrade state", nodeName)
 			}
 		})

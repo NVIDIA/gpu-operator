@@ -28,6 +28,7 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,6 +59,7 @@ type NodeLabelingReconciler struct {
 	Scheme    *runtime.Scheme
 	Namespace string
 	Log       logr.Logger
+	recorder  events.EventRecorder
 }
 
 // nodeLabelingController holds per-reconcile state so that helper methods don't need to
@@ -70,6 +72,7 @@ type nodeLabelingController struct {
 	clusterPolicy *gpuv1.ClusterPolicy
 	gpuCluster    *nvidiav1alpha1.GPUCluster
 	logger        logr.Logger
+	recorder      events.EventRecorder
 
 	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
 	// at least one node because pods holding gpu.nvidia.com claims are still present; the
@@ -213,6 +216,7 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		clusterPolicy: clusterPolicy,
 		gpuCluster:    gpuCluster,
 		logger:        logger,
+		recorder:      r.recorder,
 	}
 
 	gpuLabelUpdateResult, err := nlc.labelGPUNodes(ctx)
@@ -607,7 +611,19 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 			nlc.logger.Error(err, "failed to get node for orphaned driver pod", "pod", pod.Name, "node", pod.Spec.NodeName)
 			continue
 		}
-		if !nodeOwnedByNVIDIADriver(node, nvidiaDrivers.Items) {
+		owner := nodeNVIDIADriverOwner(node, nvidiaDrivers.Items)
+		if owner == nil {
+			continue
+		}
+
+		// Migration must use the same per-driver policy as the upgrade controller,
+		// which removes upgrade-state labels when automatic upgrades are disabled.
+		if !owner.Spec.GetUpgradePolicyWithDefaults().AutoUpgrade {
+			nlc.recorder.Eventf(owner, &pod, corev1.EventTypeWarning, "ManualDriverPodReplacementRequired", "SkipMigration",
+				"Orphaned driver pod %s/%s on node %s requires manual replacement because NVIDIADriver %s has autoUpgrade disabled",
+				pod.Namespace, pod.Name, node.Name, owner.Name)
+			nlc.logger.Info("Orphaned driver pod requires manual replacement because automatic upgrades are disabled",
+				"nvidiaDriver", owner.Name, "node", node.Name, "pod", pod.Name)
 			continue
 		}
 
@@ -632,20 +648,21 @@ func (nlc *nodeLabelingController) labelNodesWithOrphanedDriverPods(ctx context.
 	return nil
 }
 
-// nodeOwnedByNVIDIADriver returns true when the node has an owner label matching a live NVIDIADriver.
-func nodeOwnedByNVIDIADriver(node *corev1.Node, nvidiaDrivers []nvidiav1alpha1.NVIDIADriver) bool {
+// nodeNVIDIADriverOwner returns the live NVIDIADriver selected by the node's owner label.
+func nodeNVIDIADriverOwner(node *corev1.Node, nvidiaDrivers []nvidiav1alpha1.NVIDIADriver) *nvidiav1alpha1.NVIDIADriver {
 	if node.Labels == nil || node.Labels[consts.NVIDIADriverOwnerLabel] == "" {
-		return false
+		return nil
 	}
-	for _, nvidiaDriver := range nvidiaDrivers {
+	for i := range nvidiaDrivers {
+		nvidiaDriver := &nvidiaDrivers[i]
 		if nvidiaDriver.HasDeletionTimestamp() {
 			continue
 		}
 		if node.Labels[consts.NVIDIADriverOwnerLabel] == nvidiaDriver.Name {
-			return true
+			return nvidiaDriver
 		}
 	}
-	return false
+	return nil
 }
 
 // isDriverUpgradeRequestAllowed returns true when migration can request a driver upgrade
@@ -677,6 +694,8 @@ func singletonCRPredicate[T interface {
 
 // SetupWithManager registers the NodeLabelingReconciler with the controller-runtime manager.
 func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	r.recorder = mgr.GetEventRecorder("nvidia-gpu-operator")
+
 	mapToSingleton := func(_ context.Context, _ client.Object) []reconcile.Request {
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: nodeLabelingControllerSingletonName}}}
 	}
