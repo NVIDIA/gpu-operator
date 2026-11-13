@@ -451,7 +451,7 @@ spec:
       #       GDS and precompiled are enabled
       {{- if and (.GDS) (deref .GDS.Spec.Enabled) }}
       - image: {{ .GDS.ImagePath }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ default "IfNotPresent" .GDS.Spec.ImagePullPolicy }}
         name: nvidia-fs-ctr
         {{- if and (.Openshift) (.Runtime.OpenshiftDriverToolkitEnabled) }}
         command: ["ocp_dtk_entrypoint"]
