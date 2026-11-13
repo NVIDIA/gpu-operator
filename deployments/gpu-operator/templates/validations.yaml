@@ -1,3 +1,10 @@
+{{- /* Helm upgrades must not silently drop the ClusterVersion permission on OpenShift.
+      Helm's API capabilities come from the cluster when rendering online;
+      offline GitOps renderers must set platform.openshift explicitly. */ -}}
+{{- if and (not .Values.platform.openshift) (.Capabilities.APIVersions.Has "config.openshift.io/v1") }}
+{{ fail "OpenShift detected, but platform.openshift=false would omit the GPU Operator's required OpenShift RBAC (including clusterversions). Set platform.openshift=true in your Helm values before installing or upgrading. When rendering offline for OpenShift, explicitly set the same value." }}
+{{- end }}
+
 {{- if and .Values.clusterPolicy.deployCR .Values.gpuCluster.deployCR }}
 {{ fail "clusterPolicy.deployCR and gpuCluster.deployCR cannot both be true; only one CR can exist" }}
 {{- end }}
