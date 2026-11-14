@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -116,13 +116,8 @@ type CommonUpgradeManagerImpl struct {
 func NewCommonUpgradeStateManager(
 	log logr.Logger,
 	k8sConfig *rest.Config,
-	scheme *runtime.Scheme,
+	k8sClient client.Client,
 	eventRecorder record.EventRecorder) (*CommonUpgradeManagerImpl, error) {
-	k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
-	if err != nil {
-		return &CommonUpgradeManagerImpl{}, fmt.Errorf("error creating k8s client: %v", err)
-	}
-
 	k8sInterface, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		return &CommonUpgradeManagerImpl{}, fmt.Errorf("error creating k8s interface: %v", err)
@@ -201,23 +196,11 @@ func (m *CommonUpgradeManagerImpl) GetDriverDaemonSets(ctx context.Context, name
 
 // GetPodsOwnedbyDs returns a list of the pods owned by the specified DaemonSet
 func (m *CommonUpgradeManagerImpl) GetPodsOwnedbyDs(ds *appsv1.DaemonSet, pods []corev1.Pod) []corev1.Pod {
-	dsPodList := []corev1.Pod{}
-	for i := range pods {
-		pod := &pods[i]
-		if IsOrphanedPod(pod) {
-			m.Log.V(consts.LogLevelInfo).Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
-			continue
-		}
-		m.Log.V(consts.LogLevelInfo).Info("Pod", "pod", pod.Name, "owner", pod.OwnerReferences[0].Name)
-
-		if ds.UID != pod.OwnerReferences[0].UID {
-			m.Log.V(consts.LogLevelInfo).Info("Driver Pod is not owned by an Driver DaemonSet",
-				"pod", pod, "actual owner", pod.OwnerReferences[0])
-			continue
-		}
-		dsPodList = append(dsPodList, *pod)
-	}
-	return dsPodList
+	podsByOwner := m.GetPodsByDSOwner(
+		map[types.UID]*appsv1.DaemonSet{ds.UID: ds},
+		pods,
+	)
+	return podsByOwner[ds.UID]
 }
 
 // GetOrphanedPods returns a list of the pods not owned by any DaemonSet
@@ -233,8 +216,38 @@ func (m *CommonUpgradeManagerImpl) GetOrphanedPods(pods []corev1.Pod) []corev1.P
 	return podList
 }
 
+// GetPodsByDSOwner indexes pods controlled by the supplied DaemonSets.
+// Pods without a controller are indexed under NoOwner.
+func (m *CommonUpgradeManagerImpl) GetPodsByDSOwner(
+	daemonSets map[types.UID]*appsv1.DaemonSet,
+	pods []corev1.Pod) map[types.UID][]corev1.Pod {
+	podsByOwner := make(map[types.UID][]corev1.Pod)
+
+	for _, pod := range pods {
+		owner := metav1.GetControllerOfNoCopy(&pod)
+		if owner == nil {
+			m.Log.V(consts.LogLevelInfo).Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
+			podsByOwner[NoOwner] = append(podsByOwner[NoOwner], pod)
+			continue
+		}
+
+		daemonSet, found := daemonSets[owner.UID]
+		if !found || daemonSet == nil || !metav1.IsControlledBy(&pod, daemonSet) {
+			m.Log.V(consts.LogLevelInfo).Info("Driver Pod is not owned by a Driver DaemonSet",
+				"pod", pod, "actual owner", owner)
+			continue
+		}
+
+		m.Log.V(consts.LogLevelInfo).Info("Pod", "pod", pod.Name, "owner", owner.Name)
+		podsByOwner[daemonSet.UID] = append(podsByOwner[daemonSet.UID], pod)
+	}
+
+	m.Log.V(consts.LogLevelInfo).Info("Total orphaned Pods found:", "count", len(podsByOwner[NoOwner]))
+	return podsByOwner
+}
+
 func IsOrphanedPod(pod *corev1.Pod) bool {
-	return len(pod.OwnerReferences) < 1
+	return metav1.GetControllerOfNoCopy(pod) == nil
 }
 
 // ProcessDoneOrUnknownNodes iterates over UpgradeStateDone or UpgradeStateUnknown nodes and determines

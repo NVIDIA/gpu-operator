@@ -58,6 +58,7 @@ func New(config *rest.Config, options ctrlcache.Options) (ctrlcache.Cache, error
 	return ctrlcache.New(config, options)
 }
 
+// stripUnusedNodeFields keeps only the Node fields that the operator reads.
 func stripUnusedNodeFields(in any) (any, error) {
 	node, ok := in.(*corev1.Node)
 	if !ok {
@@ -65,10 +66,17 @@ func stripUnusedNodeFields(in any) (any, error) {
 	}
 
 	runtimeVersion := node.Status.NodeInfo.ContainerRuntimeVersion
+	var conditions []corev1.NodeCondition
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == corev1.NodeReady {
+			conditions = append(conditions, corev1.NodeCondition{Type: condition.Type, Status: condition.Status})
+		}
+	}
 	node.ManagedFields = nil
-	node.Spec = corev1.NodeSpec{}
+	node.Spec = corev1.NodeSpec{Unschedulable: node.Spec.Unschedulable}
 	node.Status = corev1.NodeStatus{
-		NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: runtimeVersion},
+		NodeInfo:   corev1.NodeSystemInfo{ContainerRuntimeVersion: runtimeVersion},
+		Conditions: conditions,
 	}
 	return node, nil
 }
@@ -85,8 +93,6 @@ func Options(operatorNamespace string) ctrlcache.Options {
 		DefaultTransform:  stripManagedFields,
 		ByObject: map[client.Object]ctrlcache.ByObject{
 			&corev1.Node{}: {
-				// The operator reads only the container runtime version from node
-				// status. Drop all other status data from the cached object.
 				Transform: stripUnusedNodeFields,
 			},
 			&corev1.Pod{}:               {Namespaces: cachedNamespaces},
