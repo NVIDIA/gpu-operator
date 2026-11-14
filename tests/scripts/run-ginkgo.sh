@@ -10,6 +10,7 @@ Runs the Ginkgo e2e specs whose labels match LABEL_FILTER.
 Examples:
   $0 clusterpolicy
   $0 nvidia-driver
+  $0 gpucluster
 EOF
     exit 1
 fi
