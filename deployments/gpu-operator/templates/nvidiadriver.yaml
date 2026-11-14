@@ -73,11 +73,11 @@ spec:
   {{- if .Values.driver.licensingConfig.secretName }}
   licensingConfig:
     secretName: {{ .Values.driver.licensingConfig.secretName }}
-    nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
+    nlsEnabled: {{ if hasKey .Values.driver.licensingConfig "nlsEnabled" }}{{ .Values.driver.licensingConfig.nlsEnabled }}{{ else }}true{{ end }}
   {{- else if .Values.driver.licensingConfig.configMapName }}
   licensingConfig:
     name: {{ .Values.driver.licensingConfig.configMapName }}
-    nlsEnabled: {{ .Values.driver.licensingConfig.nlsEnabled | default true }}
+    nlsEnabled: {{ if hasKey .Values.driver.licensingConfig "nlsEnabled" }}{{ .Values.driver.licensingConfig.nlsEnabled }}{{ else }}true{{ end }}
   {{- end }}
   {{- if .Values.driver.virtualTopology.config }}
   virtualTopologyConfig:
