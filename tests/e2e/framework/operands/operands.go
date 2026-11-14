@@ -38,19 +38,18 @@ func expectNoRepeatedRestarts(ctx context.Context, clients e2eoperator.Clients, 
 	gomega.Expect(pods).NotTo(gomega.BeEmpty(), "no %s pods found", operandNameFromSelector(selector))
 
 	for _, pod := range pods {
-		if len(pod.Status.ContainerStatuses) == 0 {
-			continue
-		}
-		firstContainerStatus := pod.Status.ContainerStatuses[0]
-		restartCount := firstContainerStatus.RestartCount
-		if restartCount > 1 {
-			previousLogs, err := clients.Pods.Logs(ctx, &pod, &corev1.PodLogOptions{Container: firstContainerStatus.Name, Previous: true})
-			if err != nil {
-				e2elog.Logf("WARN: failed to read previous logs of pod %s/%s: %v", pod.Namespace, pod.Name, err)
-			} else {
-				e2elog.Logf("previous logs of pod %s/%s:\n%s", pod.Namespace, pod.Name, previousLogs)
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			restartCount := containerStatus.RestartCount
+			if restartCount <= 1 {
+				continue
 			}
-			ginkgo.Fail(fmt.Sprintf("pod %s/%s restarted %d times", pod.Namespace, pod.Name, restartCount))
+			previousLogs, err := clients.Pods.Logs(ctx, &pod, &corev1.PodLogOptions{Container: containerStatus.Name, Previous: true})
+			if err != nil {
+				e2elog.Logf("WARN: failed to read previous logs of container %s in pod %s/%s: %v", containerStatus.Name, pod.Namespace, pod.Name, err)
+			} else {
+				e2elog.Logf("previous logs of container %s in pod %s/%s:\n%s", containerStatus.Name, pod.Namespace, pod.Name, previousLogs)
+			}
+			ginkgo.Fail(fmt.Sprintf("container %s in pod %s/%s restarted %d times", containerStatus.Name, pod.Namespace, pod.Name, restartCount))
 		}
 		ginkgo.GinkgoWriter.Printf("Repeated restarts not observed for pod %s\n", pod.Name)
 	}
