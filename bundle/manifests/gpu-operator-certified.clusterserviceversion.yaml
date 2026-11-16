@@ -269,9 +269,9 @@ spec:
     - name: gpu-operator-validator-image
       image: ghcr.io/nvidia/gpu-operator:main-latest
     - name: k8s-driver-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.13.0@sha256:c48dd0248777af64a4c1059982eafc5b0fc28ec2d98995c407af2b1bd8449fc3
     - name: vfio-manager-image
-      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8
+      image: nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.13.0@sha256:c48dd0248777af64a4c1059982eafc5b0fc28ec2d98995c407af2b1bd8449fc3
     - name: cc-manager-image
       image: nvcr.io/nvidia/cloud-native/k8s-cc-manager:v0.4.5@sha256:9cf906a498585f10de919d75b7d0ef5ea6094844ba37f4649b2d8ed225a76047
     - name: sandbox-device-plugin-image
@@ -1136,11 +1136,11 @@ spec:
                   - name: "DRIVER_IMAGE-615"
                     value: "nvcr.io/nvidia/driver@sha256:54d5e96cd981acf4525dc1d0bcc4f27acde1fe199bb739dc7cf5923517db66b5"
                   - name: "DRIVER_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.13.0@sha256:c48dd0248777af64a4c1059982eafc5b0fc28ec2d98995c407af2b1bd8449fc3"
                   - name: "MIG_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.15.2@sha256:b621f8257993e36c6bfa2c55810b17ede2101ba8db3a7f5fef05979fbe73e0c9"
                   - name: "VFIO_MANAGER_IMAGE"
-                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8"
+                    value: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.13.0@sha256:c48dd0248777af64a4c1059982eafc5b0fc28ec2d98995c407af2b1bd8449fc3"
                   - name: "CC_MANAGER_IMAGE"
                     value: "nvcr.io/nvidia/cloud-native/k8s-cc-manager:v0.4.5@sha256:9cf906a498585f10de919d75b7d0ef5ea6094844ba37f4649b2d8ed225a76047"
                   - name: "SANDBOX_DEVICE_PLUGIN_IMAGE"
