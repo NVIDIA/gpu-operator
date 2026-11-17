@@ -146,6 +146,9 @@ metadata:
             "ccManager": {
               "enabled": true
             },
+            "gpuConfigManager": {
+              "enabled": false
+            },
             "gds": {
               "enabled": false
             },
