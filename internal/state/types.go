@@ -113,6 +113,27 @@ type dcgmExporterRenderData struct {
 	ServiceInternalTrafficPolicy string
 }
 
+// gpuConfigManagerSpec is a wrapper of GPUConfigManagerSpec with the resolved image
+// path and the GPU configuration manager's configurable environment.
+type gpuConfigManagerSpec struct {
+	Spec      *nvidiav1.GPUConfigManagerSpec
+	ImagePath string
+	Env       []nvidiav1.EnvVar
+}
+
+// gpuConfigManagerRenderData is the templating data for the DRA-stack GPU
+// configuration manager manifests.
+type gpuConfigManagerRenderData struct {
+	GPUConfigManager *gpuConfigManagerSpec
+	// PullSpec carries the image pull policy and secrets.
+	PullSpec   *nvidiav1alpha1.DRADriverSpec
+	HostPaths  *nvidiav1alpha1.HostPathsSpec
+	Daemonsets *nvidiav1.DaemonsetsSpec
+	Namespace  string
+	// OpenshiftVersion gates OpenShift-only objects; empty on vanilla Kubernetes.
+	OpenshiftVersion string
+}
+
 // validatorRenderData is the templating data for the DRA validator manifests. It
 // reuses draDriverSpec so .Validator.ImagePath carries the gpu-operator image (which
 // runs in the validator) and .Validator.Spec exposes the image pull settings.
@@ -146,4 +167,8 @@ type draDriverRenderData struct {
 	// per-container default); a negative value omits the startup and liveness probes.
 	GPUsHealthcheckPort           int32
 	ComputeDomainsHealthcheckPort int32
+	// GPUConfigGateEnv is spec.gpuConfigManager.env with one entry per name, passed
+	// to the gpu-config init container whether or not the GPU configuration manager
+	// is enabled.
+	GPUConfigGateEnv []nvidiav1.EnvVar
 }

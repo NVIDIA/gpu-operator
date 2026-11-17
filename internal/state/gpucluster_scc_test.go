@@ -157,6 +157,7 @@ func TestGPUClusterOperandSCCs(t *testing.T) {
 			users: []string{
 				"system:serviceaccount:test-operator:nvidia-dra-driver-kubeletplugin",
 				"system:serviceaccount:test-operator:compute-domain-daemon-service-account",
+				"system:serviceaccount:test-operator:nvidia-gpu-config-manager-dra",
 			},
 			render: func(t *testing.T, catalog InfoCatalog) []*unstructured.Unstructured {
 				s := newTestDRAState(t)

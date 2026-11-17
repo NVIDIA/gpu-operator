@@ -37,6 +37,10 @@ func dcgmEnabled(cr *nvidiav1alpha1.GPUCluster) bool {
 	return cr.Spec.DCGM != nil && cr.Spec.DCGM.Enabled != nil && *cr.Spec.DCGM.Enabled
 }
 
+func gpuConfigManagerEnabled(cr *nvidiav1alpha1.GPUCluster) bool {
+	return cr.Spec.GPUConfigManager != nil && cr.Spec.GPUConfigManager.IsEnabled()
+}
+
 // gpuClusterDaemonSetSource watches DaemonSets and enqueues the owning
 // GPUCluster. Every operand state returns the same source; the manager
 // deduplicates them by key. The predicate drops status updates that do not

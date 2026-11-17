@@ -1028,6 +1028,84 @@ spec:
                     description: NVIDIA DRA driver image tag
                     type: string
                 type: object
+              gpuConfigManager:
+                description: |-
+                  GPUConfigManager defines the spec for the GPU configuration manager. It configures
+                  GPU settings such as the power limit, locked clocks and ECC mode on each node from
+                  ConfigMaps in the operator namespace, and applies them again after every driver
+                  load. Disabled when unset.
+                properties:
+                  config:
+                    description: |-
+                      Config selects the ConfigMap (key config.yaml) in the operator namespace with the GPU settings for all nodes.
+                      For a node, gpu-config-node-<node name> wins over gpu-config-pool-<pool>, which wins over this one.
+                      <pool> is derived from the node's nvidia.com/gpu-config.pool label (lowercased, "_" to "-"; values that
+                      can't name a ConfigMap are ignored); set POOL_LABEL_KEY in spec.gpuConfigManager.env to use another label.
+                    properties:
+                      name:
+                        default: gpu-config
+                        description: |-
+                          Name of the ConfigMap in the operator namespace with the GPU settings for nodes
+                          that have no per-node or per-pool ConfigMap
+                        type: string
+                    type: object
+                  enabled:
+                    description: Enabled indicates if deployment of the GPU configuration
+                      manager is enabled
+                    type: boolean
+                  env:
+                    description: |-
+                      Optional: List of environment variables. They are also passed to the gpu-config init container
+                      of the validator / DRA kubelet plugin, even when the manager is disabled. GPU_CONFIG_NO_MODULE_TIMEOUT
+                      sets how long that container waits for the nvidia module before letting allocators start (default 5m).
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable.
+                          type: string
+                        value:
+                          description: Value of the environment variable.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  hostNetwork:
+                    description: HostNetwork indicates whether the GPU configuration
+                      manager pod uses the host's network namespace.
+                    type: boolean
+                  resources:
+                    description: 'Optional: Define resources requests and limits for
+                      each pod'
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                type: object
               hostPaths:
                 description: HostPaths defines the host paths used in host-path volumes
                   for various components.

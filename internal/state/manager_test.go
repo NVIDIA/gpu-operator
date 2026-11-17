@@ -189,12 +189,13 @@ func TestNewStatesNVIDIADriver(t *testing.T) {
 }
 
 func TestNewStatesGPUCluster(t *testing.T) {
-	skipIfManifestDirExists(t, "/opt/gpu-operator/manifests/state-dra-driver")
+	skipIfManifestDirExists(t, "/opt/gpu-operator/manifests/state-gpu-config-manager")
 
 	states, err := newStates(nvidiav1alpha1.GPUClusterCRDName, "test-ns", nil, runtime.NewScheme())
 	require.Error(t, err)
 	assert.Nil(t, states)
-	assert.Contains(t, err.Error(), "failed to create DRA driver state")
+	// The GPU configuration manager state is created first.
+	assert.Contains(t, err.Error(), "failed to create GPU configuration manager state")
 }
 
 func TestNewManagerNVIDIADriver(t *testing.T) {

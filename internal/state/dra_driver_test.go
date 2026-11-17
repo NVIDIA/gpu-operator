@@ -35,6 +35,7 @@ import (
 
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/gpuconfig/decision"
 )
 
 const draManifestDir = "../../manifests/state-dra-driver"
@@ -110,9 +111,9 @@ func TestDRADriverRenderGPUsCut(t *testing.T) {
 	ds := findDaemonSet(t, objs)
 	podSpec := ds.Spec.Template.Spec
 
-	// Init container is the DRA validator, privileged, with the verified mount plan
-	// and no /driver-root symlink machinery.
-	require.Len(t, podSpec.InitContainers, 1)
+	// First init container is the DRA validator, privileged, with the verified mount
+	// plan and no /driver-root symlink machinery; the gpu-config init container follows.
+	require.Len(t, podSpec.InitContainers, 2)
 	initCtr := podSpec.InitContainers[0]
 	assert.Equal(t, "driver-validation", initCtr.Name)
 	assert.Equal(t, "nvcr.io/nvidia/gpu-operator-validator:test", initCtr.Image)
@@ -575,4 +576,86 @@ func TestDRADriverKubeletPluginScheduling(t *testing.T) {
 	// claim-holding pod; the mode label must not unschedule it directly.
 	assert.Equal(t, "true", ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu.deploy.dra-driver"])
 	assert.NotContains(t, ds.Spec.Template.Spec.NodeSelector, "nvidia.com/gpu-operator.resource-allocation.mode")
+}
+
+func TestDRADriverGPUConfigGate(t *testing.T) {
+	timeout := []nvidiav1.EnvVar{{Name: "GPU_CONFIG_NO_MODULE_TIMEOUT", Value: "10m"}}
+	defaultEnv := map[string]string{"COMPONENT": "gpu-config", "GPU_CONFIG_STACK": string(decision.DRAStack)}
+	withTimeout := map[string]string{
+		"COMPONENT":                    "gpu-config",
+		"GPU_CONFIG_STACK":             string(decision.DRAStack),
+		"GPU_CONFIG_NO_MODULE_TIMEOUT": "10m",
+	}
+	cases := map[string]struct {
+		spec    *nvidiav1.GPUConfigManagerSpec
+		wantEnv map[string]string
+		wantLen int
+	}{
+		"manager unset":   {wantEnv: defaultEnv, wantLen: 4},
+		"manager enabled": {spec: &nvidiav1.GPUConfigManagerSpec{Enabled: new(true)}, wantEnv: defaultEnv, wantLen: 4},
+		"manager enabled with env": {
+			spec:    &nvidiav1.GPUConfigManagerSpec{Enabled: new(true), Env: timeout},
+			wantEnv: withTimeout,
+			wantLen: 5,
+		},
+		"manager disabled with env": {
+			spec:    &nvidiav1.GPUConfigManagerSpec{Enabled: new(false), Env: timeout},
+			wantEnv: withTimeout,
+			wantLen: 5,
+		},
+		"env replaces manifest entries and repeated names": {
+			spec: &nvidiav1.GPUConfigManagerSpec{Env: []nvidiav1.EnvVar{
+				{Name: "GPU_CONFIG_STACK", Value: "custom"},
+				{Name: "NODE_NAME", Value: "node-1"},
+				{Name: "GPU_CONFIG_NO_MODULE_TIMEOUT", Value: "5m"},
+				{Name: "GPU_CONFIG_NO_MODULE_TIMEOUT", Value: "10m"},
+			}},
+			wantEnv: map[string]string{
+				"COMPONENT":                    "gpu-config",
+				"GPU_CONFIG_STACK":             "custom",
+				"NODE_NAME":                    "node-1",
+				"GPU_CONFIG_NO_MODULE_TIMEOUT": "10m",
+			},
+			wantLen: 5,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := newTestDRAState(t)
+			cr := sampleGPUCluster()
+			cr.Spec.GPUConfigManager = tc.spec
+			objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+			require.NoError(t, err)
+			ds := findDaemonSet(t, objs)
+			// The GPU configuration manager finds the gpu-config init container's pods by this name.
+			require.Equal(t, decision.DRAKubeletPluginDaemonSet, ds.Name)
+
+			inits := ds.Spec.Template.Spec.InitContainers
+			require.Len(t, inits, 2)
+			require.Equal(t, "driver-validation", inits[0].Name)
+			gate := inits[1]
+			require.Equal(t, decision.GateContainer, gate.Name)
+			require.Equal(t, "nvcr.io/nvidia/gpu-operator-validator:test", gate.Image)
+			require.Len(t, gate.Env, tc.wantLen)
+			env := envMap(gate.Env)
+			require.Len(t, env, tc.wantLen, "env names must be unique")
+			for _, e := range gate.Env {
+				want, ok := tc.wantEnv[e.Name]
+				if !ok {
+					continue
+				}
+				require.Equal(t, want, e.Value, e.Name)
+				require.Nil(t, e.ValueFrom, e.Name)
+			}
+			for k := range tc.wantEnv {
+				require.Contains(t, env, k)
+			}
+			require.NotContains(t, envMap(inits[0].Env), "GPU_CONFIG_NO_MODULE_TIMEOUT")
+			require.NotNil(t, gate.SecurityContext.RunAsUser)
+			require.Equal(t, int64(0), *gate.SecurityContext.RunAsUser)
+			require.Len(t, gate.VolumeMounts, 1)
+			require.Equal(t, "validations", gate.VolumeMounts[0].Name)
+			require.False(t, gate.VolumeMounts[0].ReadOnly)
+		})
+	}
 }

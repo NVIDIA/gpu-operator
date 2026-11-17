@@ -46,6 +46,12 @@ type GPUClusterSpec struct {
 	// reused enabled field carries no server-side default; the controller defaults nil enabled.
 	DCGMExporter *nvidiav1.DCGMExporterSpec `json:"dcgmExporter,omitempty"`
 
+	// GPUConfigManager defines the spec for the GPU configuration manager. It configures
+	// GPU settings such as the power limit, locked clocks and ECC mode on each node from
+	// ConfigMaps in the operator namespace, and applies them again after every driver
+	// load. Disabled when unset.
+	GPUConfigManager *nvidiav1.GPUConfigManagerSpec `json:"gpuConfigManager,omitempty"`
+
 	// HostPaths defines the host paths used in host-path volumes for various components.
 	HostPaths HostPathsSpec `json:"hostPaths,omitempty"`
 
