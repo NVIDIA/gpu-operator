@@ -64,7 +64,7 @@ func (s *SafeDriverLoadManagerImpl) UnblockLoading(ctx context.Context, node *co
 	if err != nil {
 		s.log.V(consts.LogLevelError).Error(
 			err, "Failed to change node upgrade annotation for node", "node",
-			node, "annotation", annotationKey)
+			node.Name, "annotation", annotationKey)
 		return err
 	}
 	return nil

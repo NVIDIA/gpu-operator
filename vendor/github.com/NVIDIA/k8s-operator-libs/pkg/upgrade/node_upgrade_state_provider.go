@@ -71,7 +71,7 @@ func (p *NodeUpgradeStateProviderImpl) GetNode(ctx context.Context, nodeName str
 // The function then waits for the operator cache to get updated
 func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 	ctx context.Context, node *corev1.Node, newNodeState string) error {
-	p.Log.V(consts.LogLevelInfo).Info("Updating node upgrade state",
+	p.Log.V(consts.LogLevelDebug).Info("Updating node upgrade state",
 		"node", node.Name,
 		"new state", newNodeState)
 
@@ -82,7 +82,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 	err := p.K8sClient.Patch(ctx, node, patch)
 	if err != nil {
 		p.Log.V(consts.LogLevelError).Error(err, "Failed to patch node state label on a node object",
-			"node", node,
+			"node", node.Name,
 			"state", newNodeState)
 		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
 			"Failed to update node state label to %s, %s", newNodeState, err.Error())
@@ -118,7 +118,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 
 	if err != nil {
 		p.Log.V(consts.LogLevelError).Error(err, "Error while waiting on node label update",
-			"node", node,
+			"node", node.Name,
 			"state", newNodeState)
 		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
 			"Failed to update node state label to %s, %s", newNodeState, err.Error())
@@ -137,7 +137,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 // The function then waits for the operator cache to get updated
 func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 	ctx context.Context, node *corev1.Node, key string, value string) error {
-	p.Log.V(consts.LogLevelInfo).Info("Updating node upgrade annotation",
+	p.Log.V(consts.LogLevelDebug).Info("Updating node upgrade annotation",
 		"node", node.Name,
 		"annotationKey", key,
 		"annotationValue", value)
@@ -152,7 +152,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 	err := p.K8sClient.Patch(ctx, node, patch)
 	if err != nil {
 		p.Log.V(consts.LogLevelError).Error(err, "Failed to patch node state annotation on a node object",
-			"node", node,
+			"node", node.Name,
 			"annotationKey", key,
 			"annotationValue", value)
 		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
@@ -198,13 +198,13 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 
 	if err != nil {
 		p.Log.V(consts.LogLevelError).Error(err, "Error while waiting on node annotation update",
-			"node", node,
+			"node", node.Name,
 			"annotationKey", key,
 			"annotationValue", value)
 		logEventf(p.eventRecorder, node, corev1.EventTypeWarning, GetEventReason(),
 			"Failed to update node annotation to %s=%s: %s", key, value, err.Error())
 	} else {
-		p.Log.V(consts.LogLevelInfo).Info("Successfully changed node upgrade state annotation",
+		p.Log.V(consts.LogLevelDebug).Info("Successfully changed node upgrade state annotation",
 			"node", node.Name,
 			"annotationKey", key,
 			"annotationValue", value)

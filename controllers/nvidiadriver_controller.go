@@ -424,7 +424,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			needsUpdate := hasGPULabels(newLabels) && !maps.Equal(newLabels, oldLabels)
 
 			if needsUpdate {
-				logger.Info("Node labels have been changed",
+				logger.V(consts.LogLevelDebug).Info("Node labels have been changed",
 					"name", nodeName,
 				)
 			}
