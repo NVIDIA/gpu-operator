@@ -6,6 +6,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/NVIDIA/go-nvlib v0.13.0
+	github.com/NVIDIA/go-nvml v0.13.4-1.0.20261102194955-f83235b8e2ea
 	github.com/NVIDIA/k8s-kata-manager v0.2.3
 	github.com/NVIDIA/k8s-operator-libs v0.0.0-20261020171813-42ee2fff224f
 	github.com/NVIDIA/nvidia-container-toolkit v1.20.2
