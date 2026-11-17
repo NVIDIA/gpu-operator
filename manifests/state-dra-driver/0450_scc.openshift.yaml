@@ -35,6 +35,7 @@ supplementalGroups:
 users:
 - system:serviceaccount:{{ .Namespace }}:nvidia-dra-driver-kubeletplugin
 - system:serviceaccount:{{ .Namespace }}:compute-domain-daemon-service-account
+- system:serviceaccount:{{ .Namespace }}:nvidia-gpu-config-manager-dra
 volumes:
 - '*'
 {{end}}

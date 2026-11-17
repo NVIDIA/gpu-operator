@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nvidia-gpu-config-manager-dra
+  namespace: test-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nvidia-gpu-config-manager-dra
+  namespace: test-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nvidia-gpu-config-manager-dra
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceclaims
+  verbs:
+  - get
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - resourceslices
+  verbs:
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nvidia-gpu-config-manager-dra
+  namespace: test-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nvidia-gpu-config-manager-dra
+subjects:
+- kind: ServiceAccount
+  name: nvidia-gpu-config-manager-dra
+  namespace: test-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nvidia-gpu-config-manager-dra
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nvidia-gpu-config-manager-dra
+subjects:
+- kind: ServiceAccount
+  name: nvidia-gpu-config-manager-dra
+  namespace: test-operator
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nvidia-gpu-config-manager-dra
+    app.kubernetes.io/component: nvidia-gpu-config-manager
+  name: nvidia-gpu-config-manager-dra
+  namespace: test-operator
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-gpu-config-manager-dra
+  template:
+    metadata:
+      labels:
+        app: nvidia-gpu-config-manager-dra
+        app.kubernetes.io/component: nvidia-gpu-config-manager
+    spec:
+      containers:
+      - command:
+        - gpu-config-manager
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: GPU_CONFIG_STACK
+          value: dra
+        - name: GPU_CONFIG_CLUSTER_DOCUMENT
+          value: gpu-config
+        image: nvcr.io/nvidia/gpu-operator-validator:test
+        imagePullPolicy: IfNotPresent
+        name: nvidia-gpu-config-manager
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /run/nvidia/validations
+          mountPropagation: HostToContainer
+          name: validations
+        - mountPath: /driver-root
+          mountPropagation: HostToContainer
+          name: driver-install-dir
+          readOnly: true
+        - mountPath: /host
+          mountPropagation: HostToContainer
+          name: host-root
+          readOnly: true
+      initContainers:
+      - command:
+        - nvidia-validator
+        env:
+        - name: COMPONENT
+          value: driver
+        - name: WITH_WAIT
+          value: "true"
+        - name: DRIVER_VALIDATION_SKIP_GPU_INIT
+          value: "true"
+        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION
+          value: "true"
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: HOST_ROOT
+          value: /
+        - name: DRIVER_INSTALL_DIR
+          value: /run/nvidia/driver
+        - name: DRIVER_INSTALL_DIR_CTR_PATH
+          value: /driver-root
+        image: nvcr.io/nvidia/gpu-operator-validator:test
+        imagePullPolicy: IfNotPresent
+        name: driver-validation
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /host
+          mountPropagation: HostToContainer
+          name: host-root
+          readOnly: true
+        - mountPath: /driver-root
+          mountPropagation: HostToContainer
+          name: driver-install-dir
+        - mountPath: /run/nvidia/validations
+          name: validations
+      nodeSelector:
+        nvidia.com/gpu.deploy.gpu-config-manager: "true"
+      priorityClassName: system-node-critical
+      serviceAccountName: nvidia-gpu-config-manager-dra
+      terminationGracePeriodSeconds: 90
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /
+        name: host-root
+      - hostPath:
+          path: /run/nvidia/driver
+          type: DirectoryOrCreate
+        name: driver-install-dir
+      - hostPath:
+          path: /run/nvidia/validations
+          type: DirectoryOrCreate
+        name: validations
+  updateStrategy:
+    type: RollingUpdate
+---

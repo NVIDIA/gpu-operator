@@ -423,6 +423,11 @@ func (in *GPUClusterSpec) DeepCopyInto(out *GPUClusterSpec) {
 		*out = new(v1.DCGMExporterSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.GPUConfigManager != nil {
+		in, out := &in.GPUConfigManager, &out.GPUConfigManager
+		*out = new(v1.GPUConfigManagerSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	out.HostPaths = in.HostPaths
 	in.Daemonsets.DeepCopyInto(&out.Daemonsets)
 }

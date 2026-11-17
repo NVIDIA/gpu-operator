@@ -131,6 +131,9 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 		ComputeDomainsHealthcheckPort: resolveHealthcheckPort(
 			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort),
 	}
+	if cr.Spec.GPUConfigManager != nil {
+		renderData.GPUConfigGateEnv = dedupeEnv(cr.Spec.GPUConfigManager.Env)
+	}
 
 	return s.renderObjects(ctx, renderData)
 }
