@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -125,9 +126,10 @@ func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespa
 		return nil, err
 	}
 
+	podsByOwner := m.GetPodsByDSOwner(daemonSets, podList.Items)
 	filteredPodList := []corev1.Pod{}
 	for _, ds := range daemonSets {
-		dsPods := m.GetPodsOwnedbyDs(ds, podList.Items)
+		dsPods := podsByOwner[ds.UID]
 		if int(ds.Status.DesiredNumberScheduled) != len(dsPods) {
 			m.Log.V(consts.LogLevelInfo).Info("Driver DaemonSet has Unscheduled pods", "name", ds.Name)
 			return nil, fmt.Errorf("driver DaemonSet should not have Unscheduled pods")
@@ -136,26 +138,25 @@ func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespa
 	}
 
 	// Collect also orphaned driver pods
-	filteredPodList = append(filteredPodList, m.GetOrphanedPods(podList.Items)...)
+	filteredPodList = append(filteredPodList, podsByOwner[NoOwner]...)
 
 	upgradeStateLabel := GetUpgradeStateLabelKey()
 
 	for i := range filteredPodList {
 		pod := &filteredPodList[i]
 		var ownerDaemonSet *appsv1.DaemonSet
-		if IsOrphanedPod(pod) {
-			ownerDaemonSet = nil
-		} else {
-			ownerDaemonSet = daemonSets[pod.OwnerReferences[0].UID]
+		owner := metav1.GetControllerOfNoCopy(pod)
+		if owner != nil {
+			ownerDaemonSet = daemonSets[owner.UID]
 		}
 		// Check if pod is already scheduled to a Node
 		if pod.Spec.NodeName == "" && pod.Status.Phase == corev1.PodPending {
-			m.Log.V(consts.LogLevelInfo).Info("Driver Pod has no NodeName, skipping", "pod", pod.Name)
+			m.Log.V(consts.LogLevelDebug).Info("Driver Pod has no NodeName, skipping", "pod", pod.Name)
 			continue
 		}
 		nodeState, err := m.buildNodeUpgradeState(ctx, pod, ownerDaemonSet)
 		if err != nil {
-			m.Log.V(consts.LogLevelError).Error(err, "Failed to build node upgrade state for pod", "pod", pod)
+			m.Log.V(consts.LogLevelError).Error(err, "Failed to build node upgrade state for pod", "pod", pod.Name)
 			return nil, err
 		}
 		nodeStateLabel := nodeState.Node.Labels[upgradeStateLabel]
@@ -184,7 +185,11 @@ func (m *ClusterUpgradeStateManagerImpl) ApplyState(ctx context.Context,
 		return nil
 	}
 
+	driverDaemonSets, ownedDriverPods, orphanedDriverPods := currentState.driverPodCounts()
 	m.Log.V(consts.LogLevelInfo).Info("Node states:",
+		"driverDaemonSets", driverDaemonSets,
+		"ownedDriverPods", ownedDriverPods,
+		"orphanedDriverPods", orphanedDriverPods,
 		"Unknown", len(currentState.NodeStates[UpgradeStateUnknown]),
 		UpgradeStateDone, len(currentState.NodeStates[UpgradeStateDone]),
 		UpgradeStateUpgradeRequired, len(currentState.NodeStates[UpgradeStateUpgradeRequired]),
@@ -382,7 +387,7 @@ func (m *ClusterUpgradeStateManagerImpl) buildNodeUpgradeState(
 	}
 
 	upgradeStateLabel := GetUpgradeStateLabelKey()
-	m.Log.V(consts.LogLevelInfo).Info("Node hosting a driver pod",
+	m.Log.V(consts.LogLevelDebug).Info("Node hosting a driver pod",
 		"node", node.Name, "state", node.Labels[upgradeStateLabel])
 
 	return &NodeUpgradeState{Node: node, DriverPod: pod, DriverDaemonSet: ds, NodeMaintenance: nm}, nil
