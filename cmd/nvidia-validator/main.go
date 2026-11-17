@@ -438,6 +438,9 @@ func validateFlags(ctx context.Context, cli *cli.Command) (context.Context, erro
 			return ctx, fmt.Errorf("invalid -n <node-name> flag: must not be empty string for metrics exporter")
 		}
 	}
+	if componentFlag == gpuConfigComponent && (nodeNameFlag == "" || namespaceFlag == "") {
+		return ctx, fmt.Errorf("invalid -n <node-name> or -ns <namespace> flag: both are required for %s", componentFlag)
+	}
 	if nodeNameFlag == "" && (componentFlag == "vfio-pci" || componentFlag == "vgpu-manager" || componentFlag == "vgpu-devices") {
 		return ctx, fmt.Errorf("invalid -n <node-name> flag: must not be empty string for %s validation", componentFlag)
 	}
@@ -466,6 +469,8 @@ func isValidComponent() bool {
 	case "vgpu-devices":
 		fallthrough
 	case "cc-manager":
+		fallthrough
+	case gpuConfigComponent:
 		fallthrough
 	case NVIDIAFS:
 		fallthrough
@@ -648,6 +653,15 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		err := CCManager.validate()
 		if err != nil {
 			return fmt.Errorf("error validating CC Manager installation: %w", err)
+		}
+		return nil
+	case gpuConfigComponent:
+		gpuConfig := &GPUConfig{
+			ctx:    ctx,
+			getenv: os.Getenv,
+		}
+		if err := gpuConfig.validate(); err != nil {
+			return fmt.Errorf("error waiting for the GPU configuration applier: %w", err)
 		}
 		return nil
 	default:
