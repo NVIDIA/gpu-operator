@@ -28,6 +28,12 @@ import (
 	"github.com/NVIDIA/k8s-operator-libs/pkg/consts"
 )
 
+// Interval and timeout for reading a Node until a patch shows in the cache.
+const (
+	pollInterval = 10 * time.Millisecond
+	pollTimeout  = 10 * time.Second
+)
+
 // NodeUpgradeStateProvider allows for synchronized operations on node objects and ensures that the node,
 // got from the provider, always has the up-to-date upgrade state
 type NodeUpgradeStateProvider interface {
@@ -97,13 +103,10 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 	// so we wait until it's synced.
 	// That way, since only one call to reconcile at a time is allowed for upgrade controller, each new update
 	// will have the updated node object in the cache.
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-	//nolint:staticcheck
-	err = wait.PollImmediateUntil(time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		p.Log.V(consts.LogLevelDebug).Info("Requesting node object to see if operator cache has updated",
 			"node", node.Name)
-		err := p.K8sClient.Get(timeoutCtx, types.NamespacedName{Name: node.Name}, node)
+		err := p.K8sClient.Get(ctx, types.NamespacedName{Name: node.Name}, node)
 		if err != nil {
 			return false, err
 		}
@@ -114,7 +117,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeState(
 			return false, nil
 		}
 		return true, nil
-	}, timeoutCtx.Done())
+	})
 
 	if err != nil {
 		p.Log.V(consts.LogLevelError).Error(err, "Error while waiting on node label update",
@@ -168,13 +171,10 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 	// so we wait until it's synced.
 	// That way, since only one call to reconcile at a time is allowed for upgrade controller, each new update
 	// will have the updated node object in the cache.
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-	//nolint:staticcheck
-	err = wait.PollImmediateUntil(time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
 		p.Log.V(consts.LogLevelDebug).Info("Requesting node object to see if operator cache has updated",
 			"node", node.Name)
-		err := p.K8sClient.Get(timeoutCtx, types.NamespacedName{Name: node.Name}, node)
+		err := p.K8sClient.Get(ctx, types.NamespacedName{Name: node.Name}, node)
 		if err != nil {
 			return false, err
 		}
@@ -194,7 +194,7 @@ func (p *NodeUpgradeStateProviderImpl) ChangeNodeUpgradeAnnotation(
 			return false, nil
 		}
 		return true, nil
-	}, timeoutCtx.Done())
+	})
 
 	if err != nil {
 		p.Log.V(consts.LogLevelError).Error(err, "Error while waiting on node annotation update",
