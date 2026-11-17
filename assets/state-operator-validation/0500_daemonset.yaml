@@ -56,6 +56,31 @@ spec:
               mountPropagation: Bidirectional
             - name: host-dev-char
               mountPath: /host-dev-char
+        # Waits until the GPU configuration manager has configured the GPUs for the current driver load.
+        # Always rendered; the container checks at runtime whether the manager is enabled.
+        - name: gpu-config
+          image: "FILLED BY THE OPERATOR"
+          command: ['sh', '-c']
+          args: ["nvidia-validator"]
+          env:
+          - name: COMPONENT
+            value: gpu-config
+          - name: GPU_CONFIG_STACK
+            value: container
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: OPERATOR_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+              mountPropagation: Bidirectional
         - name: toolkit-validation
           image: "FILLED BY THE OPERATOR"
           command: ['sh', '-c']

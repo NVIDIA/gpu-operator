@@ -80,6 +80,7 @@ const (
 	draValidatorDeployLabelKey     = "nvidia.com/gpu.deploy.dra-validator"
 	draDCGMDeployLabelKey          = "nvidia.com/gpu.deploy.dcgm-dra"
 	draDCGMExporterDeployLabelKey  = "nvidia.com/gpu.deploy.dcgm-exporter-dra"
+	gpuConfigManagerDeployLabelKey = "nvidia.com/gpu.deploy.gpu-config-manager"
 	gfdDeployLabelKey              = "nvidia.com/gpu.deploy.gpu-feature-discovery"
 	dcgmDeployLabelKey             = "nvidia.com/gpu.deploy.dcgm"
 	dcgmExporterDeployLabelKey     = "nvidia.com/gpu.deploy.dcgm-exporter"
@@ -106,6 +107,7 @@ var gpuStateLabels = map[string]map[string]string{
 		"nvidia.com/gpu.deploy.node-status-exporter": "true",
 		"nvidia.com/gpu.deploy.operator-validator":   "true",
 		"nvidia.com/gpu.deploy.client":               "true",
+		gpuConfigManagerDeployLabelKey:               "true",
 	},
 	gpuWorkloadConfigVMPassthrough: {
 		"nvidia.com/gpu.deploy.sandbox-device-plugin": "true",
@@ -134,6 +136,8 @@ var gpuClusterStateLabels = map[string]string{
 	draValidatorDeployLabelKey:    "true",
 	draDCGMDeployLabelKey:         "true",
 	draDCGMExporterDeployLabelKey: "true",
+	// In both stacks' sets so a node keeps a "false" or paused value when switching stacks.
+	gpuConfigManagerDeployLabelKey: "true",
 }
 
 // clusterPolicyStateLabelKeys returns every deploy-label key the ClusterPolicy
@@ -806,6 +810,9 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 		addState(n, "/opt/gpu-operator/state-operator-metrics")
 		addState(n, "/opt/gpu-operator/state-driver")
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
+		// The validator's gpu-config step waits for the GPU configuration manager,
+		// so the GPU configuration manager must deploy before the validator.
+		addState(n, "/opt/gpu-operator/state-gpu-config-manager")
 		addState(n, "/opt/gpu-operator/state-operator-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
 		addState(n, "/opt/gpu-operator/state-mps-control-daemon")
@@ -1037,6 +1044,8 @@ func (n ClusterPolicyController) isStateEnabled(stateName string) bool {
 		return n.sandboxEnabled && clusterPolicySpec.CCManager.IsEnabled() && clusterPolicySpec.SandboxWorkloads.Mode == string(gpuv1.Kata)
 	case "state-sandbox-validation":
 		return n.sandboxEnabled
+	case "state-gpu-config-manager":
+		return clusterPolicySpec.GPUConfigManager.IsEnabled()
 	case "state-operator-validation":
 		return true
 	case "state-operator-metrics":
