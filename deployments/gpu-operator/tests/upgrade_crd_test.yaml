@@ -1,0 +1,32 @@
+suite: upgrade_crd hook
+templates:
+  - upgrade_crd.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+chart:
+  appVersion: "v25.0.0"
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}
+
+  - it: renders no documents when upgradeCRD is disabled
+    set:
+      operator:
+        upgradeCRD: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: omits the nfd CRD filepath when nfd is disabled
+    set:
+      nfd:
+        enabled: false
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --filepath=/opt/gpu-operator/nfd-api-crds.yaml

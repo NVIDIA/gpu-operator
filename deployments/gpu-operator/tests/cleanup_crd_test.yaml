@@ -1,0 +1,43 @@
+suite: cleanup_crd job
+templates:
+  - cleanup_crd.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+chart:
+  appVersion: "v25.0.0"
+tests:
+  - it: does not render the cleanup Job by default (cleanupCRD disabled)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should match snapshot
+    set:
+      operator:
+        cleanupCRD: true
+    asserts:
+      - matchSnapshot: {}
+
+  - it: omits the nfd CRD filepath argument when nfd is disabled
+    set:
+      operator:
+        cleanupCRD: true
+      nfd:
+        enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --filepath=/opt/gpu-operator/nfd-api-crds.yaml
+
+  - it: applies tolerations and image pull secrets to the cleanup Job
+    set:
+      operator:
+        cleanupCRD: true
+        imagePullSecrets:
+          - my-pull-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: my-pull-secret

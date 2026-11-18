@@ -1,0 +1,19 @@
+suite: clusterrolebinding
+templates:
+  - clusterrolebinding.yaml
+release:
+  name: gpu-operator
+  namespace: gpu-operator
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}
+
+  - it: places the subject ServiceAccount in the release namespace
+    release:
+      name: gpu-operator
+      namespace: another-ns
+    asserts:
+      - equal:
+          path: subjects[0].namespace
+          value: another-ns
