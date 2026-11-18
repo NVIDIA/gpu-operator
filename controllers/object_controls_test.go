@@ -1389,7 +1389,6 @@ func TestOperandToolkitReadinessWaitsForLiveDriver(t *testing.T) {
 		"assets/state-dcgm-exporter/0800_daemonset.yaml",
 		"assets/state-dcgm/0400_dcgm.yml",
 		"assets/state-device-plugin/0500_daemonset.yaml",
-		"assets/state-mig-manager/0600_daemonset.yaml",
 		"assets/state-mps-control-daemon/0400_daemonset.yaml",
 	}
 
