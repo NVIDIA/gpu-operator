@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -77,6 +78,22 @@ type ClusterUpgradeState struct {
 // NewClusterUpgradeState creates an empty ClusterUpgradeState object
 func NewClusterUpgradeState() ClusterUpgradeState {
 	return ClusterUpgradeState{NodeStates: make(map[string][]*NodeUpgradeState)}
+}
+
+// driverPodCounts returns the number of driver DaemonSets, the driver pods they own and the orphaned driver pods
+func (s *ClusterUpgradeState) driverPodCounts() (daemonSets, ownedPods, orphanedPods int) {
+	daemonSetUIDs := make(map[types.UID]struct{})
+	for _, nodeStates := range s.NodeStates {
+		for _, nodeState := range nodeStates {
+			if nodeState.IsOrphanedPod() {
+				orphanedPods++
+				continue
+			}
+			ownedPods++
+			daemonSetUIDs[nodeState.DriverDaemonSet.UID] = struct{}{}
+		}
+	}
+	return len(daemonSetUIDs), ownedPods, orphanedPods
 }
 
 // RestartOnlyPredicate is used for a node whose driver pod is out-of-sync with its
@@ -201,23 +218,11 @@ func (m *CommonUpgradeManagerImpl) GetDriverDaemonSets(ctx context.Context, name
 
 // GetPodsOwnedbyDs returns a list of the pods owned by the specified DaemonSet
 func (m *CommonUpgradeManagerImpl) GetPodsOwnedbyDs(ds *appsv1.DaemonSet, pods []corev1.Pod) []corev1.Pod {
-	dsPodList := []corev1.Pod{}
-	for i := range pods {
-		pod := &pods[i]
-		if IsOrphanedPod(pod) {
-			m.Log.V(consts.LogLevelInfo).Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
-			continue
-		}
-		m.Log.V(consts.LogLevelInfo).Info("Pod", "pod", pod.Name, "owner", pod.OwnerReferences[0].Name)
-
-		if ds.UID != pod.OwnerReferences[0].UID {
-			m.Log.V(consts.LogLevelInfo).Info("Driver Pod is not owned by an Driver DaemonSet",
-				"pod", pod, "actual owner", pod.OwnerReferences[0])
-			continue
-		}
-		dsPodList = append(dsPodList, *pod)
-	}
-	return dsPodList
+	podsByOwner := m.GetPodsByDSOwner(
+		map[types.UID]*appsv1.DaemonSet{ds.UID: ds},
+		pods,
+	)
+	return podsByOwner[ds.UID]
 }
 
 // GetOrphanedPods returns a list of the pods not owned by any DaemonSet
@@ -229,12 +234,42 @@ func (m *CommonUpgradeManagerImpl) GetOrphanedPods(pods []corev1.Pod) []corev1.P
 			podList = append(podList, *pod)
 		}
 	}
-	m.Log.V(consts.LogLevelInfo).Info("Total orphaned Pods found:", "count", len(podList))
+	m.Log.V(consts.LogLevelDebug).Info("Total orphaned Pods found:", "count", len(podList))
 	return podList
 }
 
+// GetPodsByDSOwner indexes pods controlled by the supplied DaemonSets.
+// Pods without a controller are indexed under NoOwner.
+func (m *CommonUpgradeManagerImpl) GetPodsByDSOwner(
+	daemonSets map[types.UID]*appsv1.DaemonSet,
+	pods []corev1.Pod) map[types.UID][]corev1.Pod {
+	podsByOwner := make(map[types.UID][]corev1.Pod)
+
+	for _, pod := range pods {
+		owner := metav1.GetControllerOfNoCopy(&pod)
+		if owner == nil {
+			m.Log.V(consts.LogLevelDebug).Info("Driver Pod has no owner DaemonSet", "pod", pod.Name)
+			podsByOwner[NoOwner] = append(podsByOwner[NoOwner], pod)
+			continue
+		}
+
+		daemonSet, found := daemonSets[owner.UID]
+		if !found || daemonSet == nil || !metav1.IsControlledBy(&pod, daemonSet) {
+			m.Log.V(consts.LogLevelDebug).Info("Driver Pod is not owned by a Driver DaemonSet",
+				"pod", pod.Name, "actual owner", owner)
+			continue
+		}
+
+		m.Log.V(consts.LogLevelDebug).Info("Pod", "pod", pod.Name, "owner", owner.Name)
+		podsByOwner[daemonSet.UID] = append(podsByOwner[daemonSet.UID], pod)
+	}
+
+	m.Log.V(consts.LogLevelDebug).Info("Total orphaned Pods found:", "count", len(podsByOwner[NoOwner]))
+	return podsByOwner
+}
+
 func IsOrphanedPod(pod *corev1.Pod) bool {
-	return len(pod.OwnerReferences) < 1
+	return metav1.GetControllerOfNoCopy(pod) == nil
 }
 
 // ProcessDoneOrUnknownNodes iterates over UpgradeStateDone or UpgradeStateUnknown nodes and determines
@@ -257,7 +292,7 @@ func (m *CommonUpgradeManagerImpl) ProcessDoneOrUnknownNodes(
 			return err
 		}
 		if isWaitingForSafeDriverLoad {
-			m.Log.V(consts.LogLevelInfo).Info("Node is waiting for safe driver load, initialize upgrade",
+			m.Log.V(consts.LogLevelDebug).Info("Node is waiting for safe driver load, initialize upgrade",
 				"node", nodeState.Node.Name)
 		}
 		if (!isPodSynced && !isOrphaned) || isWaitingForSafeDriverLoad || isUpgradeRequested {
@@ -266,7 +301,7 @@ func (m *CommonUpgradeManagerImpl) ProcessDoneOrUnknownNodes(
 			if IsNodeUnschedulable(nodeState.Node) {
 				annotationKey := GetUpgradeInitialStateAnnotationKey()
 				annotationValue := trueString
-				m.Log.V(consts.LogLevelInfo).Info(
+				m.Log.V(consts.LogLevelDebug).Info(
 					"Node is unschedulable, adding annotation to track initial state of the node",
 					"node", nodeState.Node.Name, "annotation", annotationKey)
 				err = m.NodeUpgradeStateProvider.ChangeNodeUpgradeAnnotation(ctx, nodeState.Node, annotationKey,
@@ -278,7 +313,7 @@ func (m *CommonUpgradeManagerImpl) ProcessDoneOrUnknownNodes(
 			err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateUpgradeRequired)
 			if err != nil {
 				m.Log.V(consts.LogLevelError).Error(
-					err, "Failed to change node upgrade state", "state", UpgradeStateUpgradeRequired, "node:", nodeState.Node)
+					err, "Failed to change node upgrade state", "state", UpgradeStateUpgradeRequired, "node", nodeState.Node.Name)
 				return err
 			}
 			m.Log.V(consts.LogLevelInfo).Info("Node requires upgrade, changed its state to UpgradeRequired",
@@ -317,14 +352,14 @@ func (m *CommonUpgradeManagerImpl) podInSyncWithDS(ctx context.Context,
 	podRevisionHash, err := m.PodManager.GetPodControllerRevisionHash(nodeState.DriverPod)
 	if err != nil {
 		m.Log.V(consts.LogLevelError).Error(
-			err, "Failed to get pod template revision hash", "pod", nodeState.DriverPod)
+			err, "Failed to get pod template revision hash", "pod", nodeState.DriverPod.Name)
 		return isPodSynced, isOrphened, err
 	}
 	m.Log.V(consts.LogLevelDebug).Info("pod template revision hash", "hash", podRevisionHash)
 	daemonsetRevisionHash, err := m.PodManager.GetDaemonsetControllerRevisionHash(ctx, nodeState.DriverDaemonSet)
 	if err != nil {
 		m.Log.V(consts.LogLevelError).Error(
-			err, "Failed to get daemonset template revision hash", "daemonset", nodeState.DriverDaemonSet)
+			err, "Failed to get daemonset template revision hash", "daemonset", nodeState.DriverDaemonSet.Name)
 		return isPodSynced, isOrphened, err
 	}
 	m.Log.V(consts.LogLevelDebug).Info("daemonset template revision hash", "hash", daemonsetRevisionHash)
@@ -364,7 +399,7 @@ func (m *CommonUpgradeManagerImpl) ProcessDrainNodes(
 		drainConfig.Nodes = append(drainConfig.Nodes, nodeState.Node)
 	}
 
-	m.Log.V(consts.LogLevelInfo).Info("Scheduling nodes drain", "drainConfig", drainConfig)
+	m.Log.V(consts.LogLevelInfo).Info("Scheduling nodes drain", "nodes", len(drainConfig.Nodes))
 
 	return m.DrainManager.ScheduleNodesDrain(ctx, &drainConfig)
 }
@@ -379,7 +414,7 @@ func (m *CommonUpgradeManagerImpl) ProcessCordonRequiredNodes(
 		err := m.CordonManager.Cordon(ctx, nodeState.Node)
 		if err != nil {
 			m.Log.V(consts.LogLevelWarning).Error(
-				err, "Node cordon failed", "node", nodeState.Node)
+				err, "Node cordon failed", "node", nodeState.Node.Name)
 			return err
 		}
 		err = m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateWaitForJobsRequired)
@@ -404,7 +439,7 @@ func (m *CommonUpgradeManagerImpl) ProcessWaitForJobsRequiredNodes(
 		nodes = append(nodes, nodeState.Node)
 		if waitForCompletionSpec == nil || waitForCompletionSpec.PodSelector == "" {
 			// update node state to next state as no pod selector is specified for waiting
-			m.Log.V(consts.LogLevelInfo).Info("No jobs to wait for as no pod selector was provided. Moving to next state.")
+			m.Log.V(consts.LogLevelDebug).Info("No jobs to wait for as no pod selector was provided. Moving to next state.")
 			nextState := UpgradeStatePodDeletionRequired
 			if !m.IsPodDeletionEnabled() {
 				nextState = UpgradeStateDrainRequired
@@ -489,13 +524,13 @@ func (m *CommonUpgradeManagerImpl) ProcessPodRestartNodes(
 			err := m.SafeDriverLoadManager.UnblockLoading(ctx, nodeState.Node)
 			if err != nil {
 				m.Log.V(consts.LogLevelError).Error(
-					err, "Failed to unblock loading of the driver", "nodeState", nodeState)
+					err, "Failed to unblock loading of the driver", "node", nodeState.Node.Name)
 				return err
 			}
 			driverPodInSync, err := m.isDriverPodInSync(ctx, nodeState)
 			if err != nil {
 				m.Log.V(consts.LogLevelError).Error(
-					err, "Failed to check if driver pod on the node is in sync", "nodeState", nodeState)
+					err, "Failed to check if driver pod on the node is in sync", "node", nodeState.Node.Name)
 				return err
 			}
 			if driverPodInSync {
@@ -519,7 +554,7 @@ func (m *CommonUpgradeManagerImpl) ProcessPodRestartNodes(
 				if !m.isDriverPodFailing(nodeState.DriverPod) {
 					continue
 				}
-				m.Log.V(consts.LogLevelInfo).Info("Driver pod is failing on node with repeated restarts",
+				m.Log.V(consts.LogLevelDebug).Info("Driver pod is failing on node with repeated restarts",
 					"node", nodeState.Node.Name, "pod", nodeState.DriverPod.Name)
 				err = m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateFailed)
 				if err != nil {
@@ -546,7 +581,7 @@ func (m *CommonUpgradeManagerImpl) ProcessUpgradeFailedNodes(
 		driverPodInSync, err := m.isDriverPodInSync(ctx, nodeState)
 		if err != nil {
 			m.Log.V(consts.LogLevelError).Error(
-				err, "Failed to check if driver pod on the node is in sync", "nodeState", nodeState)
+				err, "Failed to check if driver pod on the node is in sync", "node", nodeState.Node.Name)
 			return err
 		}
 		if driverPodInSync {
@@ -556,7 +591,7 @@ func (m *CommonUpgradeManagerImpl) ProcessUpgradeFailedNodes(
 			// when the upgrade started.
 			annotationKey := GetUpgradeInitialStateAnnotationKey()
 			if _, ok := nodeState.Node.Annotations[annotationKey]; ok {
-				m.Log.V(consts.LogLevelInfo).Info("Node was Unschedulable at beginning of upgrade, skipping uncordon",
+				m.Log.V(consts.LogLevelDebug).Info("Node was Unschedulable at beginning of upgrade, skipping uncordon",
 					"node", nodeState.Node.Name)
 				newUpgradeState = UpgradeStateDone
 			}
@@ -594,7 +629,7 @@ func (m *CommonUpgradeManagerImpl) ProcessValidationRequiredNodes(
 		err := m.SafeDriverLoadManager.UnblockLoading(ctx, nodeState.Node)
 		if err != nil {
 			m.Log.V(consts.LogLevelError).Error(
-				err, "Failed to unblock loading of the driver", "nodeState", nodeState)
+				err, "Failed to unblock loading of the driver", "node", node.Name)
 			return err
 		}
 		validationDone, err := m.ValidationManager.Validate(ctx, node)
@@ -604,7 +639,7 @@ func (m *CommonUpgradeManagerImpl) ProcessValidationRequiredNodes(
 		}
 
 		if !validationDone {
-			m.Log.V(consts.LogLevelInfo).Info("Validations not complete on the node", "node", node.Name)
+			m.Log.V(consts.LogLevelDebug).Info("Validations not complete on the node", "node", node.Name)
 			continue
 		}
 
@@ -694,7 +729,7 @@ func (m *CommonUpgradeManagerImpl) updateNodeToUncordonOrDoneState(ctx context.C
 		// check if node is already in requestor mode, if not do update node to 'upgrade-done',
 		// otherwise node state will be handled by the requestor mode at uncordon-required completion
 		if !isNodeUnderRequestorMode {
-			m.Log.V(consts.LogLevelInfo).Info("Node was Unschedulable at beginning of upgrade, skipping uncordon",
+			m.Log.V(consts.LogLevelDebug).Info("Node was Unschedulable at beginning of upgrade, skipping uncordon",
 				"node", node.Name)
 			newUpgradeState = UpgradeStateDone
 		}

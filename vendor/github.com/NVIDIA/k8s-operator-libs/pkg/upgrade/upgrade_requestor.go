@@ -186,7 +186,7 @@ func (m *RequestorNodeStateManagerImpl) createNodeMaintenance(ctx context.Contex
 	nodeState *NodeUpgradeState) error {
 	nm := m.NewNodeMaintenance(nodeState.Node.Name)
 	nodeState.NodeMaintenance = nm
-	m.Log.V(consts.LogLevelInfo).Info("creating node maintenance", nodeState.Node.Name, nm.Name)
+	m.Log.V(consts.LogLevelDebug).Info("creating node maintenance", nodeState.Node.Name, nm.Name)
 	err := m.K8sClient.Create(ctx, nm, &client.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
@@ -292,7 +292,7 @@ func (m *RequestorNodeStateManagerImpl) ProcessUpgradeRequiredNodes(
 			}
 		}
 		if m.SkipNodeUpgrade(nodeState.Node) {
-			m.Log.V(consts.LogLevelInfo).Info("Node is marked for skipping upgrades", "node", nodeState.Node.Name)
+			m.Log.V(consts.LogLevelDebug).Info("Node is marked for skipping upgrades", "node", nodeState.Node.Name)
 			continue
 		}
 
@@ -328,18 +328,18 @@ func (m *RequestorNodeStateManagerImpl) createOrUpdateNodeMaintenance(ctx contex
 		}
 		// check if object is owned by the requestor, if so skip re-creation
 		if nm.Spec.RequestorID == m.opts.MaintenanceOPRequestorID {
-			m.Log.V(consts.LogLevelInfo).Info("nodeMaintenance already exists", nm.Name, "skip creation")
+			m.Log.V(consts.LogLevelDebug).Info("nodeMaintenance already exists", nm.Name, "skip creation")
 			return nil
 		}
 
 		// check if requestor is already in AdditionalRequestors
 		if slices.Contains(nm.Spec.AdditionalRequestors, m.opts.MaintenanceOPRequestorID) {
-			m.Log.V(consts.LogLevelInfo).Info("requestor already in AdditionalRequestors list",
+			m.Log.V(consts.LogLevelDebug).Info("requestor already in AdditionalRequestors list",
 				"requestorID", m.opts.MaintenanceOPRequestorID)
 			return nil
 		}
 
-		m.Log.V(consts.LogLevelInfo).Info("appending new requestor under AdditionalRequestors", "requestor",
+		m.Log.V(consts.LogLevelDebug).Info("appending new requestor under AdditionalRequestors", "requestor",
 			m.opts.MaintenanceOPRequestorID, "nodeMaintenance", client.ObjectKeyFromObject(nm))
 		// create a deep copy of the original object before modifying it
 		originalNm := nm.DeepCopy()
@@ -377,7 +377,7 @@ func (m *RequestorNodeStateManagerImpl) deleteOrUpdateNodeMaintenance(ctx contex
 		}
 		// check if object is owned by deleting requestor, if so proceed to deletion
 		if nm.Spec.RequestorID == m.opts.MaintenanceOPRequestorID {
-			m.Log.V(consts.LogLevelInfo).Info("deleting node maintenance",
+			m.Log.V(consts.LogLevelDebug).Info("deleting node maintenance",
 				"nodeMaintenance", client.ObjectKeyFromObject(nodeState.NodeMaintenance))
 			err := m.deleteNodeMaintenance(ctx, nodeState)
 			if err != nil {
@@ -387,7 +387,7 @@ func (m *RequestorNodeStateManagerImpl) deleteOrUpdateNodeMaintenance(ctx contex
 				return err
 			}
 		} else {
-			m.Log.V(consts.LogLevelInfo).Info("removing requestor from node maintenance additional requestors list",
+			m.Log.V(consts.LogLevelDebug).Info("removing requestor from node maintenance additional requestors list",
 				nodeState.NodeMaintenance.GetName(), nodeState.NodeMaintenance.GetNamespace())
 			// remove requestorID from spec.AdditionalRequestors list and patch the object
 			// check if requestorID is under additional requestors list
@@ -480,7 +480,7 @@ func (m *RequestorNodeStateManagerImpl) ProcessUncordonRequiredNodes(
 		err = m.deleteOrUpdateNodeMaintenance(ctx, nodeState)
 		if err != nil {
 			m.Log.V(consts.LogLevelWarning).Error(
-				err, "Node uncordon failed", "node", nodeState.Node)
+				err, "Node uncordon failed", "node", nodeState.Node.Name)
 			return err
 		}
 	}

@@ -83,7 +83,7 @@ func (m *InplaceNodeStateManagerImpl) ProcessUpgradeRequiredNodes(
 			}
 		}
 		if m.SkipNodeUpgrade(nodeState.Node) {
-			m.Log.V(consts.LogLevelInfo).Info("Node is marked for skipping upgrades", "node", nodeState.Node.Name)
+			m.Log.V(consts.LogLevelDebug).Info("Node is marked for skipping upgrades", "node", nodeState.Node.Name)
 			continue
 		}
 
@@ -142,7 +142,7 @@ func (m *InplaceNodeStateManagerImpl) nextStateForUpgradeRequiredNode(
 	}
 	// Restart-only change: cordon the node so it stays unschedulable if the pod restart fails, as in
 	// the full upgrade flow, then restart the driver pod without evicting workloads.
-	m.Log.V(consts.LogLevelInfo).Info(
+	m.Log.V(consts.LogLevelDebug).Info(
 		"Restart-only change detected; cordoning node and restarting driver pod in place, "+
 			"skipping pod-deletion and drain", "node", nodeState.Node.Name)
 	if err := m.CordonManager.Cordon(ctx, nodeState.Node); err != nil {
@@ -199,7 +199,7 @@ func (m *InplaceNodeStateManagerImpl) ProcessUncordonRequiredNodes(
 		err := m.CordonManager.Uncordon(ctx, nodeState.Node)
 		if err != nil {
 			m.Log.V(consts.LogLevelWarning).Error(
-				err, "Node uncordon failed", "node", nodeState.Node)
+				err, "Node uncordon failed", "node", nodeState.Node.Name)
 			return err
 		}
 		err = m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateDone)

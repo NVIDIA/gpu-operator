@@ -89,20 +89,15 @@ func (m *DrainManagerImpl) ScheduleNodesDrain(ctx context.Context, drainConfig *
 				log.V(consts.LogLevelWarning).Info("Drain Pod failed", "error", err)
 				return
 			}
-			log.V(consts.LogLevelInfo).Info("Drain Pod finished")
+			log.V(consts.LogLevelDebug).Info("Drain Pod finished")
 		},
 		Out:    os.Stdout,
 		ErrOut: os.Stdout,
 	}
 
 	for _, node := range drainConfig.Nodes {
-		// We need to shadow the loop variable or initialize some other one with its value
-		// to avoid concurrency issues when launching goroutines.
-		// If a loop variable is used as it is, all/most goroutines, spawned inside this loop,
-		// will use the 'node' value of the last item in drainConfig.Nodes
-		node := node
 		if !m.drainingNodes.Has(node.Name) {
-			m.log.V(consts.LogLevelInfo).Info("Schedule drain for node", "node", node.Name)
+			m.log.V(consts.LogLevelDebug).Info("Schedule drain for node", "node", node.Name)
 			logEvent(m.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(), "Scheduling drain of the node")
 
 			m.drainingNodes.Add(node.Name)
@@ -116,7 +111,7 @@ func (m *DrainManagerImpl) ScheduleNodesDrain(ctx context.Context, drainConfig *
 						"Failed to cordon the node, %s", err.Error())
 					return
 				}
-				m.log.V(consts.LogLevelInfo).Info("Cordoned the node", "node", node.Name)
+				m.log.V(consts.LogLevelDebug).Info("Cordoned the node", "node", node.Name)
 
 				err = drain.RunNodeDrain(drainHelper, node.Name)
 				if err != nil {
@@ -126,13 +121,13 @@ func (m *DrainManagerImpl) ScheduleNodesDrain(ctx context.Context, drainConfig *
 						"Failed to drain the node, %s", err.Error())
 					return
 				}
-				m.log.V(consts.LogLevelInfo).Info("Drained the node", "node", node.Name)
+				m.log.V(consts.LogLevelDebug).Info("Drained the node", "node", node.Name)
 				logEvent(m.eventRecorder, node, corev1.EventTypeNormal, GetEventReason(), "Successfully drained the node")
 
 				_ = m.nodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, node, UpgradeStatePodRestartRequired)
 			}()
 		} else {
-			m.log.V(consts.LogLevelInfo).Info("Node is already being drained, skipping", "node", node.Name)
+			m.log.V(consts.LogLevelDebug).Info("Node is already being drained, skipping", "node", node.Name)
 		}
 	}
 	return nil

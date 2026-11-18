@@ -246,13 +246,44 @@ func (s *stateSkel) getObj(ctx context.Context, obj *unstructured.Unstructured) 
 	reqLogger := log.FromContext(ctx)
 	reqLogger.V(consts.LogLevelInfo).Info("Get Object", "Namespace:", obj.GetNamespace(), "Name:", obj.GetName())
 
-	err := s.client.Get(
-		ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
+	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
+	var err error
+	// The client reads unstructured objects from the API server and typed objects from the
+	// informer cache, so read a typed object when the scheme knows the kind.
+	if typed, ok := s.newTypedObject(obj.GroupVersionKind()); ok {
+		err = s.getTypedObj(ctx, key, typed, obj)
+	} else {
+		err = s.client.Get(ctx, key, obj)
+	}
 	if apierrors.IsNotFound(err) {
 		// does not exist (yet)
 		reqLogger.V(consts.LogLevelInfo).Info("Object Does not Exists")
 	}
 	return err
+}
+
+func (s *stateSkel) newTypedObject(gvk schema.GroupVersionKind) (client.Object, bool) {
+	obj, err := s.client.Scheme().New(gvk)
+	if err != nil {
+		return nil, false
+	}
+	typed, ok := obj.(client.Object)
+	return typed, ok
+}
+
+// getTypedObj reads the object into typed and copies the result into out.
+func (s *stateSkel) getTypedObj(ctx context.Context, key types.NamespacedName, typed client.Object, out *unstructured.Unstructured) error {
+	if err := s.client.Get(ctx, key, typed); err != nil {
+		return err
+	}
+	content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(typed)
+	if err != nil {
+		return fmt.Errorf("failed to convert %T to unstructured: %w", typed, err)
+	}
+	gvk := out.GroupVersionKind()
+	out.SetUnstructuredContent(content)
+	out.SetGroupVersionKind(gvk)
+	return nil
 }
 
 func (s *stateSkel) createObj(ctx context.Context, obj *unstructured.Unstructured) error {
@@ -324,18 +355,15 @@ func (s *stateSkel) createOrUpdateObjs(
 			desiredObj.SetAnnotations(annotations)
 		}
 
-		err := s.createObj(ctx, desiredObj)
-		if err == nil {
-			// object created successfully
+		currentObj := desiredObj.DeepCopy()
+		err := s.getObj(ctx, currentObj)
+		if apierrors.IsNotFound(err) {
+			if err := s.createObj(ctx, desiredObj); err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
 			continue
 		}
-		if !apierrors.IsAlreadyExists(err) {
-			// Some error occurred
-			return err
-		}
-
-		currentObj := desiredObj.DeepCopy()
-		if err := s.getObj(ctx, currentObj); err != nil {
+		if err != nil {
 			// Some error occurred
 			return err
 		}
@@ -350,8 +378,16 @@ func (s *stateSkel) createOrUpdateObjs(
 			}
 		}
 
+		// Merge before the comparison, so that the live fields the merge keeps, such as the
+		// secrets of a ServiceAccount, do not count as a change.
 		if err := s.mergeObjects(desiredObj, currentObj); err != nil {
 			return err
+		}
+
+		if utils.ContentEqual(s.client.Scheme(), desiredObj, currentObj) {
+			reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
+				"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
+			continue
 		}
 
 		// Object found, Update it
