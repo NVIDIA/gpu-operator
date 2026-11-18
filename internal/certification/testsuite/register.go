@@ -99,29 +99,19 @@ func init() {
 		},
 	})
 
-	// TS1006 - GPUDirectRDMA
+	// TS1006 - GPUDirectRDMA with DMA-BUF
 	certification.RegisterTestSet(&certification.TestSet{
 		Name:        "TS1006",
-		Description: "GPUDirectRDMA",
+		Description: "GPUDirectRDMA with DMA-BUF",
 		Tests: []certification.Test{
 			OperandCheck,
 			&clusterpolicy.RDMA{},
 		},
 	})
 
-	// TS1007 - GPUDirectRDMA with DMA-BUF
+	// TS1007 - GDRCopy enabled
 	certification.RegisterTestSet(&certification.TestSet{
 		Name:        "TS1007",
-		Description: "GPUDirectRDMA with DMA-BUF",
-		Tests: []certification.Test{
-			OperandCheck,
-			&clusterpolicy.RDMA{DMABuf: true},
-		},
-	})
-
-	// TS1008 - GDRCopy enabled
-	certification.RegisterTestSet(&certification.TestSet{
-		Name:        "TS1008",
 		Description: "GDRCopy Enabled",
 		Tests: []certification.Test{
 			OperandCheck,

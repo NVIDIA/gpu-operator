@@ -25,9 +25,8 @@ configMapGenerator:
       #   TS1003 - Driver Update
       #   TS1004 - MIG mode (single strategy)  — skipped if no MIG-capable GPUs detected
       #   TS1005 - MIG mode (mixed strategy)   — skipped if no MIG-capable GPUs detected
-      #   TS1006 - GPUDirectRDMA               — skipped if fewer than 2 GPU nodes with RDMA hardware
-      #   TS1007 - GPUDirectRDMA with DMA-BUF  — skipped if fewer than 2 GPU nodes with RDMA hardware
-      #   TS1008 - GDRCopy                     — skipped if no operator-managed driver pods
+      #   TS1006 - GPUDirectRDMA with DMA-BUF  — skipped if fewer than 2 GPU nodes with RDMA hardware
+      #   TS1007 - GDRCopy                     — skipped if no operator-managed driver pods
       #
       # Examples:
       #   all              - run all registered sets
@@ -47,6 +46,6 @@ configMapGenerator:
       - TARGET_DRIVER_IMAGE=
       - TARGET_DRIVER_VERSION=
 
-      # -- TS1006/TS1007 (RDMA) --
+      # -- TS1006 (RDMA) --
       # Base CUDA image for RDMA test pods (must have glibc >= host MOFED libs).
       - RDMA_BASE_IMAGE=nvcr.io/nvidia/cuda:13.1.1-base-ubuntu24.04
