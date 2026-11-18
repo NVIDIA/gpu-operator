@@ -33,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 // SyncOptions changes how SyncObject writes kinds that need special handling.
@@ -92,7 +94,7 @@ func SyncObject(ctx context.Context, c client.Client, owner, desired, live clien
 	}
 
 	if ContentEqual(c.Scheme(), desired, live) {
-		logger.Info("Identical, skipping update")
+		logger.V(consts.LogLevelDebug).Info("Identical, skipping update")
 		return nil
 	}
 
@@ -101,7 +103,7 @@ func SyncObject(ctx context.Context, c client.Client, owner, desired, live clien
 	}
 	desired.SetResourceVersion(live.GetResourceVersion())
 
-	logger.Info("Different, updating")
+	logger.V(consts.LogLevelDebug).Info("Different, updating")
 	if err := c.Update(ctx, desired); err != nil {
 		logger.Info("Couldn't update", "Error", err)
 		return err
