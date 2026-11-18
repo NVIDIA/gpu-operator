@@ -2858,9 +2858,9 @@ func isCustomPluginConfigSet(pluginConfig *gpuv1.DevicePluginConfig) bool {
 }
 
 // adds shared volume mounts required for custom plugin config provided via a ConfigMap
-func addSharedMountsForPluginConfig(container *corev1.Container, config *gpuv1.DevicePluginConfig) {
+func addSharedMountsForPluginConfig(container *corev1.Container) {
 	emptyDirMount := corev1.VolumeMount{Name: "config", MountPath: "/config"}
-	configVolMount := corev1.VolumeMount{Name: utils.ConfigMapVolumeName(config.Name), MountPath: "/available-configs"}
+	configVolMount := corev1.VolumeMount{Name: consts.OperandConfigVolumeName, MountPath: "/available-configs"}
 
 	container.VolumeMounts = append(container.VolumeMounts, emptyDirMount)
 	container.VolumeMounts = append(container.VolumeMounts, configVolMount)
@@ -2899,7 +2899,7 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		}
 		setContainerEnv(&obj.Spec.Template.Spec.Containers[i], "CONFIG_FILE", "/config/config.yaml")
 		// setup sharedvolume(emptydir) for main container
-		addSharedMountsForPluginConfig(&obj.Spec.Template.Spec.Containers[i], config.DevicePlugin.Config)
+		addSharedMountsForPluginConfig(&obj.Spec.Template.Spec.Containers[i])
 	}
 
 	// if hostPID is already set, we skip setting the shareProcessNamespace field
@@ -2910,7 +2910,7 @@ func handleDevicePluginConfig(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		obj.Spec.Template.Spec.ShareProcessNamespace = &shareProcessNamespace
 	}
 	// setup volumes from configmap and shared emptyDir
-	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(config.DevicePlugin.Config.Name, nil))
+	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createConfigMapVolume(consts.OperandConfigVolumeName, config.DevicePlugin.Config.Name, nil))
 	obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, createEmptyDirVolume("config"))
 
 	// apply env/volume changes to initContainer
@@ -2946,7 +2946,7 @@ func transformConfigManagerInitContainer(obj *appsv1.DaemonSet, config *gpuv1.Cl
 	setContainerEnv(initContainer, "FALLBACK_STRATEGIES", "empty")
 
 	// setup volume mounts
-	addSharedMountsForPluginConfig(initContainer, config.DevicePlugin.Config)
+	addSharedMountsForPluginConfig(initContainer)
 	return nil
 }
 
@@ -2982,7 +2982,7 @@ func transformConfigManagerSidecarContainer(obj *appsv1.DaemonSet, config *gpuv1
 	setContainerEnv(container, "FALLBACK_STRATEGIES", "empty")
 
 	// setup volume mounts
-	addSharedMountsForPluginConfig(container, config.DevicePlugin.Config)
+	addSharedMountsForPluginConfig(container)
 	return nil
 }
 
@@ -3057,7 +3057,7 @@ func transformPeerMemoryContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPo
 		if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
 			// note: transformDriverContainer() will have already created a Volume backed by the ConfigMap.
 			// Only add a VolumeMount for nvidia-peermem-ctr.
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, driversDir)
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, consts.KernelModuleConfigVolumeName, config.Driver.KernelModuleConfig.Name, driversDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
 			}
@@ -3123,7 +3123,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, consts.RepoConfigVolumeName, config.Driver.RepoConfig.ConfigMapName, destinationDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom package repo config: %w", err)
 			}
@@ -3136,7 +3136,7 @@ func transformGDSContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
 			}
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, consts.CertConfigVolumeName, config.Driver.CertConfig.Name, destinationDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 			}
@@ -3216,7 +3216,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, consts.RepoConfigVolumeName, config.Driver.RepoConfig.ConfigMapName, destinationDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom package repo config: %w", err)
 			}
@@ -3229,7 +3229,7 @@ func transformGDRCopyContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolic
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to get destination directory for ssl key/cert config: %w", err)
 			}
-			volumeMounts, _, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+			volumeMounts, _, err := createConfigMapVolumeMounts(n, consts.CertConfigVolumeName, config.Driver.CertConfig.Name, destinationDir)
 			if err != nil {
 				return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 			}
@@ -3511,7 +3511,7 @@ func (n ClusterPolicyController) getSubscriptionPathsToVolumeSources() (MountPat
 // createConfigMapVolumeMounts creates a VolumeMount for each key
 // in the ConfigMap. Use subPath to ensure original contents
 // at destinationDir are not overwritten.
-func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string, destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
+func createConfigMapVolumeMounts(n ClusterPolicyController, volumeName, configMapName, destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
 	ctx := n.ctx
 	// get the ConfigMap
 	cm := &corev1.ConfigMap{}
@@ -3532,7 +3532,7 @@ func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string
 	var volumeMounts []corev1.VolumeMount
 	for _, filename := range filenames {
 		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{Name: utils.ConfigMapVolumeName(configMapName), ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
+			corev1.VolumeMount{Name: volumeName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename), SubPath: filename})
 		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
 			Key:  filename,
 			Path: filename,
@@ -3541,7 +3541,7 @@ func createConfigMapVolumeMounts(n ClusterPolicyController, configMapName string
 	return volumeMounts, itemsToInclude, nil
 }
 
-func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
+func createConfigMapVolume(volumeName, configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
 	volumeSource := corev1.VolumeSource{
 		ConfigMap: &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{
@@ -3550,7 +3550,7 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 			Items: itemsToInclude,
 		},
 	}
-	return corev1.Volume{Name: utils.ConfigMapVolumeName(configMapName), VolumeSource: volumeSource}
+	return corev1.Volume{Name: volumeName, VolumeSource: volumeSource}
 }
 
 func createEmptyDirVolume(volumeName string) corev1.Volume {
@@ -3714,12 +3714,12 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 
 	// mount any custom kernel module configuration parameters at /drivers
 	if config.Driver.KernelModuleConfig != nil && config.Driver.KernelModuleConfig.Name != "" {
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.KernelModuleConfig.Name, driversDir)
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, consts.KernelModuleConfigVolumeName, config.Driver.KernelModuleConfig.Name, driversDir)
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %v", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
-		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.KernelModuleConfig.Name, itemsToInclude))
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(consts.KernelModuleConfigVolumeName, config.Driver.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	if len(config.Driver.Env) > 0 {
@@ -3763,12 +3763,12 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %v", err)
 		}
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.RepoConfig.ConfigMapName, destinationDir)
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, consts.RepoConfigVolumeName, config.Driver.RepoConfig.ConfigMapName, destinationDir)
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %v", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
-		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(consts.RepoConfigVolumeName, config.Driver.RepoConfig.ConfigMapName, itemsToInclude))
 	}
 
 	// set any custom ssl key/certificate configuration provided
@@ -3777,12 +3777,12 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to get destination directory for custom cert config: %v", err)
 		}
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.Driver.CertConfig.Name, destinationDir)
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, consts.CertConfigVolumeName, config.Driver.CertConfig.Name, destinationDir)
 		if err != nil {
 			return fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 		}
 		driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, volumeMounts...)
-		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.Driver.CertConfig.Name, itemsToInclude))
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(consts.CertConfigVolumeName, config.Driver.CertConfig.Name, itemsToInclude))
 	}
 
 	secretName := config.Driver.SecretEnv
@@ -3918,12 +3918,12 @@ func transformVGPUManagerContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterP
 
 	// mount any custom kernel module configuration parameters at /drivers
 	if config.VGPUManager.KernelModuleConfig != nil && config.VGPUManager.KernelModuleConfig.Name != "" {
-		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, config.VGPUManager.KernelModuleConfig.Name, driversDir)
+		volumeMounts, itemsToInclude, err := createConfigMapVolumeMounts(n, consts.KernelModuleConfigVolumeName, config.VGPUManager.KernelModuleConfig.Name, driversDir)
 		if err != nil {
 			return fmt.Errorf("failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
-		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(config.VGPUManager.KernelModuleConfig.Name, itemsToInclude))
+		podSpec.Volumes = append(podSpec.Volumes, createConfigMapVolume(consts.KernelModuleConfigVolumeName, config.VGPUManager.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	return nil

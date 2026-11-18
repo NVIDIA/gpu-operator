@@ -623,19 +623,28 @@ func TestDriverAdditionalConfigs(t *testing.T) {
 }
 
 func TestDriverConfigMapVolumeNames(t *testing.T) {
-	configMaps := map[string]string{"driver.repo": "custom.list", "driver.cert": "custom.crt", "driver.kernel": "custom.conf"}
+	longName := strings.Repeat("a", 64)
+	configMaps := map[string]struct {
+		volumeName string
+		filename   string
+		mountPath  string
+	}{
+		"driver.repo": {"repo-config", "custom.list", "/etc/apt/sources.list.d/custom.list"},
+		"driver-repo": {"cert-config", "custom.crt", "/usr/local/share/ca-certificates/custom.crt"},
+		longName:      {"kernel-module-config", "custom.conf", "/drivers/custom.conf"},
+	}
 	builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
-	for name, filename := range configMaps {
+	for name, config := range configMaps {
 		builder.WithObjects(&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns"},
-			Data:       map[string]string{filename: "configuration"},
+			Data:       map[string]string{config.filename: "configuration"},
 		})
 	}
 	state := &stateDriver{stateSkel: stateSkel{client: builder.Build(), namespace: "test-ns"}}
 	driver := &nvidiav1alpha1.NVIDIADriver{Spec: nvidiav1alpha1.NVIDIADriverSpec{
 		RepoConfig:         &nvidiav1alpha1.DriverRepoConfigSpec{Name: "driver.repo"},
-		CertConfig:         &nvidiav1alpha1.DriverCertConfigSpec{Name: "driver.cert"},
-		KernelModuleConfig: &nvidiav1alpha1.KernelModuleConfigSpec{Name: "driver.kernel"},
+		CertConfig:         &nvidiav1alpha1.DriverCertConfigSpec{Name: "driver-repo"},
+		KernelModuleConfig: &nvidiav1alpha1.KernelModuleConfigSpec{Name: longName},
 	}}
 	configs, err := state.getDriverAdditionalConfigs(context.Background(), driver,
 		testClusterInfo{runtime: "containerd"}, nodePool{osRelease: "ubuntu", osVersion: "ubuntu22.04"})
@@ -644,10 +653,17 @@ func TestDriverConfigMapVolumeNames(t *testing.T) {
 	require.Len(t, configs.VolumeMounts, 3)
 	renderData := getMinimalDriverRenderData()
 	renderData.AdditionalConfigs = configs
+	renderData.GDS = &gdsDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.16.1",
+		Spec:      &nvidiav1alpha1.GPUDirectStorageSpec{Enabled: new(true)},
+	}
+	renderData.GDRCopy = &gdrcopyDriverSpec{
+		ImagePath: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.4.1",
+		Spec:      &nvidiav1alpha1.GDRCopySpec{Enabled: new(true)},
+	}
+	renderData.GPUDirectRDMA = &nvidiav1alpha1.GPUDirectRDMASpec{Enabled: new(true)}
 	ds, err := getDaemonsetFromObjects(renderDriverObjects(t, scheme.Scheme, renderData))
 	require.NoError(t, err)
-	container := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
-	require.NotNil(t, container)
 	seen := make(map[string]bool)
 	found := make(map[string]bool)
 	for _, volume := range ds.Spec.Template.Spec.Volumes {
@@ -657,17 +673,24 @@ func TestDriverConfigMapVolumeNames(t *testing.T) {
 		if volume.ConfigMap == nil {
 			continue
 		}
-		filename, ok := configMaps[volume.ConfigMap.Name]
+		config, ok := configMaps[volume.ConfigMap.Name]
 		if !ok {
 			continue
 		}
 		found[volume.ConfigMap.Name] = true
-		require.Equal(t, []corev1.KeyToPath{{Key: filename, Path: filename}}, volume.ConfigMap.Items)
-		mount := findVolumeMountByName(container.VolumeMounts, volume.Name)
-		require.NotNil(t, mount)
-		require.Equal(t, filename, mount.SubPath)
+		require.Equal(t, config.volumeName, volume.Name)
+		require.Equal(t, []corev1.KeyToPath{{Key: config.filename, Path: config.filename}}, volume.ConfigMap.Items)
 	}
 	require.Len(t, found, len(configMaps))
+	for _, name := range []string{"nvidia-driver-ctr", "nvidia-fs-ctr", "nvidia-gdrcopy-ctr", "nvidia-peermem-ctr"} {
+		container := findContainerByName(ds.Spec.Template.Spec.Containers, name)
+		require.NotNil(t, container, "container %s", name)
+		for _, config := range configMaps {
+			require.Contains(t, container.VolumeMounts, corev1.VolumeMount{
+				Name: config.volumeName, MountPath: config.mountPath, SubPath: config.filename, ReadOnly: true,
+			}, "container %s", name)
+		}
+	}
 }
 
 func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
@@ -774,7 +797,7 @@ func TestDriverAdditionalConfigsSubscriptionMounts(t *testing.T) {
 					"sl-micro": "/etc/zypp/repos.d/custom.repo",
 				}
 				expectedAdditionalMounts = append(expectedAdditionalMounts, corev1.VolumeMount{
-					Name: "test-repo-config", MountPath: repoPaths[tc.osRelease],
+					Name: "repo-config", MountPath: repoPaths[tc.osRelease],
 					SubPath: "custom.repo", ReadOnly: true,
 				})
 			}

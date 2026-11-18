@@ -282,7 +282,7 @@ func TestGetDriverAdditionalConfigsCertAndKernelAndTopology(t *testing.T) {
 	certConfigDir, err := getCertConfigPath("rhel")
 	require.NoError(t, err)
 
-	assertConfigMapMount := func(name, mountDir, file string) {
+	assertConfigMapMount := func(name, configMapName, mountDir, file string) {
 		t.Helper()
 		mount, ok := mountsByName[name]
 		require.True(t, ok, "%s mount missing", name)
@@ -293,12 +293,12 @@ func TestGetDriverAdditionalConfigsCertAndKernelAndTopology(t *testing.T) {
 		volume, ok := volumesByName[name]
 		require.True(t, ok, "%s volume missing", name)
 		require.NotNil(t, volume.ConfigMap)
-		assert.Equal(t, name, volume.ConfigMap.Name)
+		assert.Equal(t, configMapName, volume.ConfigMap.Name)
 		assert.Contains(t, volume.ConfigMap.Items, corev1.KeyToPath{Key: file, Path: file})
 	}
 
-	assertConfigMapMount("cert-config", certConfigDir, "ca.crt")
-	assertConfigMapMount("kernel-config", "/drivers", "module.conf")
+	assertConfigMapMount("cert-config", "cert-config", certConfigDir, "ca.crt")
+	assertConfigMapMount("kernel-module-config", "kernel-config", "/drivers", "module.conf")
 
 	topologyMount, ok := mountsByName["topology-config"]
 	require.True(t, ok, "topology-config mount missing")
