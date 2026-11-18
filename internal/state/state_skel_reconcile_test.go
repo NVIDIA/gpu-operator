@@ -310,7 +310,7 @@ func TestDeleteStateRelatedObjectsScoping(t *testing.T) {
 	)
 
 	ctx := context.Background()
-	foundObjects, err := skel.deleteStateRelatedObjects(ctx)
+	foundObjects, err := skel.deleteStateRelatedObjects(ctx, nil)
 	require.NoError(t, err)
 	assert.True(t, foundObjects)
 
@@ -331,13 +331,13 @@ func TestDeleteStateRelatedObjectsScoping(t *testing.T) {
 func TestHandleStateObjectsDeletion(t *testing.T) {
 	t.Run("objects present reports not ready while deleting", func(t *testing.T) {
 		skel, _ := newDeletionSkel(t, stateLabeledDaemonSet("ds-here", "test-ns"))
-		syncState, err := skel.handleStateObjectsDeletion(context.Background())
+		syncState, err := skel.handleStateObjectsDeletion(context.Background(), nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateNotReady), syncState)
 	})
 	t.Run("nothing to delete reports ignore", func(t *testing.T) {
 		skel, _ := newDeletionSkel(t)
-		syncState, err := skel.handleStateObjectsDeletion(context.Background())
+		syncState, err := skel.handleStateObjectsDeletion(context.Background(), nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateIgnore), syncState)
 	})
@@ -347,7 +347,7 @@ func TestHandleStateObjectsDeletion(t *testing.T) {
 				return fmt.Errorf("injected delete error")
 			},
 		}, stateLabeledDaemonSet("ds-here", "test-ns"))
-		syncState, err := skel.handleStateObjectsDeletion(context.Background())
+		syncState, err := skel.handleStateObjectsDeletion(context.Background(), nil)
 		require.ErrorContains(t, err, "failed to delete k8s objects")
 		assert.Equal(t, SyncState(SyncStateError), syncState)
 	})
@@ -365,7 +365,7 @@ func TestDeleteStateRelatedObjectsForbiddenListSkipped(t *testing.T) {
 	}, stateLabeledDaemonSet("ds-here", "test-ns"))
 
 	ctx := context.Background()
-	syncState, err := skel.handleStateObjectsDeletion(ctx)
+	syncState, err := skel.handleStateObjectsDeletion(ctx, nil)
 	require.NoError(t, err)
 	assert.Equal(t, SyncState(SyncStateIgnore), syncState)
 	assert.NoError(t, fakeClient.Get(ctx,
@@ -384,7 +384,7 @@ func TestDeleteStateRelatedObjectsNotFoundOnDeleteIgnored(t *testing.T) {
 		},
 	}, stateLabeledDaemonSet("ds-here", "test-ns"))
 
-	foundObjects, err := skel.deleteStateRelatedObjects(context.Background())
+	foundObjects, err := skel.deleteStateRelatedObjects(context.Background(), nil)
 	require.NoError(t, err)
 	assert.True(t, foundObjects)
 	assert.Equal(t, 1, deleteCalls, "expected exactly one delete attempt")
@@ -397,7 +397,7 @@ func TestDeleteStateRelatedObjectsListErrorPropagates(t *testing.T) {
 		},
 	}, stateLabeledDaemonSet("ds-here", "test-ns"))
 
-	_, err := skel.deleteStateRelatedObjects(context.Background())
+	_, err := skel.deleteStateRelatedObjects(context.Background(), nil)
 	require.ErrorContains(t, err, "injected list error")
 }
 
@@ -408,7 +408,7 @@ func TestDeleteStateRelatedObjectsDeleteErrorPropagates(t *testing.T) {
 		},
 	}, stateLabeledDaemonSet("ds-here", "test-ns"))
 
-	foundObjects, err := skel.deleteStateRelatedObjects(context.Background())
+	foundObjects, err := skel.deleteStateRelatedObjects(context.Background(), nil)
 	require.ErrorContains(t, err, "injected delete error")
 	assert.True(t, foundObjects, "a delete failure still reports the objects it found")
 }
@@ -427,7 +427,7 @@ func TestDeleteStateRelatedObjectsSkipsAlreadyDeleting(t *testing.T) {
 		},
 	}, deletingDaemonSet)
 
-	foundObjects, err := skel.deleteStateRelatedObjects(context.Background())
+	foundObjects, err := skel.deleteStateRelatedObjects(context.Background(), nil)
 	require.NoError(t, err)
 	assert.True(t, foundObjects, "an object still present counts as found")
 	assert.Zero(t, deleteCalls, "an object already being deleted must not be deleted again")
@@ -447,6 +447,6 @@ func TestDeleteStateRelatedObjectsMappingErrorPropagates(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(erroringRESTMapper{}).Build()
 	skel := &stateSkel{name: "test-state", namespace: "test-ns", client: fakeClient, scheme: scheme}
 
-	_, err := skel.deleteStateRelatedObjects(context.Background())
+	_, err := skel.deleteStateRelatedObjects(context.Background(), nil)
 	require.ErrorContains(t, err, "injected mapping error")
 }

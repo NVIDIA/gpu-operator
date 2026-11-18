@@ -49,6 +49,11 @@ type configurableState struct {
 	// image path and DRA apiVersion. It receives ctx and the skeleton so operands that
 	// need the client or logging (e.g. dcgm-exporter's ServiceMonitor CRD probe) can use them.
 	buildRenderData func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster, imagePath, apiVersion, openshiftVersion string) (any, error)
+
+	// preSync validates external dependencies before any operand is applied.
+	// It is skipped when the state is disabled so missing dependencies cannot
+	// prevent teardown.
+	preSync func(ctx context.Context, s *configurableState, cr *nvidiav1alpha1.GPUCluster) error
 }
 
 var _ State = (*configurableState)(nil)
@@ -65,7 +70,13 @@ func (s *configurableState) Sync(ctx context.Context, customResource any, infoCa
 	}
 
 	if len(objs) == 0 {
-		return s.handleStateObjectsDeletion(ctx)
+		return s.handleStateObjectsDeletion(ctx, cr)
+	}
+
+	if s.preSync != nil {
+		if err := s.preSync(ctx, s, cr); err != nil {
+			return SyncStateNotReady, err
+		}
 	}
 
 	return s.syncObjects(ctx, cr, objs)
