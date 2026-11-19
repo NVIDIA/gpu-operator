@@ -2590,15 +2590,15 @@ func getMIGManagerTestOutput(testCase string) map[string]any {
 		"numDaemonsets":          1,
 		"migManagerImage":        "nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.5.0",
 		"imagePullSecret":        "ngc-secret",
-		"migConfigVolumePresent": true,
-		"env": map[string]string{
-			"DEFAULT_CONFIG_FILE": "/mig-parted-config/config-default.yaml",
-		},
+		"migConfigVolumePresent": false,
+		"env":                    map[string]string{},
 	}
 
 	switch testCase {
 	case "default":
+		// No config volume
 	case "custom-config":
+		output["migConfigVolumePresent"] = true
 		output["env"] = map[string]string{
 			"CONFIG_FILE": "/mig-parted-config/config.yaml",
 		}
