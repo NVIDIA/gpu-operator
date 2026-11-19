@@ -59,9 +59,9 @@ else
 fi
 
 echo "Get the operator namespaces"
-OPERATOR_POD_NAME=$($K get pods -lapp=gpu-operator -oname -A)
+OPERATOR_PODS=$($K get pods -lapp=gpu-operator -oname -A)
 
-if [ -z "$OPERATOR_POD_NAME" ]; then
+if [ -z "$OPERATOR_PODS" ]; then
     echo "FATAL: could not find the GPU Operator Pod ..."
     exit 1
 fi
@@ -217,29 +217,38 @@ echo "# Operator Pod"
 echo "#"
 echo
 
-echo "Get the GPU Operator Pod (status)"
-$K get "${OPERATOR_POD_NAME}" \
+echo "Get the GPU Operator Pods (status)"
+$K get pods -lapp=gpu-operator \
     -owide \
     -n "${OPERATOR_NAMESPACE}" \
     > "${ARTIFACT_DIR}/gpu_operator_pod.status"
 
-echo "Get the GPU Operator Pod (yaml)"
-$K get "${OPERATOR_POD_NAME}" \
+echo "Get the GPU Operator Pods (yaml)"
+$K get pods -lapp=gpu-operator \
     -oyaml \
     -n "${OPERATOR_NAMESPACE}" \
     > "${ARTIFACT_DIR}/gpu_operator_pod.yaml"
 
-echo "Get the GPU Operator Pod logs"
-$K logs "${OPERATOR_POD_NAME}" \
+echo "Get the Leases in ${OPERATOR_NAMESPACE}"
+$K get leases -oyaml \
     -n "${OPERATOR_NAMESPACE}" \
-    --timestamps \
-    > "${ARTIFACT_DIR}/gpu_operator_pod.log"
+    > "${ARTIFACT_DIR}/gpu_operator_namespace_leases.yaml"
 
-$K logs "${OPERATOR_POD_NAME}" \
-    -n "${OPERATOR_NAMESPACE}" \
-    --timestamps \
-    --previous \
-    > "${ARTIFACT_DIR}/gpu_operator_pod.previous.log"
+for operator_pod in ${OPERATOR_PODS}; do
+    operator_pod_name=$(echo "$operator_pod" | cut -d/ -f2)
+
+    echo "Get the GPU Operator Pod logs ($operator_pod_name)"
+    $K logs "${operator_pod}" \
+        -n "${OPERATOR_NAMESPACE}" \
+        --timestamps \
+        > "${ARTIFACT_DIR}/gpu_operator_pod_${operator_pod_name}.log"
+
+    $K logs "${operator_pod}" \
+        -n "${OPERATOR_NAMESPACE}" \
+        --timestamps \
+        --previous \
+        > "${ARTIFACT_DIR}/gpu_operator_pod_${operator_pod_name}.previous.log"
+done
 
 echo ""
 echo "#"
@@ -272,7 +281,7 @@ do
     fi
     pod_name=$(echo "$pod" | cut -d/ -f2)
 
-    if [ "${pod}" == "${OPERATOR_POD_NAME}" ]; then
+    if echo "${OPERATOR_PODS}" | grep -Fqx "${pod}"; then
         echo "Skipping operator pod $pod_name ..."
         continue
     fi

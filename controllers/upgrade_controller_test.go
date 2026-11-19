@@ -168,8 +168,7 @@ func (f *fakeUpgradeStateManager) ApplyState(_ context.Context, _ *upgrade.Clust
 	return nil
 }
 
-// newTestOperatorMetrics builds the gauges the upgrade reconciler touches without
-// registering them; InitOperatorMetrics panics when registered twice per binary.
+// newTestOperatorMetrics builds only the gauges the upgrade reconciler touches.
 func newTestOperatorMetrics() *OperatorMetrics {
 	newGauge := func(name string) promcli.Gauge {
 		return promcli.NewGauge(promcli.GaugeOpts{Name: name})

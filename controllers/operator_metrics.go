@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	promcli "github.com/prometheus/client_golang/prometheus"
@@ -66,8 +67,8 @@ const (
 	operatorMetricsNamespace = "gpu_operator"
 )
 
-// InitOperatorMetrics registers all GPU operator Prometheus metrics with the
-// controller-runtime registry and returns the initialised OperatorMetrics.
+// InitOperatorMetrics creates GPU operator Prometheus metrics. The metrics are
+// registered after the manager becomes leader.
 func InitOperatorMetrics() *OperatorMetrics {
 	m := &OperatorMetrics{
 		gpuNodesTotal: promcli.NewGauge(
@@ -195,8 +196,23 @@ func InitOperatorMetrics() *OperatorMetrics {
 			},
 		),
 	}
+	return m
+}
 
-	metrics.Registry.MustRegister(
+// Start implements manager.Runnable. It registers metrics with the
+// controller-runtime registry.
+func (m *OperatorMetrics) Start(context.Context) error {
+	m.register(metrics.Registry)
+	return nil
+}
+
+// NeedLeaderElection implements manager.LeaderElectionRunnable. Returning true
+// makes the manager call Start only after this replica acquires the lease, so that a
+// standby replica does not also expose reconciliation metrics.
+func (m *OperatorMetrics) NeedLeaderElection() bool { return true }
+
+func (m *OperatorMetrics) register(registry promcli.Registerer) {
+	registry.MustRegister(
 		m.gpuNodesTotal,
 
 		m.reconciliationLastSuccess,
@@ -218,6 +234,4 @@ func InitOperatorMetrics() *OperatorMetrics {
 		m.upgradesFailed,
 		m.upgradesPending,
 	)
-
-	return m
 }

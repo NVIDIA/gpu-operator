@@ -8,17 +8,15 @@ metadata:
     app.kubernetes.io/component: "gpu-operator"
     nvidia.com/gpu-driver-upgrade-drain.skip: "true"
 spec:
-  replicas: 1
+  replicas: {{ .Values.operator.replicaCount | default 1 }}
   selector:
     matchLabels:
-      app.kubernetes.io/component: "gpu-operator"
-      app: "gpu-operator"
+      {{- include "gpu-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "gpu-operator.labels" . | nindent 8 }}
-        app.kubernetes.io/component: "gpu-operator"
-        app: "gpu-operator"
+        {{- include "gpu-operator.selectorLabels" . | nindent 8 }}
         nvidia.com/gpu-driver-upgrade-drain.skip: "true"
       annotations:
         {{- toYaml .Values.operator.annotations | nindent 8 }}
@@ -54,6 +52,9 @@ spec:
       {{- with .Values.operator.leaderElection }}
         {{- if .renewDeadline }}
         - --leader-lease-renew-deadline={{ .renewDeadline }}
+        {{- end }}
+        {{- if .warmup }}
+        - --leader-election-warmup
         {{- end }}
       {{- end }}
       {{- if .Values.operator.logging.develMode }}
@@ -112,9 +113,24 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-    {{- with .Values.operator.affinity }}
+    {{- $affinity := .Values.operator.affinity | default dict }}
+    {{- $podAntiAffinity := .Values.operator.podAntiAffinity | default dict }}
+    {{- $addPodAntiAffinity := and (dig "enabled" true $podAntiAffinity) (gt (int .Values.operator.replicaCount) 1) (not (hasKey $affinity "podAntiAffinity")) }}
+    {{- if or $affinity $addPodAntiAffinity }}
       affinity:
+      {{- with $affinity }}
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $addPodAntiAffinity }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  {{- include "gpu-operator.selectorLabels" . | nindent 18 }}
+      {{- end }}
     {{- end }}
     {{- with .Values.operator.tolerations }}
       tolerations:
