@@ -3,6 +3,10 @@
 # Declare variables to be passed into your templates.
 
 platform:
+  # Must be true on OpenShift, including upgrades of existing Helm releases.
+  # The operator needs OpenShift RBAC to read clusterversions and manage SCCs;
+  # setting this to false on OpenShift would remove those permissions.
+  # GitOps / offline helm template workflows must set this explicitly.
   openshift: false
 
 nfd:

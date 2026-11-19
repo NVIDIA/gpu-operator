@@ -42,6 +42,23 @@ After installation, the GPU Operator and its operands should be up and running.
 Note:
 To deploy the GPU Operator on OpenShift, follow the instructions in the [official documentation](https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html).
 
+**OpenShift Helm upgrades:** The Helm chart now conditions its OpenShift-only
+ClusterRole permissions on `platform.openshift`, whose default is `false`.
+If you already deploy this chart on OpenShift (including older releases that did
+not set the value), **set `platform.openshift=true` explicitly before upgrading**.
+Otherwise the new manifest would remove permissions for `clusterversions` and
+SCCs, and the operator may fail reconciliation. For Helm commands, add
+`--set platform.openshift=true`; for GitOps or values-file based deployments,
+persist `platform.openshift: true` in the values source. Verify your rendered
+ClusterRole still includes the `config.openshift.io`,
+`image.openshift.io` and `security.openshift.io` rules before applying it.
+
+Online Helm rendering fails early if it discovers the OpenShift API while
+`platform.openshift=false`. **Offline** `helm template` and some GitOps
+renderers cannot discover cluster APIs and may not trigger this validation, so
+the explicit values setting remains essential. OLM remains the recommended
+installation method for OpenShift.
+
 
 ## Product Documentation
 For information on platform support and getting started, visit the official documentation [repository](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html).

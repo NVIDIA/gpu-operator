@@ -88,7 +88,7 @@ func getAssetsFrom(n *ClusterPolicyController, path string, openshiftVersion str
 	}
 	sort.Strings(files)
 	for _, file := range files {
-		if strings.Contains(file, "openshift") && openshiftVersion == "" {
+		if strings.Contains(filepath.Base(file), "openshift") && openshiftVersion == "" {
 			continue
 		}
 
@@ -144,6 +144,9 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 		case "ClusterRole":
 			_, _, err := s.Decode(m, nil, &res.ClusterRole)
 			panicIfError(err)
+			if n.openshift == "" {
+				res.ClusterRole.Rules = withoutOpenShiftAPIGroups(res.ClusterRole.Rules)
+			}
 			ctrl = append(ctrl, ClusterRole)
 		case "ClusterRoleBinding":
 			_, _, err := s.Decode(m, nil, &res.ClusterRoleBinding)
@@ -198,6 +201,26 @@ func addResourcesControls(n *ClusterPolicyController, path string) (Resources, c
 	}
 
 	return res, ctrl
+}
+
+// withoutOpenShiftAPIGroups keeps ordinary Kubernetes permissions while
+// removing OpenShift-only grants from mixed ClusterRoles on vanilla clusters.
+func withoutOpenShiftAPIGroups(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
+	filtered := make([]rbacv1.PolicyRule, 0, len(rules))
+	for _, rule := range rules {
+		groups := make([]string, 0, len(rule.APIGroups))
+		for _, group := range rule.APIGroups {
+			if !strings.HasSuffix(group, ".openshift.io") {
+				groups = append(groups, group)
+			}
+		}
+		if len(rule.APIGroups) > 0 && len(groups) == 0 {
+			continue
+		}
+		rule.APIGroups = groups
+		filtered = append(filtered, rule)
+	}
+	return filtered
 }
 
 func panicIfError(err error) {
