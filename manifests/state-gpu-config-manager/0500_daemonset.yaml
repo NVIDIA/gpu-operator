@@ -1,0 +1,182 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-gpu-config-manager-dra
+  namespace: {{ .Namespace }}
+  labels:
+    app: nvidia-gpu-config-manager-dra
+    app.kubernetes.io/component: nvidia-gpu-config-manager
+    {{- range $k, $v := .Daemonsets.Labels }}
+    {{- if ne $k "app.kubernetes.io/component" }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+    {{- end }}
+  {{- if .Daemonsets.Annotations }}
+  annotations:
+    {{- range $k, $v := .Daemonsets.Annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-gpu-config-manager-dra
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: nvidia-gpu-config-manager-dra
+        # k8s-driver-manager finds the GPU configuration manager pods of both
+        # ClusterPolicy and GPUCluster by this label.
+        app.kubernetes.io/component: nvidia-gpu-config-manager
+        {{- range $k, $v := .Daemonsets.Labels }}
+        {{- if and (ne $k "app") (ne $k "app.kubernetes.io/part-of") (ne $k "app.kubernetes.io/component") }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
+      {{- if .Daemonsets.Annotations }}
+      annotations:
+        {{- range $k, $v := .Daemonsets.Annotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      {{- end }}
+    spec:
+      priorityClassName: {{ .Daemonsets.PriorityClassName | default "system-node-critical" | quote }}
+      serviceAccountName: nvidia-gpu-config-manager-dra
+      # Selects on the deploy label alone, so setting it to "false" or a paused value removes the pod.
+      nodeSelector:
+        nvidia.com/gpu.deploy.gpu-config-manager: "true"
+      {{- if .PullSpec.ImagePullSecrets }}
+      imagePullSecrets:
+      {{- range .PullSpec.ImagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if deref .GPUConfigManager.Spec.HostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      # The kubelet plugin's gpu-config init container waits for this pod, so
+      # this pod must tolerate every node the kubelet plugin runs on.
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      {{- range .Daemonsets.Tolerations }}
+      - {{ . | toJson }}
+      {{- end }}
+      # Keep below k8s-driver-manager's 5-minute wait for this pod to terminate.
+      terminationGracePeriodSeconds: 90
+      initContainers:
+      # Same as the DRA kubelet plugin's driver-validation init container.
+      - name: driver-validation
+        image: {{ .GPUConfigManager.ImagePath }}
+        {{- if .PullSpec.ImagePullPolicy }}
+        imagePullPolicy: {{ .PullSpec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - nvidia-validator
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        env:
+        - name: COMPONENT
+          value: driver
+        - name: WITH_WAIT
+          value: "true"
+        # Validate with 'nvidia-smi --version': GPUs may be bound to vfio-pci.
+        - name: DRIVER_VALIDATION_SKIP_GPU_INIT
+          value: "true"
+        - name: DISABLE_DEV_CHAR_SYMLINK_CREATION
+          value: "true"
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: HOST_ROOT
+          value: "/"
+        - name: DRIVER_INSTALL_DIR
+          value: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
+        - name: DRIVER_INSTALL_DIR_CTR_PATH
+          value: /driver-root
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: driver-install-dir
+          mountPath: /driver-root
+          mountPropagation: HostToContainer
+        - name: validations
+          mountPath: /run/nvidia/validations
+      containers:
+      - name: nvidia-gpu-config-manager
+        image: {{ .GPUConfigManager.ImagePath }}
+        {{- if .PullSpec.ImagePullPolicy }}
+        imagePullPolicy: {{ .PullSpec.ImagePullPolicy }}
+        {{- end }}
+        command:
+        - gpu-config-manager
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        # spec.gpuConfigManager.env replaces an entry of the same name, as on
+        # the ClusterPolicy side.
+        {{- $override := dict }}
+        {{- range .GPUConfigManager.Env }}
+        {{- $_ := set $override .Name true }}
+        {{- end }}
+        env:
+        {{- if not (hasKey $override "NODE_NAME") }}
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        {{- end }}
+        {{- if not (hasKey $override "OPERATOR_NAMESPACE") }}
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{- end }}
+        {{- if not (hasKey $override "GPU_CONFIG_STACK") }}
+        - name: GPU_CONFIG_STACK
+          value: dra
+        {{- end }}
+        {{- range .GPUConfigManager.Env }}
+        - name: {{ .Name }}
+          value: {{ .Value | quote }}
+        {{- end }}
+        {{- if .GPUConfigManager.Spec.Resources }}
+        resources: {{ .GPUConfigManager.Spec.Resources | toJson }}
+        {{- else }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        {{- end }}
+        volumeMounts:
+        - name: validations
+          mountPath: /run/nvidia/validations
+          mountPropagation: HostToContainer
+        - name: driver-install-dir
+          mountPath: /driver-root
+          mountPropagation: HostToContainer
+          readOnly: true
+        - name: host-root
+          mountPath: /host
+          mountPropagation: HostToContainer
+          readOnly: true
+      volumes:
+      - name: host-root
+        hostPath:
+          path: "/"
+      - name: driver-install-dir
+        hostPath:
+          path: {{ .HostPaths.DriverInstallDir | default "/run/nvidia/driver" | quote }}
+          type: DirectoryOrCreate
+      - name: validations
+        hostPath:
+          path: /run/nvidia/validations
+          type: DirectoryOrCreate

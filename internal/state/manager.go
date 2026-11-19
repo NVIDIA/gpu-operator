@@ -143,6 +143,10 @@ func newGPUClusterStates(k8sClient client.Client, namespace string, scheme *runt
 		manifestDir string
 		newState    func(client.Client, string, *runtime.Scheme, string) (State, error)
 	}{
+		// The GPU configuration manager precedes the DRA driver: the kubelet
+		// plugin's gpu-config init container doesn't wait when the manager's
+		// DaemonSet doesn't exist.
+		{"GPU configuration manager", "/opt/gpu-operator/manifests/state-gpu-config-manager", NewStateGPUConfigManager},
 		{"DRA driver", "/opt/gpu-operator/manifests/state-dra-driver", NewStateDRADriver},
 		{"DCGM", "/opt/gpu-operator/manifests/state-dcgm", NewStateDCGM},
 		{"DCGM Exporter", "/opt/gpu-operator/manifests/state-dcgm-exporter", NewStateDCGMExporter},
