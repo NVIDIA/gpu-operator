@@ -27,6 +27,7 @@ import (
 	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 
 	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 type policyCollector struct{}
@@ -138,8 +139,8 @@ func parseConfig(spec *nvidiav1.ClusterPolicySpec) PolicyConfig {
 	if spec.DevicePlugin.Config != nil {
 		cfg.TimeSlicingConfigName = spec.DevicePlugin.Config.Name
 	}
-	if spec.MIGManager.Config != nil {
-		cfg.MIGConfigName = spec.MIGManager.Config.Name
+	if name, isCustom := nvidiav1.GetConfigMapName(spec.MIGManager.Config, consts.LegacyMIGPartedConfigMapName); isCustom {
+		cfg.MIGConfigName = name
 	}
 
 	return cfg

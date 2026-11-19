@@ -2590,15 +2590,15 @@ func getMIGManagerTestOutput(testCase string) map[string]any {
 		"numDaemonsets":          1,
 		"migManagerImage":        "nvcr.io/nvidia/cloud-native/k8s-mig-manager:v0.5.0",
 		"imagePullSecret":        "ngc-secret",
-		"migConfigVolumePresent": true,
-		"env": map[string]string{
-			"DEFAULT_CONFIG_FILE": "/mig-parted-config/config-default.yaml",
-		},
+		"migConfigVolumePresent": false,
+		"env":                    map[string]string{},
 	}
 
 	switch testCase {
 	case "default":
+		// No config volume
 	case "custom-config":
+		output["migConfigVolumePresent"] = true
 		output["env"] = map[string]string{
 			"CONFIG_FILE": "/mig-parted-config/config.yaml",
 		}
@@ -2674,6 +2674,13 @@ func TestMIGManager(t *testing.T) {
 				if !envFound {
 					t.Fatalf("Expected env is not set for daemonset mig-manager %s->%s", key, value)
 				}
+			}
+			for _, envVar := range ds.Spec.Template.Spec.Containers[mainCtrIdx].Env {
+				if envVar.Name != "CONFIG_FILE" && envVar.Name != "DEFAULT_CONFIG_FILE" {
+					continue
+				}
+				_, expected := tc.output["env"].(map[string]string)[envVar.Name]
+				require.True(t, expected, "Unexpected env %s set for daemonset mig-manager", envVar.Name)
 			}
 
 			// cleanup by deleting all kubernetes objects

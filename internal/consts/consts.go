@@ -48,6 +48,12 @@ const (
 	OcpDriverToolkitIdentificationLabel = "openshift.driver-toolkit"
 	NfdOSTreeVersionLabelKey            = "feature.node.kubernetes.io/system-os_release.OSTREE_VERSION"
 
+	// LegacyMIGPartedConfigMapName is the migManager.config.name default of the
+	// ClusterPolicy CRD before v26.3.0. This ConfigMap is not created anymore, but
+	// ClusterPolicies created with that CRD can still carry it, so it needs special
+	// handling.
+	LegacyMIGPartedConfigMapName = "default-mig-parted-config"
+
 	// NvidiaAnnotationHashKey indicates annotation name for last applied hash by gpu-operator
 	NvidiaAnnotationHashKey = "nvidia.com/last-applied-hash"
 

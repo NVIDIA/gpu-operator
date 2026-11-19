@@ -101,32 +101,18 @@ func runMIGTest(
 
 	// Step 3: Set mig.config label on MIG-capable nodes.
 	// Mixed uses "all-balanced" (has device-filters, works on all GPUs).
-	// Single selects a per-node profile from the auto-generated ConfigMap, picking
-	// the first all-1g.* profile with more than one instance. Each node gets its
-	// own profile to handle heterogeneous GPU types across nodes.
+	// Single selects a per-node profile (see selectSingleMIGProfile). Each node
+	// gets its own profile to handle heterogeneous GPU types across nodes.
+	customConfigName, err := clients.GetCustomMIGPartedConfigMapName(ctx)
+	if err != nil {
+		result.Fail("failed to get MIG config name from ClusterPolicy: %v", err)
+		return
+	}
 	migConfig := DefaultMIGConfigMixed
 	for _, node := range migNodes.Items {
 		nodeConfig := migConfig
 		if strategy == migStrategySingle {
-			nodeConfig = DefaultMIGConfigSingle // fallback
-			if profile, err := clients.SelectSingleMIGProfileFromNode(ctx, cfg.Namespace, node.Name); err == nil {
-				nodeConfig = profile
-				result.AddDetail("node %s: auto-detected single profile %s from per-node configmap", node.Name, profile)
-			} else {
-				result.AddDetail("node %s: per-node mig-config not available: %v, falling back to static configmap", node.Name, err)
-				pciDeviceID, err := clients.GetGPUPCIDeviceID(ctx, cfg.Namespace, node.Name)
-				if err != nil {
-					result.AddDetail("node %s: could not query MIG-capable GPU device ID: %v, using default %s", node.Name, err, nodeConfig)
-				} else {
-					result.AddDetail("node %s: detected MIG-capable GPU with PCI device ID: %s", node.Name, pciDeviceID)
-					profile, err := clients.SelectSingleMIGProfile(ctx, cfg.Namespace, pciDeviceID)
-					if err != nil {
-						result.AddDetail("node %s: could not auto-detect single profile: %v, using default %s", node.Name, err, nodeConfig)
-					} else {
-						nodeConfig = profile
-					}
-				}
-			}
+			nodeConfig = selectSingleMIGProfile(ctx, clients, result, cfg.Namespace, node.Name, customConfigName)
 		}
 		labelPatch := `[{"op": "add", "path": "` + MIGConfigLabelPath + `", "value": "` + nodeConfig + `"}]`
 		if _, err := clients.PatchNode(ctx, node.Name, []byte(labelPatch)); err != nil {
@@ -289,6 +275,42 @@ func runMIGTest(
 		return
 	}
 	result.AddDetail("MIG workload completed successfully with resource %s", resourceName)
+}
+
+// selectSingleMIGProfile returns the single-strategy profile for a node. With a
+// custom mig-parted config, mig-manager applies profiles from that ConfigMap, so
+// the profile comes from its all-balanced entry for the node's GPU. Otherwise the
+// profile comes from the per-node ConfigMap that mig-manager generates from the
+// node hardware. It returns DefaultMIGConfigSingle if no profile is found.
+func selectSingleMIGProfile(
+	ctx context.Context,
+	clients *k8s.Clients,
+	result *certification.TestResult,
+	namespace, nodeName, customConfigName string,
+) string {
+	if customConfigName == "" {
+		profile, err := clients.SelectSingleMIGProfileFromNode(ctx, namespace, nodeName)
+		if err != nil {
+			result.AddDetail("node %s: per-node mig-config not available: %v, using default %s", nodeName, err, DefaultMIGConfigSingle)
+			return DefaultMIGConfigSingle
+		}
+		result.AddDetail("node %s: auto-detected single profile %s from per-node configmap", nodeName, profile)
+		return profile
+	}
+
+	pciDeviceID, err := clients.GetGPUPCIDeviceID(ctx, namespace, nodeName)
+	if err != nil {
+		result.AddDetail("node %s: could not query MIG-capable GPU device ID: %v, using default %s", nodeName, err, DefaultMIGConfigSingle)
+		return DefaultMIGConfigSingle
+	}
+	result.AddDetail("node %s: detected MIG-capable GPU with PCI device ID: %s", nodeName, pciDeviceID)
+	profile, err := clients.SelectSingleMIGProfile(ctx, namespace, customConfigName, pciDeviceID)
+	if err != nil {
+		result.AddDetail("node %s: could not select single profile from configmap %s: %v, using default %s", nodeName, customConfigName, err, DefaultMIGConfigSingle)
+		return DefaultMIGConfigSingle
+	}
+	result.AddDetail("node %s: selected single profile %s from configmap %s", nodeName, profile, customConfigName)
+	return profile
 }
 
 func verifyMIGResources(node corev1.Node, strategy migStrategy) bool {
