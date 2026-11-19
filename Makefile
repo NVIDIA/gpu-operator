@@ -215,13 +215,22 @@ goimports:
 lint:
 	golangci-lint run ./...
 
-BUILD_FLAGS = -ldflags "-s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)"
+LDFLAGS = -s -w -X $(VERSION_PKG).gitCommit=$(GIT_COMMIT) -X $(VERSION_PKG).version=$(VERSION)
+BUILD_FLAGS = -ldflags "$(LDFLAGS)"
+# go-nvml dlopens libnvidia-ml at runtime; force lazy binding so the binary starts on hosts without it.
+ifeq ($(shell go env GOOS),linux)
+CGO_BUILD_FLAGS = -ldflags "$(LDFLAGS) -extldflags=-Wl,-z,lazy"
+else
+CGO_BUILD_FLAGS = $(BUILD_FLAGS)
+endif
 build:
 	go build $(BUILD_FLAGS) ./...
 
 cmds: $(CMD_TARGETS)
+# gpu-config-manager loads NVML through cgo; every other command is static.
+CGO_CMDS := gpu-config-manager
 $(CMD_TARGETS): cmd-%:
-	CGO_ENABLED=0 go build $(BUILD_FLAGS) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
+	CGO_ENABLED=$(if $(filter $(*),$(CGO_CMDS)),1 go build $(CGO_BUILD_FLAGS),0 go build $(BUILD_FLAGS)) $(COMMAND_BUILD_OPTIONS) $(MODULE)/cmd/$(*)
 
 sync-crds:
 	@echo "- Syncing CRDs into Helm and OLM packages..."
