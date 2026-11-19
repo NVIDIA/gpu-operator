@@ -21,7 +21,7 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get"]
-  # Node events and MOFED DaemonSets are listed across all namespaces.
+  # Node events are listed across all namespaces.
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list"]

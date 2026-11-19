@@ -76,9 +76,8 @@ Changes made directly in the cluster, for example with `kubectl edit configmap`,
 | `TS1003` | Driver Update via GPU Operator | Driver version update via ClusterPolicy |
 | `TS1004` | MIG Mode (Single Strategy)     | MIG mode with single strategy |
 | `TS1005` | MIG Mode (Mixed Strategy)      | MIG mode with mixed strategy |
-| `TS1006` | GPUDirectRDMA                  | RDMA write bandwidth test between two GPU nodes |
-| `TS1007` | GPUDirectRDMA with DMA-BUF     | RDMA write bandwidth test between two GPU nodes using DMA-BUF |
-| `TS1008` | GDRCopy Enabled                | GDRCopy sidecar and workload |
+| `TS1006` | GPUDirectRDMA with DMA-BUF     | RDMA write bandwidth test between two GPU nodes using DMA-BUF |
+| `TS1007` | GDRCopy Enabled                | GDRCopy sidecar and workload |
 
 ## Output
 

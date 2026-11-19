@@ -87,7 +87,7 @@ echo "Using RDMA device: $RDMA_DEV (GID index: ${RDMA_GID:-none})"
 `
 
 // rdmaScript builds the ib_write_bw command for server (serverIP="") or client mode.
-func rdmaScript(serverIP string, dmaBuf bool) string {
+func rdmaScript(serverIP string) string {
 	var b strings.Builder
 	b.WriteString("set -e\n")
 	b.WriteString("export LD_LIBRARY_PATH=/mofed/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\n")
@@ -99,10 +99,7 @@ func rdmaScript(serverIP string, dmaBuf bool) string {
 		fmt.Fprintf(&b, "sleep 5\necho 'Running RDMA write bandwidth test to %s...'\n", serverIP)
 	}
 
-	b.WriteString("/mofed/bin/ib_write_bw --use_cuda=0")
-	if dmaBuf {
-		b.WriteString(" --use_cuda_dmabuf")
-	}
+	b.WriteString("/mofed/bin/ib_write_bw --use_cuda=0 --use_cuda_dmabuf")
 	b.WriteString(` -d "$RDMA_DEV" ${RDMA_GID:+-x "$RDMA_GID"} -a -F --report_gbits -q 1`)
 	if serverIP != "" {
 		b.WriteString(" " + serverIP)
@@ -127,16 +124,11 @@ func getHostLibPathForOS(osID, arch string) string {
 	}
 }
 
-// RDMA runs a GPUDirect RDMA bandwidth test between two GPU nodes.
-type RDMA struct {
-	DMABuf bool
-}
+// RDMA runs a GPUDirect RDMA bandwidth test over DMA-BUF between two GPU nodes.
+type RDMA struct{}
 
 func (t *RDMA) Name() string {
-	if t.DMABuf {
-		return "gpudirect-rdma-dmabuf"
-	}
-	return "gpudirect-rdma"
+	return "gpudirect-rdma-dmabuf"
 }
 
 func (t *RDMA) Run(ctx context.Context, clients *k8s.Clients, cfg certification.Config) *certification.TestResult {
@@ -161,40 +153,7 @@ func (t *RDMA) Run(ctx context.Context, clients *k8s.Clients, cfg certification.
 	}
 	result.AddDetail("found %d GPU nodes for RDMA test", len(gpuNodes))
 
-	// Step 1: Enable RDMA if not using DMA-BUF. The rdma.enabled field controls
-	// nvidia_peermem, which is unnecessary with DMA-BUF.
-	if !t.DMABuf {
-		result.AddDetail("enabling GPUDirectRDMA via rdma.enabled=true (auto-detecting useHostMofed)")
-		if err := clients.EnableRDMA(ctx); err != nil {
-			result.Fail("failed to enable RDMA: %v", err)
-			return result
-		}
-
-		// Step 2: Restart driver pods to pick up RDMA config (OnDelete update strategy)
-		result.AddDetail("deleting driver pods to trigger RDMA enablement")
-		if err := clients.DeletePodsByLabel(ctx, cfg.Namespace, k8s.DriverLabelSelector); err != nil {
-			result.Fail("failed to delete driver pods: %v", err)
-			return result
-		}
-
-		// Step 3: Wait for driver and device-plugin pods to be ready
-		result.AddDetail("waiting for driver pods to restart with RDMA enabled")
-		if err := clients.WaitForPodsReady(ctx, cfg.Namespace, k8s.DriverLabelSelector, timeout); err != nil {
-			result.Fail("driver pods not ready after RDMA enablement: %v", err)
-			return result
-		}
-		result.AddDetail("driver pods ready with RDMA enabled")
-
-		result.AddDetail("waiting for device-plugin pods to be ready")
-		if err := clients.WaitForPodReady(ctx, cfg.Namespace, DevicePluginAppLabel, timeout); err != nil {
-			result.Fail("device-plugin pods not ready: %v", err)
-			return result
-		}
-	} else {
-		result.AddDetail("DMA-BUF mode: skipping rdma.enabled (nvidia_peermem not needed)")
-	}
-
-	// Step 4: Deploy server-client ib_write_bw bandwidth test
+	// Step 1: Deploy server-client ib_write_bw bandwidth test
 	result.AddDetail("deploying RDMA bandwidth test: server on %s, client on %s", gpuNodes[0], gpuNodes[1])
 
 	baseImage := cfg.RDMABaseImage
@@ -224,14 +183,14 @@ func (t *RDMA) Run(ctx context.Context, clients *k8s.Clients, cfg certification.
 
 	t.cleanupRDMAPods(ctx, clients, cfg.Namespace)
 
-	serverPod := t.buildRDMAPod(cfg.Namespace, rdmaServerPodName, gpuNodes[0], rdmaScript("", t.DMABuf), baseImage, serverLibPath)
+	serverPod := t.buildRDMAPod(cfg.Namespace, rdmaServerPodName, gpuNodes[0], rdmaScript(""), baseImage, serverLibPath)
 	if err := clients.CreatePod(ctx, cfg.Namespace, serverPod); err != nil {
 		result.Fail("failed to create RDMA server pod: %v", err)
 		return result
 	}
 	defer t.cleanupRDMAPods(ctx, clients, cfg.Namespace)
 
-	// Step 5: Wait for server to be running and get its IP
+	// Step 2: Wait for server to be running and get its IP
 	var serverIP string
 	err = clients.WaitForCondition(ctx, timeout, func(ctx context.Context) (bool, error) {
 		pod, err := clients.GetPod(ctx, cfg.Namespace, rdmaServerPodName)
@@ -254,14 +213,14 @@ func (t *RDMA) Run(ctx context.Context, clients *k8s.Clients, cfg certification.
 	}
 	result.AddDetail("RDMA server running on %s at %s", gpuNodes[0], serverIP)
 
-	// Step 6: Deploy client on a different node
-	clientPod := t.buildRDMAPod(cfg.Namespace, rdmaClientPodName, gpuNodes[1], rdmaScript(serverIP, t.DMABuf), baseImage, clientLibPath)
+	// Step 3: Deploy client on a different node
+	clientPod := t.buildRDMAPod(cfg.Namespace, rdmaClientPodName, gpuNodes[1], rdmaScript(serverIP), baseImage, clientLibPath)
 	if err := clients.CreatePod(ctx, cfg.Namespace, clientPod); err != nil {
 		result.Fail("failed to create RDMA client pod: %v", err)
 		return result
 	}
 
-	// Step 7: Wait for bandwidth test to complete
+	// Step 4: Wait for bandwidth test to complete
 	result.AddDetail("running RDMA write bandwidth test across nodes")
 	succeeded, err := clients.WaitForPodComplete(ctx, cfg.Namespace, rdmaClientPodName, timeout)
 	if err != nil {
