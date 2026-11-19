@@ -495,6 +495,48 @@ func TestIsDaemonSetReady(t *testing.T) {
 			expectedReady: false,
 		},
 		{
+			name: "all desired pods available but none updated",
+			daemonSet: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     2,
+					DesiredNumberScheduled: 2,
+					CurrentNumberScheduled: 2,
+					NumberAvailable:        2,
+					UpdatedNumberScheduled: 0,
+				},
+			},
+			expectedReady: false,
+		},
+		{
+			name: "all desired pods available but only some updated",
+			daemonSet: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     2,
+					DesiredNumberScheduled: 2,
+					CurrentNumberScheduled: 2,
+					NumberAvailable:        2,
+					UpdatedNumberScheduled: 1,
+				},
+			},
+			expectedReady: false,
+		},
+		{
+			name: "all desired pods updated but only some available",
+			daemonSet: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Status: appsv1.DaemonSetStatus{
+					ObservedGeneration:     2,
+					DesiredNumberScheduled: 2,
+					CurrentNumberScheduled: 2,
+					NumberAvailable:        1,
+					UpdatedNumberScheduled: 2,
+				},
+			},
+			expectedReady: false,
+		},
+		{
 			name: "all desired pods available and updated",
 			daemonSet: &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Generation: 2},
@@ -524,11 +566,19 @@ func TestIsDaemonSetReady(t *testing.T) {
 	}
 
 	skel := &stateSkel{}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			ready, err := skel.isDaemonSetReady(toUnstructuredDaemonSet(t, testCase.daemonSet), logr.Discard())
-			require.NoError(t, err)
-			assert.Equal(t, testCase.expectedReady, ready)
+	// OnDelete waits for manual replacement of old pods; availability alone does
+	// not mean the requested configuration has been applied.
+	for _, strategy := range []appsv1.DaemonSetUpdateStrategyType{appsv1.RollingUpdateDaemonSetStrategyType, appsv1.OnDeleteDaemonSetStrategyType} {
+		t.Run(string(strategy), func(t *testing.T) {
+			for _, testCase := range testCases {
+				t.Run(testCase.name, func(t *testing.T) {
+					ds := testCase.daemonSet.DeepCopy()
+					ds.Spec.UpdateStrategy.Type = strategy
+					ready, err := skel.isDaemonSetReady(toUnstructuredDaemonSet(t, ds), logr.Discard())
+					require.NoError(t, err)
+					assert.Equal(t, testCase.expectedReady, ready)
+				})
+			}
 		})
 	}
 }
