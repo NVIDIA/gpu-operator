@@ -43,6 +43,7 @@ import (
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
@@ -69,6 +70,7 @@ type GPUClusterReconciler struct {
 	recorder         events.EventRecorder
 }
 
+//+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingadmissionpolicies;validatingadmissionpolicybindings,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nvidia.com,resources=gpuclusters/finalizers,verbs=update
@@ -100,6 +102,10 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.reconcileDelete(ctx, instance)
 	}
 
+	if err := coexistence.EnsureAdmission(ctx, r.Client); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensure allocator admission: %w", err)
+	}
+
 	if err := utils.EnsureFinalizer(ctx, r.Client, instance, nodeCleanupFinalizer); err != nil {
 		return ctrl.Result{}, fmt.Errorf("add node cleanup finalizer: %w", err)
 	}
@@ -108,7 +114,7 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("error adding finalizer to GPUCluster %s: %w", req.NamespacedName, err)
 	}
 
-	if msg, err := r.validatePrerequisites(ctx); err != nil {
+	if msg, err := r.validatePrerequisites(ctx, instance); err != nil {
 		return ctrl.Result{}, err
 	} else if msg != "" {
 		logger.V(consts.LogLevelWarning).Info("GPUCluster prerequisite not met", "reason", msg)
@@ -203,14 +209,23 @@ func gpuClusterOperandNotReadyMessage(results []state.Result) string {
 
 // validatePrerequisites checks the cross-CR rules that gate DRA enablement, returning
 // a message describing the first unmet prerequisite or an empty string when all are met.
-func (r *GPUClusterReconciler) validatePrerequisites(ctx context.Context) (string, error) {
-	clusterPolicies := &gpuv1.ClusterPolicyList{}
-	if err := r.List(ctx, clusterPolicies); err != nil {
-		return "", fmt.Errorf("error listing ClusterPolicy objects: %w", err)
+func (r *GPUClusterReconciler) validatePrerequisites(ctx context.Context, instance *nvidiav1alpha1.GPUCluster) (string, error) {
+	cp, _, err := resolveActiveConfig(ctx, r.Client)
+	if err != nil {
+		return "", err
 	}
-	// TODO: relax this prerequisite once ClusterPolicy and GPUCluster can co-exist
-	if clusterPolicy := getSingletonClusterPolicy(clusterPolicies.Items); clusterPolicy != nil {
-		return fmt.Sprintf("A ClusterPolicy CR %q exists; a ClusterPolicy CR and GPUCluster CR may not exist at the same time", clusterPolicy.Name), nil
+	if cp != nil {
+		if !cp.CreationTimestamp.Before(&instance.CreationTimestamp) {
+			return "InvalidSourceOrder: ClusterPolicy must predate GPUCluster", nil
+		}
+		if cp.DeletionTimestamp.IsZero() {
+			if cp.Spec.Driver.IsEnabled() && !cp.Spec.Driver.UseNvidiaDriverCRDType() {
+				return "DriverPrerequisiteNotMet: coexistence requires independent NVIDIADriver ownership or host-installed drivers", nil
+			}
+			if !nodeSelectionInitializedTrue(cp) {
+				return "NodeAdoptionPending: waiting for ClusterPolicy node adoption", nil
+			}
+		}
 	}
 	return "", nil
 }
@@ -374,6 +389,13 @@ func (r *GPUClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	),
 	)
 	if err != nil {
+		return err
+	}
+
+	// ClusterPolicy adoption completion allows the GPUCluster stack to start.
+	if err := c.Watch(source.Kind(mgr.GetCache(), &gpuv1.ClusterPolicy{}, handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, _ *gpuv1.ClusterPolicy) []reconcile.Request {
+		return r.enqueueAllGPUClusters(ctx, nil)
+	}), predicate.Or(predicate.TypedGenerationChangedPredicate[*gpuv1.ClusterPolicy]{}, clusterPolicyAdoptionPredicate()))); err != nil {
 		return err
 	}
 

@@ -452,7 +452,7 @@ func TestClusterPolicyBlockedByGPUCluster(t *testing.T) {
 
 	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
 	require.Equal(t, gpuv1.NotReady, clusterPolicyState(t, c, cp.Name))
-	require.ErrorContains(t, err, "ClusterPolicy and GPUCluster cannot co-exist")
+	require.ErrorContains(t, err, "ClusterPolicy must be created before GPUCluster")
 
 	// Deleting the GPUCluster instance unblocks the next reconcile
 	require.NoError(t, c.Delete(t.Context(), gc))

@@ -1368,13 +1368,13 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 		assert.NotContains(t, node.Labels, draDriverDeployLabelKey)
 	})
 
-	t.Run("both CRs present returns an error", func(t *testing.T) {
-		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
-		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+	t.Run("blocked GPUCluster does not abort CP node labeling", func(t *testing.T) {
+		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", Finalizers: []string{nodeCleanupFinalizer}}}
+		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config", Finalizers: []string{nodeCleanupFinalizer}}}
 		r, _ := newReconciler(cp, gc, gpuNode())
 
 		_, err := r.Reconcile(context.Background(), reconcile.Request{})
-		require.ErrorContains(t, err, "both ClusterPolicy and GPUCluster CRs exist")
+		require.NoError(t, err)
 	})
 }
 

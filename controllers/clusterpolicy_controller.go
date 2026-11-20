@@ -139,14 +139,14 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	// TODO: remove the below code block once both ClusterPolicy and GPUCluster can co-exist
+	// Cached backstop for CP-first creation; equal timestamps do not establish ordering.
 	gpuClusters := &nvidiav1alpha1.GPUClusterList{}
 	if err := r.List(ctx, gpuClusters); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list GPUCluster objects: %w", err)
 	}
-	if len(gpuClusters.Items) > 0 {
-		err := fmt.Errorf("conflicting GPUCluster resource %q detected; ClusterPolicy and GPUCluster cannot co-exist", gpuClusters.Items[0].Name)
-		logger.Error(err, "only one CR may be present at a time")
+	if len(gpuClusters.Items) > 0 && !instance.CreationTimestamp.Before(&gpuClusters.Items[0].CreationTimestamp) {
+		err := fmt.Errorf("GPUCluster resource %q exists; ClusterPolicy must be created before GPUCluster", gpuClusters.Items[0].Name)
+		logger.Error(err, "ClusterPolicy must be created before GPUCluster")
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 			logger.Error(condErr, "failed to set condition")

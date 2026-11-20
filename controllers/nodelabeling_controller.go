@@ -68,15 +68,14 @@ type NodeLabelingReconciler struct {
 // re-receive that state as arguments. Both sources can be present; selectNode resolves
 // each node's allocator before applying the corresponding deployment labels.
 type nodeLabelingController struct {
-	client            client.Client
-	namespace         string
-	clusterPolicy     *gpuv1.ClusterPolicy
-	gpuCluster        *nvidiav1alpha1.GPUCluster
-	logger            logr.Logger
-	defaultStack      string
-	terminatingDP     bool
-	terminatingDRA    bool
-	skipStackLabeling bool
+	client         client.Client
+	namespace      string
+	clusterPolicy  *gpuv1.ClusterPolicy
+	gpuCluster     *nvidiav1alpha1.GPUCluster
+	logger         logr.Logger
+	defaultStack   string
+	terminatingDP  bool
+	terminatingDRA bool
 
 	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
 	// at least one node because pods holding gpu.nvidia.com claims are still present; the
@@ -217,16 +216,17 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, err
 	}
 	cleanupPending, cleanupErr := r.cleanupDeletedSources(ctx)
-	skipStackLabeling := cleanupPending || cleanupErr != nil ||
-		(clusterPolicy != nil && !clusterPolicy.DeletionTimestamp.IsZero()) ||
-		(gpuCluster != nil && !gpuCluster.DeletionTimestamp.IsZero())
-	if clusterPolicy == nil && gpuCluster == nil {
-		logger.Info("No ClusterPolicy or GPUCluster CR exists, skipping node labeling")
-		return reconcile.Result{}, cleanupErr
+	if cleanupErr != nil {
+		// A failed cleanup reserves only the affected nodes; it must not freeze
+		// ordinary assignment to the surviving stack on other nodes.
+		logger.Error(cleanupErr, "Source node cleanup will be retried")
 	}
-	// TODO: allow both CRs to co-exist
-	if !skipStackLabeling && clusterPolicy != nil && gpuCluster != nil {
-		return reconcile.Result{}, fmt.Errorf("both ClusterPolicy and GPUCluster CRs exist; only one may be present at a time")
+	if clusterPolicy == nil && gpuCluster == nil {
+		logger.Info("No eligible ClusterPolicy or GPUCluster exists, skipping node labeling")
+		if cleanupPending {
+			return reconcile.Result{RequeueAfter: lifecycleRetry}, cleanupErr
+		}
+		return reconcile.Result{}, cleanupErr
 	}
 
 	defaultStack, err := coexistence.DefaultStack()
@@ -238,15 +238,14 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	usesNvidiaDriverCRD := gpuCluster != nil ||
 		(clusterPolicy != nil && clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType())
 	nlc := &nodeLabelingController{
-		client:            r.Client,
-		namespace:         r.Namespace,
-		clusterPolicy:     clusterPolicy,
-		gpuCluster:        gpuCluster,
-		logger:            logger,
-		defaultStack:      defaultStack,
-		terminatingDP:     terminatingDP,
-		terminatingDRA:    terminatingDRA,
-		skipStackLabeling: skipStackLabeling,
+		client:         r.Client,
+		namespace:      r.Namespace,
+		clusterPolicy:  clusterPolicy,
+		gpuCluster:     gpuCluster,
+		logger:         logger,
+		defaultStack:   defaultStack,
+		terminatingDP:  terminatingDP,
+		terminatingDRA: terminatingDRA,
 	}
 
 	gpuLabelUpdateResult, err := nlc.labelGPUNodes(ctx)
@@ -264,9 +263,6 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
 			"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
 		)
-		if cleanupPending {
-			return reconcile.Result{RequeueAfter: lifecycleRetry}, cleanupErr
-		}
 		return reconcile.Result{}, cleanupErr
 	}
 
@@ -282,19 +278,14 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// The k8s-driver-manager init container consumes this annotation on either stack.
-	if !skipStackLabeling || usesNvidiaDriverCRD {
-		if err := nlc.applyDriverAutoUpgradeAnnotation(ctx); err != nil {
-			return reconcile.Result{}, err
-		}
+	if err := nlc.applyDriverAutoUpgradeAnnotation(ctx); err != nil {
+		return reconcile.Result{}, err
 	}
+
 	if cleanupErr != nil {
 		return reconcile.Result{}, cleanupErr
 	}
-	if cleanupPending {
-		return reconcile.Result{RequeueAfter: lifecycleRetry}, nil
-	}
-
-	if nlc.draPluginRemovalDeferred {
+	if nlc.draPluginRemovalDeferred || cleanupPending {
 		// Pod deletion events also retrigger reconciliation; the requeue is a backstop so
 		// the kubelet-plugin label falls off even if an event is missed.
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
@@ -408,12 +399,13 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 			gpuDiscoveryStateChanged = true
 		}
 
-		if !nlc.skipStackLabeling {
-			selectionChanged, selectionErr := nlc.selectNode(ctx, &node)
-			if selectionErr != nil {
-				nlc.logger.Error(selectionErr, "Invalid allocator selection", "node", node.Name)
-			}
-			stateLabelsModified = selectionChanged
+		selectionChanged, selectionErr := nlc.selectNode(ctx, &node)
+		if selectionErr != nil {
+			nlc.logger.Error(selectionErr, "Invalid allocator selection", "node", node.Name)
+		}
+		if selectionChanged {
+			node.SetLabels(labels)
+			stateLabelsModified = true
 		}
 
 		modified := gpuDiscoveryStateChanged || stateLabelsModified
@@ -818,6 +810,14 @@ func nodeLabelingSourcePredicate[T client.Object]() predicate.TypedFuncs[T] {
 	return p
 }
 
+func clusterPolicyAdoptionPredicate() predicate.TypedFuncs[*gpuv1.ClusterPolicy] {
+	return predicate.TypedFuncs[*gpuv1.ClusterPolicy]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*gpuv1.ClusterPolicy]) bool {
+			return !nodeSelectionInitializedTrue(e.ObjectOld) && nodeSelectionInitializedTrue(e.ObjectNew)
+		},
+	}
+}
+
 // SetupWithManager registers the NodeLabelingReconciler with the controller-runtime manager.
 func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := registerWorkloadIndexes(ctx, mgr); err != nil {
@@ -854,7 +854,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		mgr.GetCache(),
 		&gpuv1.ClusterPolicy{},
 		handler.TypedEnqueueRequestsFromMapFunc(clusterPolicyMapFn),
-		nodeLabelingSourcePredicate[*gpuv1.ClusterPolicy](),
+		predicate.Or(nodeLabelingSourcePredicate[*gpuv1.ClusterPolicy](), clusterPolicyAdoptionPredicate()),
 	)); err != nil {
 		return fmt.Errorf("error watching ClusterPolicy: %w", err)
 	}
