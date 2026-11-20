@@ -57,6 +57,15 @@ func findByKind(objs []*unstructured.Unstructured, kind string) *unstructured.Un
 	return nil
 }
 
+func findByKindAndName(objs []*unstructured.Unstructured, kind, name string) *unstructured.Unstructured {
+	for _, o := range objs {
+		if o.GetKind() == kind && o.GetName() == name {
+			return o
+		}
+	}
+	return nil
+}
+
 // claimHasAdminAccess verifies the ResourceClaimTemplate requests all GPUs with adminAccess.
 func claimHasAdminAccess(t *testing.T, rct *unstructured.Unstructured) {
 	t.Helper()
@@ -117,7 +126,7 @@ func TestDCGMEnabled(t *testing.T) {
 	assert.Equal(t, 1, kinds["RoleBinding"])
 	assert.Equal(t, 1, kinds["ResourceClaimTemplate"])
 	assert.Equal(t, 1, kinds["DaemonSet"])
-	assert.Equal(t, 1, kinds["Service"])
+	assert.Equal(t, 2, kinds["Service"])
 
 	claimHasAdminAccess(t, findByKind(objs, "ResourceClaimTemplate"))
 
@@ -138,13 +147,19 @@ func TestDCGMEnabled(t *testing.T) {
 	require.Len(t, ctr.Resources.Claims, 1)
 	assert.Equal(t, "admin-gpus", ctr.Resources.Claims[0].Name)
 
-	// The exporter targets this Service on port 5555.
-	svc := findByKind(objs, "Service")
-	port, found, err := unstructured.NestedSlice(svc.Object, "spec", "ports")
-	require.NoError(t, err)
-	require.True(t, found)
-	require.Len(t, port, 1)
-	assert.Equal(t, int64(5555), port[0].(map[string]any)["port"])
+	for _, name := range []string{"nvidia-dcgm", "nvidia-dcgm-dra"} {
+		svc := findByKindAndName(objs, "Service", name)
+		require.NotNil(t, svc)
+		selector, found, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
+		require.NoError(t, err)
+		require.True(t, found)
+		assert.Equal(t, map[string]string{"app": "nvidia-dcgm-dra"}, selector)
+		port, found, err := unstructured.NestedSlice(svc.Object, "spec", "ports")
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Len(t, port, 1)
+		assert.Equal(t, int64(5555), port[0].(map[string]any)["port"])
+	}
 }
 
 func TestDCGMImageFromEnvFallback(t *testing.T) {
@@ -188,15 +203,16 @@ func TestDCGMComponentLabels(t *testing.T) {
 					assert.Equal(t, "platform", ds.Labels["team"])
 					assert.Equal(t, "platform", ds.Spec.Template.Labels["team"])
 				}
-				svc := findByKind(objs, "Service")
-				require.NotNil(t, svc)
-				assert.Equal(t, component, svc.GetLabels()["app.kubernetes.io/component"])
-				assert.Equal(t, component+"-dra", svc.GetLabels()["app"])
-				assert.Equal(t, component+"-dra", svc.GetName())
-				selector, found, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
-				require.NoError(t, err)
-				require.True(t, found)
-				assert.Equal(t, map[string]string{"app": component + "-dra"}, selector)
+				for _, name := range []string{component, component + "-dra"} {
+					svc := findByKindAndName(objs, "Service", name)
+					require.NotNil(t, svc)
+					assert.Equal(t, component, svc.GetLabels()["app.kubernetes.io/component"])
+					assert.Equal(t, name, svc.GetLabels()["app"])
+					selector, found, err := unstructured.NestedStringMap(svc.Object, "spec", "selector")
+					require.NoError(t, err)
+					require.True(t, found)
+					assert.Equal(t, map[string]string{"app": component + "-dra"}, selector)
+				}
 			}
 		})
 	}
