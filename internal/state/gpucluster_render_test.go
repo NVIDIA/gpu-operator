@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -114,6 +115,110 @@ func TestGPUClusterDaemonsetsPriorityClass(t *testing.T) {
 						})
 					}
 				})
+			}
+		})
+	}
+}
+
+// containerSecurity is the securityContext of one container in a rendered pod.
+type containerSecurity struct {
+	name string
+	sc   *corev1.SecurityContext
+}
+
+func containerSecurityContexts(spec corev1.PodSpec) []containerSecurity {
+	out := make([]containerSecurity, 0, len(spec.InitContainers)+len(spec.Containers))
+	for i := range spec.InitContainers {
+		c := spec.InitContainers[i]
+		out = append(out, containerSecurity{name: "init/" + c.Name, sc: c.SecurityContext})
+	}
+	for i := range spec.Containers {
+		c := spec.Containers[i]
+		out = append(out, containerSecurity{name: c.Name, sc: c.SecurityContext})
+	}
+	return out
+}
+
+// TestGPUClusterDaemonsetsPodSecurityContext renders each GPUCluster DaemonSet with
+// spec.daemonsets.podSecurityContext. ClusterPolicy already copies that field onto operand
+// pods (see TestClusterPolicyDaemonsetsPodSecurityContext); these renders must do the same
+// while leaving the container securityContext, including privileged and runAsUser, unchanged.
+func TestGPUClusterDaemonsetsPodSecurityContext(t *testing.T) {
+	podSecurityContext := &corev1.PodSecurityContext{
+		SELinuxOptions: &corev1.SELinuxOptions{
+			Type:  "spc_t",
+			Level: "s0",
+		},
+		// Distinct from the container runAsUser the templates pin, so a pod-level UID
+		// cannot replace the root user those containers require.
+		RunAsUser: new(int64(1000)),
+	}
+
+	type renderer interface {
+		getManifestObjects(context.Context, *nvidiav1alpha1.GPUCluster, InfoCatalog) ([]*unstructured.Unstructured, error)
+	}
+	states := map[string]renderer{
+		"dcgm":          newTestDCGMState(t),
+		"dcgm-exporter": newTestDCGMExporterState(t, false),
+		"dra-validator": newTestDRAValidationState(t),
+		"dra-driver":    newTestDRAState(t),
+	}
+
+	// Container securityContext values the operand needs regardless of the pod context.
+	type wantContainer struct {
+		privileged bool
+		runAsUser  *int64
+	}
+	required := map[string]map[string]wantContainer{
+		"dcgm": {
+			"nvidia-dcgm-ctr": {privileged: true},
+		},
+		"dcgm-exporter": {
+			"nvidia-dcgm-exporter-dra": {privileged: true},
+		},
+		"dra-driver": {
+			"init/driver-validation": {privileged: true, runAsUser: new(int64(0))},
+			"gpus":                   {privileged: true},
+			"compute-domains":        {privileged: true},
+		},
+	}
+
+	render := func(t *testing.T, s renderer, psc *corev1.PodSecurityContext) *appsv1.DaemonSet {
+		t.Helper()
+		cr := sampleGPUCluster()
+		cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
+		cr.Spec.DCGMExporter = &nvidiav1.DCGMExporterSpec{Enabled: new(true)}
+		cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+		cr.Spec.Daemonsets.PodSecurityContext = psc
+
+		objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
+		require.NoError(t, err)
+		return findDaemonSet(t, objs)
+	}
+
+	for stateName, s := range states {
+		t.Run(stateName, func(t *testing.T) {
+			base := render(t, s, nil)
+			withContext := render(t, s, podSecurityContext)
+
+			require.Nil(t, base.Spec.Template.Spec.SecurityContext)
+			require.Equal(t, podSecurityContext, withContext.Spec.Template.Spec.SecurityContext)
+			require.Equal(t, containerSecurityContexts(base.Spec.Template.Spec), containerSecurityContexts(withContext.Spec.Template.Spec))
+
+			got := map[string]*corev1.SecurityContext{}
+			for _, c := range containerSecurityContexts(withContext.Spec.Template.Spec) {
+				got[c.name] = c.sc
+			}
+			for name, want := range required[stateName] {
+				sc, ok := got[name]
+				require.Truef(t, ok, "container %s not rendered", name)
+				require.NotNil(t, sc)
+				require.NotNil(t, sc.Privileged)
+				require.Equal(t, want.privileged, *sc.Privileged)
+				if want.runAsUser != nil {
+					require.NotNil(t, sc.RunAsUser)
+					require.Equal(t, *want.runAsUser, *sc.RunAsUser)
+				}
 			}
 		})
 	}
