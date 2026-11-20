@@ -621,7 +621,7 @@ clusterPolicy:
 #
 # To enable the GPUCluster (DRA) enablement stack, set
 # gpuCluster.deployCR=true and clusterPolicy.deployCR=false
-# It is an invalid configuration for both CRs to exist.
+# Coexistence requires CP-first creation and independent NVIDIADriver ownership.
 gpuCluster:
   deployCR: false
 
