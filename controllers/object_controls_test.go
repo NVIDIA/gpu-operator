@@ -47,6 +47,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -1294,6 +1295,49 @@ func getVGPUManagerTestOutput(testCase string) map[string]any {
 	return output
 }
 
+// TestClusterPolicySecondStepSendsNoWrites checks that reconciling a ClusterPolicy state whose objects
+// already match the cluster sends no create, update, patch, or delete.
+func TestClusterPolicySecondStepSendsNoWrites(t *testing.T) {
+	baseClient, err := newCluster(cfg.nodes, clusterPolicyController.scheme)
+	require.NoError(t, err)
+	writes := 0
+	countingClient := interceptor.NewClient(baseClient.(client.WithWatch), interceptor.Funcs{
+		Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+			writes++
+			return wrappedClient.Create(ctx, object, opts...)
+		},
+		Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+			writes++
+			return wrappedClient.Update(ctx, object, opts...)
+		},
+		Patch: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			writes++
+			return wrappedClient.Patch(ctx, object, patch, opts...)
+		},
+		Delete: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.DeleteOption) error {
+			writes++
+			return wrappedClient.Delete(ctx, object, opts...)
+		},
+	})
+
+	// A copy of the shared controller with its own cluster and only the device-plugin state.
+	n := clusterPolicyController
+	n.client = countingClient
+	n.singleton = getDevicePluginTestInput("default")
+	n.controls, n.resources, n.stateNames, n.idx = nil, nil, nil, 0
+	addState(&n, filepath.Join(cfg.root, devicePluginAssetsPath))
+
+	_, err = n.step()
+	require.NoError(t, err)
+	require.Equal(t, 7, writes, "the first step creates each object of the state")
+
+	writes = 0
+	n.idx = 0
+	_, err = n.step()
+	require.NoError(t, err)
+	require.Zero(t, writes, "the second step must not write objects that did not change")
+}
+
 // TestVGPUManager tests that the GPU Operator correctly deploys the driver daemonset
 // under various scenarios/config options
 func TestVGPUManager(t *testing.T) {
@@ -2069,7 +2113,9 @@ func TestServiceMonitor(t *testing.T) {
 		{
 			description: "dcgm-exporter SM disabled, CRD present -> Disabled (delete if exists)",
 			stateName:   "state-dcgm-exporter",
-			k8sObjects:  []client.Object{serviceMonitorCRD},
+			k8sObjects: []client.Object{serviceMonitorCRD, &promv1.ServiceMonitor{
+				ObjectMeta: metav1.ObjectMeta{Name: testServiceMonitor, Namespace: testNamespace},
+			}},
 			clusterPolicySpec: gpuv1.ClusterPolicySpec{
 				DCGMExporter: gpuv1.DCGMExporterSpec{
 					Enabled:        new(true),
@@ -2473,6 +2519,7 @@ func TestRuntimeClasses(t *testing.T) {
 		clusterPolicySpec      gpuv1.ClusterPolicySpec
 		expectedState          gpuv1.State
 		expectedRuntimeClasses []string
+		deletedRuntimeClasses  []string
 	}{
 		{
 			description: "CDI enabled",
@@ -2528,6 +2575,7 @@ func TestRuntimeClasses(t *testing.T) {
 			},
 			expectedState:          gpuv1.Ready,
 			expectedRuntimeClasses: []string{},
+			deletedRuntimeClasses:  []string{"nvidia", "nvidia-legacy", "nvidia-cdi"},
 		},
 	}
 
@@ -2551,7 +2599,68 @@ func TestRuntimeClasses(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expectedRuntimeClass, rcObject.Name)
 			}
+			for _, deletedRuntimeClass := range test.deletedRuntimeClasses {
+				err := k8sClient.Get(t.Context(), client.ObjectKey{Name: deletedRuntimeClass}, &nodev1.RuntimeClass{})
+				require.True(t, apierrors.IsNotFound(err), "runtime class %q must be deleted", deletedRuntimeClass)
+			}
 
+		})
+	}
+}
+
+func TestRuntimeClassesSecondCallSendsNoWrites(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nodev1.AddToScheme(scheme))
+	require.NoError(t, nodev1beta1.AddToScheme(scheme))
+	require.NoError(t, gpuv1.AddToScheme(scheme))
+	runtimeClasses := []nodev1.RuntimeClass{
+		{ObjectMeta: metav1.ObjectMeta{Name: "FILLED_BY_OPERATOR"}, Handler: "FILLED_BY_OPERATOR"},
+		{ObjectMeta: metav1.ObjectMeta{Name: "nvidia-cdi"}, Handler: "nvidia-cdi"},
+		{ObjectMeta: metav1.ObjectMeta{Name: "nvidia-legacy"}, Handler: "nvidia-legacy"},
+	}
+
+	testCases := map[string]struct {
+		k8sVersion string
+	}{
+		"node.k8s.io/v1 RuntimeClasses":      {k8sVersion: "v1.33.0"},
+		"node.k8s.io/v1beta1 RuntimeClasses": {k8sVersion: "v1.19.0"},
+	}
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			writes := 0
+			countingClient := interceptor.NewClient(fake.NewClientBuilder().WithScheme(scheme).Build(), interceptor.Funcs{
+				Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+					writes++
+					return wrappedClient.Create(ctx, object, opts...)
+				},
+				Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+					writes++
+					return wrappedClient.Update(ctx, object, opts...)
+				},
+				Delete: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.DeleteOption) error {
+					writes++
+					return wrappedClient.Delete(ctx, object, opts...)
+				},
+			})
+			controller := ClusterPolicyController{
+				client:     countingClient,
+				ctx:        t.Context(),
+				singleton:  &gpuv1.ClusterPolicy{Spec: gpuv1.ClusterPolicySpec{CDI: gpuv1.CDIConfigSpec{Enabled: new(true)}}},
+				scheme:     scheme,
+				resources:  []Resources{{RuntimeClasses: runtimeClasses}},
+				stateNames: []string{"pre-requisites"},
+				k8sVersion: testCase.k8sVersion,
+				logger:     ctrl.Log.WithName("test"),
+			}
+
+			_, err := RuntimeClasses(controller)
+			require.NoError(t, err)
+			require.Equal(t, 3, writes, "the first call creates each RuntimeClass")
+
+			writes = 0
+			_, err = RuntimeClasses(controller)
+			require.NoError(t, err)
+			require.Zero(t, writes, "the second call must not write RuntimeClasses that did not change")
 		})
 	}
 }
