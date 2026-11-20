@@ -330,21 +330,21 @@ func TestTransformForDriverInstallDir(t *testing.T) {
 			description:      "empty driverInstallDir is a no-op",
 			driverInstallDir: "",
 			input: NewDaemonset().
-				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver", nil).
+				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia", nil).
 				WithInitContainer(
 					corev1.Container{
 						Name: "driver-validation",
 						VolumeMounts: []corev1.VolumeMount{
-							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia/driver"},
+							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia"},
 						},
 					}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver", nil).
+				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia", nil).
 				WithInitContainer(
 					corev1.Container{
 						Name: "driver-validation",
 						VolumeMounts: []corev1.VolumeMount{
-							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia/driver"},
+							{Name: driverInstallDirVolumeName, MountPath: "/run/nvidia"},
 						},
 					}),
 		},
@@ -354,7 +354,7 @@ func TestTransformForDriverInstallDir(t *testing.T) {
 			input: NewDaemonset().
 				WithHostPathVolume(driverInstallDirVolumeName, "/run/nvidia/driver", nil),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume(driverInstallDirVolumeName, "/custom-root", nil),
+				WithHostPathVolume(driverInstallDirVolumeName, "/", nil),
 		},
 		{
 			description:      "custom driverInstallDir with driver-install-dir volume and driver-validation initContainer",
@@ -369,16 +369,16 @@ func TestTransformForDriverInstallDir(t *testing.T) {
 						},
 					}),
 			expectedOutput: NewDaemonset().
-				WithHostPathVolume(driverInstallDirVolumeName, "/custom-root", nil).
+				WithHostPathVolume(driverInstallDirVolumeName, "/", nil).
 				WithInitContainer(
 					corev1.Container{
 						Name: "driver-validation",
 						VolumeMounts: []corev1.VolumeMount{
-							{Name: driverInstallDirVolumeName, MountPath: "/custom-root"},
+							{Name: driverInstallDirVolumeName, MountPath: "/driver-root"},
 						},
 						Env: []corev1.EnvVar{
 							{Name: DriverInstallDirEnvName, Value: "/custom-root"},
-							{Name: DriverInstallDirCtrPathEnvName, Value: "/custom-root"},
+							{Name: DriverInstallDirCtrPathEnvName, Value: "/driver-root/custom-root"},
 						},
 					}),
 		},
