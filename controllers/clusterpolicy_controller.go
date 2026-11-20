@@ -49,6 +49,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/state"
+	"github.com/NVIDIA/gpu-operator/internal/utils"
 )
 
 const (
@@ -120,6 +121,10 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return reconcile.Result{}, err
 	}
 
+	if !instance.DeletionTimestamp.IsZero() {
+		return teardownSourceOperands(ctx, r.Client, r.Namespace, instance)
+	}
+
 	// The ClusterPolicy with the oldest creationTimestamp (name as tie-breaker) is
 	// treated as the singleton, so the choice is stable across operator restarts and
 	// derivable by other controllers (see getSingletonClusterPolicy).
@@ -148,6 +153,10 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		clusterPolicyCtrl.operatorMetrics.reconciliationStatus.Set(reconciliationStatusClusterPolicyUnavailable)
 		return ctrl.Result{}, err
+	}
+
+	if err := utils.EnsureFinalizer(ctx, r.Client, instance, nodeCleanupFinalizer); err != nil {
+		return ctrl.Result{}, fmt.Errorf("add node cleanup finalizer: %w", err)
 	}
 
 	if err := clusterPolicyCtrl.init(ctx, r, instance); err != nil {

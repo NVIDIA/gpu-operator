@@ -42,6 +42,18 @@ After installation, the GPU Operator and its operands should be up and running.
 Note:
 To deploy the GPU Operator on OpenShift, follow the instructions in the [official documentation](https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html).
 
+## Recovering a Helm uninstall that times out
+
+The pre-delete hook waits for stack CR deletion before Helm removes the operator. A GPU node that loses contact with the control plane can leave operand Pods terminating and cause the hook to time out.
+
+1. Describe the terminating `ClusterPolicy` or `GPUCluster` and check its `OperandsRemoved` condition. Inspect the listed workloads and their Pods in the operator namespace. `kubectl get pods -n <namespace> -o wide` shows which nodes host the Pods.
+2. Restore the affected node's connectivity so the kubelet can finish termination. For a node confirmed powered off, follow the [Kubernetes non-graceful shutdown procedure](https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#non-graceful-node-shutdown). The operator needs to remain running while the stack CR finalizer completes.
+3. Retry the uninstall with a longer timeout if teardown needs more time.
+
+   ```sh
+   helm uninstall <release> --namespace <namespace> --timeout 15m
+   ```
+
 ## Operator high availability
 
 Helm installations run one operator replica by default. Increase `operator.replicaCount` to run multiple replicas with leader election. Unless explicitly disabled, the chart also adds soft pod anti-affinity and a PodDisruptionBudget (PDB) requiring at least one available replica.
