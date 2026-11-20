@@ -33,6 +33,11 @@ github.com/NVIDIA/go-nvlib/pkg/nvpci
 github.com/NVIDIA/go-nvlib/pkg/nvpci/bytes
 github.com/NVIDIA/go-nvlib/pkg/nvpci/mmio
 github.com/NVIDIA/go-nvlib/pkg/pciids
+# github.com/NVIDIA/go-nvml v0.13.4-1.0.20261102194955-f83235b8e2ea
+## explicit; go 1.20
+github.com/NVIDIA/go-nvml/pkg/dl
+github.com/NVIDIA/go-nvml/pkg/nvml
+github.com/NVIDIA/go-nvml/pkg/nvml/mock
 # github.com/NVIDIA/k8s-kata-manager v0.2.3
 ## explicit; go 1.23.0
 github.com/NVIDIA/k8s-kata-manager/api/v1alpha1/config
