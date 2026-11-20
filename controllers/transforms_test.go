@@ -2401,12 +2401,6 @@ func TestTransformCCManager(t *testing.T) {
 }
 
 func TestTransformVGPUDeviceManager(t *testing.T) {
-	originalDefaultWorkload := defaultGPUWorkloadConfig
-	defaultGPUWorkloadConfig = "container"
-	t.Cleanup(func() {
-		defaultGPUWorkloadConfig = originalDefaultWorkload
-	})
-
 	resources := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -3068,6 +3062,10 @@ func TestTransformValidatorComponent(t *testing.T) {
 			description: "vfio-pci validation",
 			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vfio-pci-validation"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					Enabled:         new(true),
+					DefaultWorkload: gpuWorkloadConfigVMPassthrough,
+				},
 				Validator: gpuv1.ValidatorSpec{
 					Repository:      "nvcr.io/nvidia/cloud-native",
 					Image:           "gpu-operator-validator",
@@ -3084,7 +3082,7 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: gpuWorkloadConfigVMPassthrough},
 					{Name: "foo", Value: "bar"},
 				},
 				SecurityContext: &corev1.SecurityContext{
@@ -3124,6 +3122,10 @@ func TestTransformValidatorComponent(t *testing.T) {
 			description: "vgpu-devices validation",
 			pod:         NewPod().WithInitContainer(corev1.Container{Name: "vgpu-devices-validation"}),
 			cpSpec: &gpuv1.ClusterPolicySpec{
+				SandboxWorkloads: gpuv1.SandboxWorkloadsSpec{
+					Enabled:         new(true),
+					DefaultWorkload: gpuWorkloadConfigVMVgpu,
+				},
 				Validator: gpuv1.ValidatorSpec{
 					Repository:      "nvcr.io/nvidia/cloud-native",
 					Image:           "gpu-operator-validator",
@@ -3140,7 +3142,7 @@ func TestTransformValidatorComponent(t *testing.T) {
 				Image:           "nvcr.io/nvidia/cloud-native/gpu-operator-validator:v1.0.0",
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env: []corev1.EnvVar{
-					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: defaultGPUWorkloadConfig},
+					{Name: "DEFAULT_GPU_WORKLOAD_CONFIG", Value: gpuWorkloadConfigVMVgpu},
 					{Name: "foo", Value: "bar"},
 				},
 				SecurityContext: &corev1.SecurityContext{

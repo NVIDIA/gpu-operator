@@ -49,6 +49,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
@@ -739,11 +740,12 @@ func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
 }
 
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error {
-	logger := n.logger.WithValues("Daemonset", obj.Name)
+	templateName := obj.Name
+	logger := n.logger.WithValues("Daemonset", templateName)
 
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
-		"nvidia-driver-daemonset":                     TransformDriver,
-		"nvidia-vgpu-manager-daemonset":               TransformVGPUManager,
+		commonDriverDaemonsetName:                     TransformDriver,
+		commonVGPUManagerDaemonsetName:                TransformVGPUManager,
 		"nvidia-vgpu-device-manager":                  TransformVGPUDeviceManager,
 		"nvidia-vfio-manager":                         TransformVFIOManager,
 		"nvidia-container-toolkit-daemonset":          TransformToolkit,
@@ -761,7 +763,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-cc-manager":                           TransformCCManager,
 	}
 
-	t, ok := transformations[obj.Name]
+	t, ok := transformations[templateName]
 	if !ok {
 		logger.Info(fmt.Sprintf("No transformation for Daemonset '%s'", obj.Name))
 		return nil
@@ -789,7 +791,10 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 
 	// apply custom labels and pod annotations
 	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets, logger)
-
+	// Precompiled and OpenShift driver transforms suffix the rendered name.
+	if templateName != commonDriverDaemonsetName && templateName != commonVGPUManagerDaemonsetName {
+		coexistence.ConstrainMode(&obj.Spec.Template.Spec, coexistence.DP)
+	}
 	return nil
 }
 
@@ -2488,6 +2493,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 		// update the security context for the validator container
 		transformValidatorSecurityContext(&podSpec.InitContainers[i])
 
+		defaultWorkload := defaultGPUWorkloadConfig(config.SandboxWorkloads)
 		switch component {
 		case "cuda":
 			// set additional env to indicate image, pullSecrets to spin-off cuda validation workload pod.
@@ -2554,7 +2560,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vfio-pci":
 			// set/append environment variables for vfio-pci-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultWorkload)
 			if len(config.Validator.VFIOPCI.Env) > 0 {
 				for _, env := range config.Validator.VFIOPCI.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
@@ -2562,7 +2568,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vgpu-manager":
 			// set/append environment variables for vgpu-manager-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultWorkload)
 			if len(config.Validator.VGPUManager.Env) > 0 {
 				for _, env := range config.Validator.VGPUManager.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
@@ -2570,7 +2576,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vgpu-devices":
 			// set/append environment variables for vgpu-devices-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultWorkload)
 			if len(config.Validator.VGPUDevices.Env) > 0 {
 				for _, env := range config.Validator.VGPUDevices.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)

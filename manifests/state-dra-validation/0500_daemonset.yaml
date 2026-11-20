@@ -80,6 +80,17 @@ spec:
                 operator: In
                 values:
                 - "true"
+              - key: nvidia.com/gpu.deploy.mode
+                operator: DoesNotExist
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: In
+                values:
+                - "true"
+              - key: nvidia.com/gpu.deploy.mode
+                operator: In
+                values:
+                - dra
       {{- if .Daemonsets.Tolerations }}
       tolerations:
       {{- range .Daemonsets.Tolerations }}

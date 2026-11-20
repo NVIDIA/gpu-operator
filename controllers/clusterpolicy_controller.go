@@ -69,6 +69,7 @@ type ClusterPolicyReconciler struct {
 	Scheme           *runtime.Scheme
 	Namespace        string
 	OperatorMetrics  *OperatorMetrics
+	DefaultStack     string
 	conditionUpdater conditions.Updater
 }
 
@@ -157,6 +158,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if err := utils.EnsureFinalizer(ctx, r.Client, instance, nodeCleanupFinalizer); err != nil {
 		return ctrl.Result{}, fmt.Errorf("add node cleanup finalizer: %w", err)
+	}
+	if adopted, err := observeSourceAdoption(ctx, r.Client, instance, r.DefaultStack); err != nil {
+		return ctrl.Result{}, err
+	} else if !adopted {
+		return ctrl.Result{RequeueAfter: lifecycleRetry}, nil
 	}
 
 	if err := clusterPolicyCtrl.init(ctx, r, instance); err != nil {
@@ -392,9 +398,7 @@ func addWatchNewGPUNode(r *ClusterPolicyReconciler, c controller.Controller, mgr
 			gpuCommonLabelAdded := !hasCommonGPULabel(oldLabels) && hasCommonGPULabel(newLabels)
 			commonOperandsLabelChanged := hasOperandsDisabled(oldLabels) != hasOperandsDisabled(newLabels)
 
-			oldGPUWorkloadConfig, _ := getWorkloadConfig(oldLabels, true)
-			newGPUWorkloadConfig, _ := getWorkloadConfig(newLabels, true)
-			gpuWorkloadConfigLabelChanged := oldGPUWorkloadConfig != newGPUWorkloadConfig
+			gpuWorkloadConfigLabelChanged := oldLabels[gpuWorkloadConfigLabelKey] != newLabels[gpuWorkloadConfigLabelKey]
 
 			oldOSTreeLabel := oldLabels[nfdOSTreeVersionLabelKey]
 			newOSTreeLabel := newLabels[nfdOSTreeVersionLabelKey]

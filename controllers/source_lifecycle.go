@@ -37,17 +37,25 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	gpu "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 )
 
 const (
-	nodeCleanupFinalizer = "nvidia.com/gpu-operator-node-cleanup"
-	operandsRemoved      = "OperandsRemoved"
-	lifecycleRetry       = 5 * time.Second
-	sourceOwnerIndex     = "gpu-operator.source-owner"
-	directPodBatchSize   = 64
-	maxReportedWorkloads = 5
+	nodeCleanupFinalizer     = "nvidia.com/gpu-operator-node-cleanup"
+	operandsRemoved          = "OperandsRemoved"
+	nodeSelectionInitialized = "NodeSelectionInitialized"
+	lifecycleRetry           = 5 * time.Second
+	sourceOwnerIndex         = "gpu-operator.source-owner"
+	directPodBatchSize       = 64
+	maxReportedWorkloads     = 5
 )
 
+func sourceStack(obj client.Object) string {
+	if _, ok := obj.(*gpuv1.ClusterPolicy); ok {
+		return coexistence.DP
+	}
+	return coexistence.DRA
+}
 func sourceConditions(obj client.Object) *[]metav1.Condition {
 	switch obj := obj.(type) {
 	case *gpuv1.ClusterPolicy:
@@ -63,26 +71,61 @@ func operandsRemovedTrue(obj client.Object) bool {
 	return cs != nil && meta.IsStatusConditionTrue(*cs, operandsRemoved)
 }
 
-// Source controllers own teardown status. Node labeling observes OperandsRemoved.
+func nodeSelectionInitializedTrue(obj client.Object) bool {
+	cs := sourceConditions(obj)
+	return cs != nil && meta.IsStatusConditionTrue(*cs, nodeSelectionInitialized)
+}
+
 func setOperandsRemoved(ctx context.Context, c client.Client, obj client.Object, done bool, reason, message string) error {
+	return setSourceCondition(ctx, c, obj, operandsRemoved, done, reason, message)
+}
+
+func setSourceCondition(ctx context.Context, c client.Client, obj client.Object, condition string, done bool, reason, message string) error {
 	original := obj.DeepCopyObject().(client.Object)
+	// Successful adoption preserves readiness. The schema requires a state on the first write.
+	notReady := condition == operandsRemoved || !done
+	switch o := obj.(type) {
+	case *gpuv1.ClusterPolicy:
+		if notReady || o.Status.State == "" {
+			o.Status.State = gpuv1.NotReady
+		}
+	case *gpu.GPUCluster:
+		if notReady || o.Status.State == "" {
+			o.Status.State = gpu.NotReady
+		}
+	}
 	status := metav1.ConditionFalse
 	if done {
 		status = metav1.ConditionTrue
 	}
 	cs := sourceConditions(obj)
-	meta.SetStatusCondition(cs, metav1.Condition{Type: operandsRemoved, Status: status, Reason: reason, Message: message, ObservedGeneration: obj.GetGeneration()})
-	meta.SetStatusCondition(cs, metav1.Condition{Type: "Ready", Status: metav1.ConditionFalse, Reason: reason, Message: message, ObservedGeneration: obj.GetGeneration()})
-	switch o := obj.(type) {
-	case *gpuv1.ClusterPolicy:
-		o.Status.State = gpuv1.NotReady
-	case *gpu.GPUCluster:
-		o.Status.State = gpu.NotReady
+	meta.SetStatusCondition(cs, metav1.Condition{Type: condition, Status: status, Reason: reason, Message: message, ObservedGeneration: obj.GetGeneration()})
+	if notReady {
+		meta.SetStatusCondition(cs, metav1.Condition{Type: "Ready", Status: metav1.ConditionFalse, Reason: reason, Message: message, ObservedGeneration: obj.GetGeneration()})
 	}
 	if reflect.DeepEqual(original, obj) {
 		return nil
 	}
 	return c.Status().Patch(ctx, obj, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{}))
+}
+
+func observeSourceAdoption(ctx context.Context, c client.Client, obj client.Object, defaultStack string) (bool, error) {
+	if nodeSelectionInitializedTrue(obj) {
+		return true, nil
+	}
+	pending, err := sourceAdoptionPending(ctx, c, obj, defaultStack)
+	reason, message := "AdoptionComplete", "Observed selection records and compatible placement on eligible discovered nodes"
+	if pending || err != nil {
+		reason, message = "NodeAdoptionPending", "Waiting to observe selection records and compatible placement"
+	}
+	if err != nil {
+		message = err.Error()
+	}
+	if statusErr := setSourceCondition(ctx, c, obj, nodeSelectionInitialized, !pending && err == nil, reason, message); statusErr != nil {
+		return false, statusErr
+	}
+	// Even a successful status patch is observed before activation in another pass.
+	return false, err
 }
 
 // Index only operands controlled directly by a source. Kubernetes garbage collection
@@ -157,12 +200,14 @@ func ownedWorkloads(ctx context.Context, c client.Client, namespace string, owne
 	return result, len(pods.Items) >= podLimit, nil
 }
 
+const draKubeletPluginDaemonSetName = "nvidia-dra-driver-kubelet-plugin"
+
 // Keep the providers until every other directly owned workload is gone. A Pod
 // from an older rollout can still consume claims after its template changes.
 func isDRAProvider(obj client.Object) bool {
 	switch obj.(type) {
 	case *appsv1.DaemonSet:
-		return obj.GetName() == "nvidia-dra-driver-kubelet-plugin"
+		return obj.GetName() == draKubeletPluginDaemonSetName
 	case *appsv1.Deployment:
 		return obj.GetName() == "nvidia-dra-driver-controller"
 	}
@@ -183,7 +228,7 @@ func teardownSourceOperands(ctx context.Context, c client.Client, namespace stri
 		return ctrl.Result{}, setOperandsRemoved(ctx, c, obj, true, "TeardownComplete", "Source-owned workload controllers removed. Succeeded ClusterPolicy validator Pods may remain for garbage collection.")
 	}
 	targets := workloads
-	if _, ok := obj.(*gpu.GPUCluster); ok {
+	if sourceStack(obj) == coexistence.DRA {
 		var dependents []client.Object
 		for _, workload := range workloads {
 			if !isDRAProvider(workload) {
@@ -241,8 +286,8 @@ func teardownBlockerMessage(targets []client.Object, podListAtLimit bool) string
 	return message
 }
 
-func stackExclusiveKeys(source client.Object) map[string]bool {
-	if _, ok := source.(*gpuv1.ClusterPolicy); ok {
+func stackExclusiveKeys(stack string) map[string]bool {
+	if stack == coexistence.DP {
 		return devicePluginOnlyStateLabelKeys()
 	}
 	keys := map[string]bool{}
@@ -254,15 +299,36 @@ func stackExclusiveKeys(source client.Object) map[string]bool {
 	return keys
 }
 
+func nodeReservedForTeardown(node *corev1.Node, cp *gpuv1.ClusterPolicy, gc *gpu.GPUCluster) bool {
+	return (cp != nil && !cp.DeletionTimestamp.IsZero() && hasStackMetadata(node, coexistence.DP)) ||
+		(gc != nil && !gc.DeletionTimestamp.IsZero() && hasStackMetadata(node, coexistence.DRA))
+}
+
+func hasStackMetadata(node *corev1.Node, stack string) bool {
+	if node.Annotations[coexistence.SelectionAnnotation] == stack {
+		return true
+	}
+	for key := range stackExclusiveKeys(stack) {
+		if value, ok := node.Labels[key]; ok && value != "false" {
+			return true
+		}
+	}
+	return false
+}
+
 // Preserve per-node opt-outs when the same stack is installed again. Discovery
 // and independent driver metadata belong to their respective controllers.
 func cleanSourceNode(node *corev1.Node, source client.Object, keepDriver bool) bool {
 	changed := false
-	for key := range stackExclusiveKeys(source) {
+	for key := range stackExclusiveKeys(sourceStack(source)) {
 		if value, ok := node.Labels[key]; ok && value != "false" {
 			delete(node.Labels, key)
 			changed = true
 		}
+	}
+	if node.Annotations[coexistence.SelectionAnnotation] == sourceStack(source) {
+		delete(node.Annotations, coexistence.SelectionAnnotation)
+		changed = true
 	}
 	if !keepDriver {
 		for _, key := range []string{driverDeployLabelKey, vgpuManagerDeployLabelKey} {

@@ -66,6 +66,18 @@ spec:
         app: nvidia-dcgm-dra
         app.kubernetes.io/component: nvidia-dcgm
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.deploy.mode
+                operator: DoesNotExist
+            - matchExpressions:
+              - key: nvidia.com/gpu.deploy.mode
+                operator: In
+                values:
+                - dra
       containers:
       - image: nvcr.io/nvidia/cloud-native/dcgm:test
         livenessProbe:

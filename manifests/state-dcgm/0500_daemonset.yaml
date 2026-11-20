@@ -46,6 +46,18 @@ spec:
       # can pause it to drain DCGM off a node during a driver reload.
       nodeSelector:
         nvidia.com/gpu.deploy.dcgm-dra: "true"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.deploy.mode
+                operator: DoesNotExist
+            - matchExpressions:
+              - key: nvidia.com/gpu.deploy.mode
+                operator: In
+                values:
+                - dra
       {{- if .DCGM.Spec.ImagePullSecrets }}
       imagePullSecrets:
       {{- range .DCGM.Spec.ImagePullSecrets }}

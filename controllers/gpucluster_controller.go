@@ -63,6 +63,7 @@ type GPUClusterReconciler struct {
 	ClusterInfo     clusterinfo.Interface
 	Namespace       string
 	OperatorMetrics *OperatorMetrics
+	DefaultStack    string
 
 	stateManager     state.Manager
 	conditionUpdater conditions.Updater
@@ -119,6 +120,12 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			logger.Error(condErr, "failed to set condition")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
+
+	if adopted, err := observeSourceAdoption(ctx, r.Client, instance, r.DefaultStack); err != nil {
+		return ctrl.Result{}, err
+	} else if !adopted {
+		return ctrl.Result{RequeueAfter: lifecycleRetry}, nil
 	}
 
 	// The operand states render ResourceClaimTemplates with adminAccess: true, which the

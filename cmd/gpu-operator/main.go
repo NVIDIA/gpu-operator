@@ -51,6 +51,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers"
 	operatorcache "github.com/NVIDIA/gpu-operator/controllers/cache"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 	"github.com/NVIDIA/gpu-operator/internal/predicates"
 	// +kubebuilder:scaffold:imports
@@ -119,6 +120,12 @@ func main() {
 		Port: 9443,
 	})
 
+	defaultStack, err := coexistence.DefaultStack()
+	if err != nil {
+		logger.Error(err, "Invalid allocator configuration")
+		os.Exit(1)
+	}
+
 	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
 
 	if operatorNamespace == "" {
@@ -171,6 +178,7 @@ func main() {
 		Log:             ctrl.Log.WithName("controllers").WithName("ClusterPolicy"),
 		Scheme:          mgr.GetScheme(),
 		OperatorMetrics: operatorMetrics,
+		DefaultStack:    defaultStack,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterPolicy")
 		os.Exit(1)
@@ -228,10 +236,11 @@ func main() {
 	}
 
 	if err = (&controllers.NodeLabelingReconciler{
-		Namespace: operatorNamespace,
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Log:       ctrl.Log.WithName("controllers").WithName("NodeLabeling"),
+		Namespace:    operatorNamespace,
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		Log:          ctrl.Log.WithName("controllers").WithName("NodeLabeling"),
+		DefaultStack: defaultStack,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeLabeling")
 		os.Exit(1)
@@ -243,6 +252,7 @@ func main() {
 		Scheme:          mgr.GetScheme(),
 		ClusterInfo:     clusterInfo,
 		OperatorMetrics: operatorMetrics,
+		DefaultStack:    defaultStack,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GPUCluster")
 		os.Exit(1)

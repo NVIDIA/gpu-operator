@@ -51,6 +51,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
@@ -1194,9 +1195,19 @@ func TestDevicePlugin(t *testing.T) {
 				return
 			}
 
-			// Without a GPUCluster in the cluster, scheduling gates on the deploy label
-			// alone; the mode nodeSelector is rendered only once the DRA stack coexists.
+			// Every DP operand requires its component label and mode absent or device-plugin.
 			require.Equal(t, "true", ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu.deploy.device-plugin"])
+			require.NotNil(t, ds.Spec.Template.Spec.Affinity)
+			for _, term := range ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				found := false
+				for _, expr := range term.MatchExpressions {
+					if expr.Key == "nvidia.com/gpu.deploy.mode" {
+						found = true
+						require.True(t, expr.Operator == corev1.NodeSelectorOpDoesNotExist || (expr.Operator == corev1.NodeSelectorOpIn && len(expr.Values) == 1 && expr.Values[0] == "device-plugin"))
+					}
+				}
+				require.True(t, found, "each affinity alternative must constrain mode")
+			}
 			require.NotContains(t, ds.Spec.Template.Spec.NodeSelector, "nvidia.com/gpu-operator.resource-allocation.mode")
 
 			configManagerInitPresent := false
@@ -2682,6 +2693,53 @@ func TestMIGManager(t *testing.T) {
 				t.Fatalf("error removing state %v:", err)
 			}
 			clusterPolicyController.idx--
+		})
+	}
+}
+
+func TestRenamedDriverDaemonSetsAreExemptFromModeAffinity(t *testing.T) {
+	for name, tc := range map[string]struct {
+		assetsPath   string
+		templateName string
+		precompiled  bool
+	}{
+		"precompiled driver": {driverAssetsPath, commonDriverDaemonsetName, true},
+		"DTK driver":         {driverAssetsPath, commonDriverDaemonsetName, false},
+		"DTK vGPU manager":   {vGPUManagerAssetsPath, commonVGPUManagerDaemonsetName, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			n := clusterPolicyController
+			n.singleton = getDriverTestInput("default")
+			if tc.precompiled {
+				n.singleton = getDriverTestInput("precompiled")
+				n.currentKernelVersion = "5.4.0-generic"
+				n.kernelVersionMap = map[string]string{n.currentKernelVersion: "ubuntu22.04"}
+			} else {
+				n.ocpDriverToolkit.enabled = true
+				n.ocpDriverToolkit.currentRhcosVersion = "test-rhcos"
+				n.ocpDriverToolkit.rhcosDriverToolkitImages = map[string]string{"test-rhcos": "example.com/dtk:latest"}
+			}
+			if tc.templateName == commonVGPUManagerDaemonsetName {
+				manager := &n.singleton.Spec.VGPUManager
+				manager.Repository = n.singleton.Spec.Driver.Repository
+				manager.Image = "vgpu-manager"
+				manager.Version = n.singleton.Spec.Driver.Version
+				manager.DriverManager = n.singleton.Spec.Driver.Manager
+			}
+
+			resources, _ := addResourcesControls(&n, filepath.Join(cfg.root, tc.assetsPath))
+			ds := &resources.DaemonSet
+			require.Equal(t, tc.templateName, ds.Name)
+			require.NoError(t, preProcessDaemonSet(ds, n))
+			require.NotEqual(t, tc.templateName, ds.Name, "the transform must rename the DaemonSet")
+			affinity := ds.Spec.Template.Spec.Affinity
+			if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+				for _, term := range affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+					for _, requirement := range term.MatchExpressions {
+						require.NotEqual(t, coexistence.ModeLabel, requirement.Key)
+					}
+				}
+			}
 		})
 	}
 }

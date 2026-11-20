@@ -132,6 +132,18 @@ spec:
         app: nvidia-dcgm-exporter-dra
         app.kubernetes.io/component: nvidia-dcgm-exporter
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.deploy.mode
+                operator: DoesNotExist
+            - matchExpressions:
+              - key: nvidia.com/gpu.deploy.mode
+                operator: In
+                values:
+                - dra
       automountServiceAccountToken: true
       containers:
       - env:
