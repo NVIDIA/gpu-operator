@@ -347,7 +347,10 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	return n.syncObjectState(obj, &corev1.ServiceAccount{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{CreateOnly: true})
+	return n.syncObjectState(obj, &corev1.ServiceAccount{}, utils.SyncOptions{
+		EnsureAbsent:       !n.isStateEnabled(n.stateNames[n.idx]),
+		SkipUpdateIfExists: true,
+	})
 }
 
 // Role creates Role resource
@@ -356,7 +359,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].Role.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	return n.syncObjectState(obj, &rbacv1.Role{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{})
+	return n.syncObjectState(obj, &rbacv1.Role{}, utils.SyncOptions{EnsureAbsent: !n.isStateEnabled(n.stateNames[n.idx])})
 }
 
 // RoleBinding creates RoleBinding resource
@@ -375,7 +378,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
-	return n.syncObjectState(obj, &rbacv1.RoleBinding{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{})
+	return n.syncObjectState(obj, &rbacv1.RoleBinding{}, utils.SyncOptions{EnsureAbsent: !n.isStateEnabled(n.stateNames[n.idx])})
 }
 
 var rbacGates = map[string]func(*gpuv1.ClusterPolicySpec) bool{
@@ -399,8 +402,8 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ClusterRole.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	shouldExist := n.isStateEnabled(n.stateNames[n.idx]) && isRBACEnabled(obj.Name, &n.singleton.Spec)
-	return n.syncObjectState(obj, &rbacv1.ClusterRole{}, shouldExist, utils.SyncOptions{})
+	ensureAbsent := !n.isStateEnabled(n.stateNames[n.idx]) || !isRBACEnabled(obj.Name, &n.singleton.Spec)
+	return n.syncObjectState(obj, &rbacv1.ClusterRole{}, utils.SyncOptions{EnsureAbsent: ensureAbsent})
 }
 
 // ClusterRoleBinding creates ClusterRoleBinding resource
@@ -413,8 +416,8 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Subjects[idx].Namespace = n.operatorNamespace
 	}
 
-	shouldExist := n.isStateEnabled(n.stateNames[n.idx]) && isRBACEnabled(obj.Name, &n.singleton.Spec)
-	return n.syncObjectState(obj, &rbacv1.ClusterRoleBinding{}, shouldExist, utils.SyncOptions{})
+	ensureAbsent := !n.isStateEnabled(n.stateNames[n.idx]) || !isRBACEnabled(obj.Name, &n.singleton.Spec)
+	return n.syncObjectState(obj, &rbacv1.ClusterRoleBinding{}, utils.SyncOptions{EnsureAbsent: ensureAbsent})
 }
 
 // createConfigMap creates a ConfigMap resource
@@ -428,7 +431,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		return n.syncObjectState(obj, &corev1.ConfigMap{}, false, utils.SyncOptions{})
+		return n.syncObjectState(obj, &corev1.ConfigMap{}, utils.SyncOptions{EnsureAbsent: true})
 	}
 
 	// avoid creating default 'mig-parted-config' ConfigMap if custom one is provided
@@ -455,7 +458,7 @@ func createConfigMap(n ClusterPolicyController, configMapIdx int) (gpuv1.State, 
 		}
 	}
 
-	return n.syncObjectState(obj, &corev1.ConfigMap{}, true, utils.SyncOptions{})
+	return n.syncObjectState(obj, &corev1.ConfigMap{}, utils.SyncOptions{})
 }
 
 // ConfigMaps creates ConfigMap resource(s)
@@ -4017,8 +4020,8 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].Deployment.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	shouldExist := n.isStateEnabled(n.stateNames[n.idx])
-	if syncState, err := n.syncObjectState(obj, &appsv1.Deployment{}, shouldExist, utils.SyncOptions{}); err != nil || !shouldExist {
+	ensureAbsent := !n.isStateEnabled(n.stateNames[n.idx])
+	if syncState, err := n.syncObjectState(obj, &appsv1.Deployment{}, utils.SyncOptions{EnsureAbsent: ensureAbsent}); err != nil || ensureAbsent {
 		return syncState, err
 	}
 
@@ -4488,7 +4491,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		return n.syncObjectState(obj, &appsv1.DaemonSet{}, false, utils.SyncOptions{})
+		return n.syncObjectState(obj, &appsv1.DaemonSet{}, utils.SyncOptions{EnsureAbsent: true})
 	}
 
 	if !n.hasGPUNodes {
@@ -4684,7 +4687,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 		obj.Users[idx] = fmt.Sprintf("system:serviceaccount:%s:%s", obj.Namespace, obj.Name)
 	}
 
-	return n.syncObjectState(obj, &secv1.SecurityContextConstraints{}, n.isStateEnabled(n.stateNames[n.idx]), utils.SyncOptions{})
+	return n.syncObjectState(obj, &secv1.SecurityContextConstraints{}, utils.SyncOptions{EnsureAbsent: !n.isStateEnabled(n.stateNames[n.idx])})
 }
 
 // Service creates Service object
@@ -4698,7 +4701,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	// Check if state is disabled and cleanup resource if exists
 	if !n.isStateEnabled(n.stateNames[n.idx]) {
-		return n.syncObjectState(obj, &corev1.Service{}, false, utils.SyncOptions{})
+		return n.syncObjectState(obj, &corev1.Service{}, utils.SyncOptions{EnsureAbsent: true})
 	}
 
 	err := preprocessService(obj, n)
@@ -4707,8 +4710,8 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
-	return n.syncObjectState(obj, &corev1.Service{}, true, utils.SyncOptions{
-		PreserveLiveFields: func(desired, current client.Object) {
+	return n.syncObjectState(obj, &corev1.Service{}, utils.SyncOptions{
+		Mutate: func(desired, current client.Object) {
 			// Keep the ClusterIP assigned by the API server.
 			desired.(*corev1.Service).Spec.ClusterIP = current.(*corev1.Service).Spec.ClusterIP
 		},
@@ -4795,7 +4798,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		if !serviceMonitorCRDExists {
 			return gpuv1.Ready, nil
 		}
-		return n.syncObjectState(obj, &promv1.ServiceMonitor{}, false, utils.SyncOptions{})
+		return n.syncObjectState(obj, &promv1.ServiceMonitor{}, utils.SyncOptions{EnsureAbsent: true})
 	}
 
 	if n.stateNames[state] == "state-dcgm-exporter" {
@@ -4805,7 +4808,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 			if !serviceMonitorCRDExists {
 				return gpuv1.Ready, nil
 			}
-			return n.syncObjectState(obj, &promv1.ServiceMonitor{}, false, utils.SyncOptions{})
+			return n.syncObjectState(obj, &promv1.ServiceMonitor{}, utils.SyncOptions{EnsureAbsent: true})
 		}
 
 		// If Prometheus CRD is missing, skip gracefully
@@ -4850,7 +4853,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 		obj.Spec.NamespaceSelector.MatchNames[idx] = obj.Namespace
 	}
 
-	return n.syncObjectState(obj, &promv1.ServiceMonitor{}, true, utils.SyncOptions{})
+	return n.syncObjectState(obj, &promv1.ServiceMonitor{}, utils.SyncOptions{})
 }
 
 func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeClass) (gpuv1.State, error) {
@@ -4868,7 +4871,7 @@ func transformRuntimeClassLegacy(n ClusterPolicyController, spec nodev1.RuntimeC
 
 	obj.Labels = spec.Labels
 
-	return n.syncObjectState(obj, &nodev1beta1.RuntimeClass{}, true, utils.SyncOptions{})
+	return n.syncObjectState(obj, &nodev1beta1.RuntimeClass{}, utils.SyncOptions{})
 }
 
 func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) (gpuv1.State, error) {
@@ -4886,7 +4889,7 @@ func transformRuntimeClass(n ClusterPolicyController, spec nodev1.RuntimeClass) 
 
 	obj.Labels = spec.Labels
 
-	return n.syncObjectState(obj, &nodev1.RuntimeClass{}, true, utils.SyncOptions{})
+	return n.syncObjectState(obj, &nodev1.RuntimeClass{}, utils.SyncOptions{})
 }
 
 func transformKataRuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
@@ -4945,7 +4948,7 @@ func RuntimeClasses(n ClusterPolicyController) (gpuv1.State, error) {
 		// 'nvidia-legacy' runtime classes. Delete these objects if they were
 		// previously created.
 		if !n.singleton.Spec.CDI.IsEnabled() && (obj.Name == "nvidia-cdi" || obj.Name == "nvidia-legacy") {
-			if _, err := n.syncObjectState(&obj, &nodev1.RuntimeClass{}, false, utils.SyncOptions{}); err != nil {
+			if _, err := n.syncObjectState(&obj, &nodev1.RuntimeClass{}, utils.SyncOptions{EnsureAbsent: true}); err != nil {
 				return gpuv1.NotReady, err
 			}
 			continue
@@ -4967,7 +4970,7 @@ func PrometheusRule(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].PrometheusRule.DeepCopy()
 	obj.Namespace = n.operatorNamespace
 
-	return n.syncObjectState(obj, &promv1.PrometheusRule{}, true, utils.SyncOptions{})
+	return n.syncObjectState(obj, &promv1.PrometheusRule{}, utils.SyncOptions{})
 }
 
 func clearRuntimeClasses(n ClusterPolicyController, runtimeClasses []nodev1.RuntimeClass) error {
@@ -4976,7 +4979,7 @@ func clearRuntimeClasses(n ClusterPolicyController, runtimeClasses []nodev1.Runt
 		if obj.Name == "FILLED_BY_OPERATOR" {
 			obj.Name = getRuntimeClassName(&n.singleton.Spec)
 		}
-		if _, err := n.syncObjectState(&obj, &nodev1.RuntimeClass{}, false, utils.SyncOptions{}); err != nil {
+		if _, err := n.syncObjectState(&obj, &nodev1.RuntimeClass{}, utils.SyncOptions{EnsureAbsent: true}); err != nil {
 			return err
 		}
 	}
@@ -4999,11 +5002,11 @@ func validateCDIDeviceListStrategy(container *corev1.Container) error {
 
 // syncObjectState calls utils.SyncObject with the ClusterPolicy as the owner of desired,
 // for an object that is ready as soon as it is written.
-func (n ClusterPolicyController) syncObjectState(desired, live client.Object, shouldExist bool, opts utils.SyncOptions) (gpuv1.State, error) {
-	if err := utils.SyncObject(n.ctx, n.client, n.singleton, desired, live, shouldExist, opts); err != nil {
+func (n ClusterPolicyController) syncObjectState(desired, live client.Object, opts utils.SyncOptions) (gpuv1.State, error) {
+	if err := utils.SyncObject(n.ctx, n.client, n.singleton, desired, live, opts); err != nil {
 		return gpuv1.NotReady, err
 	}
-	if !shouldExist {
+	if opts.EnsureAbsent {
 		return gpuv1.Disabled, nil
 	}
 	return gpuv1.Ready, nil
