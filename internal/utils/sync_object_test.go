@@ -284,26 +284,27 @@ func TestSyncObject(t *testing.T) {
 	annotatedRole.SetAnnotations(map[string]string{"revision": "v1"})
 
 	testCases := map[string]struct {
-		existing    []client.Object
-		desired     client.Object
-		live        client.Object
-		shouldExist bool
-		opts        SyncOptions
-		failOn      string
-		wantErr     bool
-		wantCalls   syncCalls
+		existing  []client.Object
+		desired   client.Object
+		live      client.Object
+		opts      SyncOptions
+		failOn    string
+		wantErr   bool
+		wantCalls syncCalls
 		// check inspects the stored object and the last object sent in an update.
 		check func(t *testing.T, c client.Client, updated client.Object)
 	}{
 		"object that should not exist and is missing": {
 			desired:   newTestRole("get"),
 			live:      &rbacv1.Role{},
+			opts:      SyncOptions{EnsureAbsent: true},
 			wantCalls: syncCalls{},
 		},
 		"object that should not exist and is present is deleted": {
 			existing:  []client.Object{newTestRole("get")},
 			desired:   newTestRole("get"),
 			live:      &rbacv1.Role{},
+			opts:      SyncOptions{EnsureAbsent: true},
 			wantCalls: syncCalls{deletes: 1},
 			check: func(t *testing.T, c client.Client, _ client.Object) {
 				err := c.Get(context.Background(), client.ObjectKey{Name: "role-a", Namespace: "test-ns"}, &rbacv1.Role{})
@@ -311,10 +312,9 @@ func TestSyncObject(t *testing.T) {
 			},
 		},
 		"missing object is created with an owner reference": {
-			desired:     newTestRole("get"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
-			wantCalls:   syncCalls{creates: 1},
+			desired:   newTestRole("get"),
+			live:      &rbacv1.Role{},
+			wantCalls: syncCalls{creates: 1},
 			check: func(t *testing.T, c client.Client, _ client.Object) {
 				stored := &rbacv1.Role{}
 				require.NoError(t, c.Get(context.Background(), client.ObjectKey{Name: "role-a", Namespace: "test-ns"}, stored))
@@ -322,27 +322,24 @@ func TestSyncObject(t *testing.T) {
 				assert.Equal(t, owner.UID, metav1.GetControllerOf(stored).UID)
 			},
 		},
-		"CreateOnly keeps an existing object": {
-			existing:    []client.Object{newServiceAccount(map[string]string{"version": "old"})},
-			desired:     newServiceAccount(map[string]string{"version": "new"}),
-			live:        &corev1.ServiceAccount{},
-			shouldExist: true,
-			opts:        SyncOptions{CreateOnly: true},
-			wantCalls:   syncCalls{},
+		"SkipUpdateIfExists keeps an existing object": {
+			existing:  []client.Object{newServiceAccount(map[string]string{"version": "old"})},
+			desired:   newServiceAccount(map[string]string{"version": "new"}),
+			live:      &corev1.ServiceAccount{},
+			opts:      SyncOptions{SkipUpdateIfExists: true},
+			wantCalls: syncCalls{},
 		},
 		"unchanged object is not updated": {
-			existing:    []client.Object{owned(newTestRole("get"))},
-			desired:     newTestRole("get"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
-			wantCalls:   syncCalls{},
+			existing:  []client.Object{owned(newTestRole("get"))},
+			desired:   newTestRole("get"),
+			live:      &rbacv1.Role{},
+			wantCalls: syncCalls{},
 		},
 		"changed object is updated with the live resource version": {
-			existing:    []client.Object{owned(newTestRole("get"))},
-			desired:     newTestRole("get", "list"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
-			wantCalls:   syncCalls{updates: 1},
+			existing:  []client.Object{owned(newTestRole("get"))},
+			desired:   newTestRole("get", "list"),
+			live:      &rbacv1.Role{},
+			wantCalls: syncCalls{updates: 1},
 			check: func(t *testing.T, c client.Client, updated client.Object) {
 				assert.Equal(t, "999", updated.GetResourceVersion())
 				stored := &rbacv1.Role{}
@@ -350,13 +347,12 @@ func TestSyncObject(t *testing.T) {
 				assert.Equal(t, []string{"get", "list"}, stored.Rules[0].Verbs)
 			},
 		},
-		"PreserveLiveFields copies a live annotation into the update": {
-			existing:    []client.Object{owned(annotatedRole)},
-			desired:     newTestRole("get", "list"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
+		"Mutate copies a live annotation into the update": {
+			existing: []client.Object{owned(annotatedRole)},
+			desired:  newTestRole("get", "list"),
+			live:     &rbacv1.Role{},
 			opts: SyncOptions{
-				PreserveLiveFields: func(desired, current client.Object) {
+				Mutate: func(desired, current client.Object) {
 					desired.SetAnnotations(current.GetAnnotations())
 				},
 			},
@@ -367,34 +363,32 @@ func TestSyncObject(t *testing.T) {
 			},
 		},
 		"read error is returned": {
-			desired:     newTestRole("get"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
-			failOn:      "get",
-			wantErr:     true,
-			wantCalls:   syncCalls{},
+			desired:   newTestRole("get"),
+			live:      &rbacv1.Role{},
+			failOn:    "get",
+			wantErr:   true,
+			wantCalls: syncCalls{},
 		},
 		"create error is returned": {
-			desired:     newTestRole("get"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
-			failOn:      "create",
-			wantErr:     true,
-			wantCalls:   syncCalls{creates: 1},
+			desired:   newTestRole("get"),
+			live:      &rbacv1.Role{},
+			failOn:    "create",
+			wantErr:   true,
+			wantCalls: syncCalls{creates: 1},
 		},
 		"update error is returned": {
-			existing:    []client.Object{owned(newTestRole("get"))},
-			desired:     newTestRole("get", "list"),
-			live:        &rbacv1.Role{},
-			shouldExist: true,
-			failOn:      "update",
-			wantErr:     true,
-			wantCalls:   syncCalls{updates: 1},
+			existing:  []client.Object{owned(newTestRole("get"))},
+			desired:   newTestRole("get", "list"),
+			live:      &rbacv1.Role{},
+			failOn:    "update",
+			wantErr:   true,
+			wantCalls: syncCalls{updates: 1},
 		},
 		"delete error is returned": {
 			existing:  []client.Object{newTestRole("get")},
 			desired:   newTestRole("get"),
 			live:      &rbacv1.Role{},
+			opts:      SyncOptions{EnsureAbsent: true},
 			failOn:    "delete",
 			wantErr:   true,
 			wantCalls: syncCalls{deletes: 1},
@@ -442,7 +436,7 @@ func TestSyncObject(t *testing.T) {
 					},
 				}).Build()
 
-			err := SyncObject(context.Background(), fakeClient, owner, testCase.desired, testCase.live, testCase.shouldExist, testCase.opts)
+			err := SyncObject(context.Background(), fakeClient, owner, testCase.desired, testCase.live, testCase.opts)
 			if testCase.wantErr {
 				require.Error(t, err)
 			} else {
@@ -475,7 +469,7 @@ func TestSyncObjectIgnoresAlreadyExistsAfterStaleRead(t *testing.T) {
 		}).Build()
 	owner := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "owner", Namespace: "test-ns", UID: "uid-owner"}}
 
-	err := SyncObject(context.Background(), fakeClient, owner, newTestRole("get"), &rbacv1.Role{}, true, SyncOptions{})
+	err := SyncObject(context.Background(), fakeClient, owner, newTestRole("get"), &rbacv1.Role{}, SyncOptions{})
 	require.NoError(t, err)
 	assert.Zero(t, updates)
 }

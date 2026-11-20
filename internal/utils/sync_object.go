@@ -37,22 +37,25 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
-// SyncOptions changes how SyncObject writes kinds that need special handling.
+// SyncOptions controls how SyncObject reconciles an object.
 type SyncOptions struct {
-	// CreateOnly keeps an existing object unchanged.
-	CreateOnly bool
-	// Use PreserveLiveFields to copy fields from the live object that the API server sets
-	// and that an update must not clear, such as the ClusterIP of a Service.
-	// Runs only when an update is to be made.
-	PreserveLiveFields func(desired, live client.Object)
+	// EnsureAbsent deletes the object if it exists. By default, SyncObject ensures it is present.
+	EnsureAbsent bool
+
+	// SkipUpdateIfExists leaves an existing object untouched on the create-or-update path.
+	SkipUpdateIfExists bool
+
+	// Use Mutate to adjust the desired object based on the object's live state in the cluster.
+	// Runs only when SkipUpdateIfExists is false.
+	Mutate func(desired, current client.Object)
 }
 
-// SyncObject makes the cluster match desired. If shouldExist is false, SyncObject deletes
+// SyncObject makes the cluster match desired. If EnsureAbsent is true, SyncObject deletes
 // the object. Otherwise, it adds a controlling owner reference from desired to owner, so
 // that deleting owner deletes desired. Then it creates the object, or updates it unless
-// ContentEqual reports no change or opts say to keep it. live must be an empty object of
-// the same type as desired.
-func SyncObject(ctx context.Context, c client.Client, owner, desired, live client.Object, shouldExist bool, opts SyncOptions) error {
+// SkipUpdateIfExists is true or ContentEqual reports no change. live must be an empty
+// object of the same type as desired.
+func SyncObject(ctx context.Context, c client.Client, owner, desired, live client.Object, opts SyncOptions) error {
 	gvk, kindErr := apiutil.GVKForObject(desired, c.Scheme())
 	kind := gvk.Kind
 	if kindErr != nil {
@@ -61,7 +64,7 @@ func SyncObject(ctx context.Context, c client.Client, owner, desired, live clien
 	logger := log.FromContext(ctx).WithValues("Kind", kind, "Name", desired.GetName(), "Namespace", desired.GetNamespace())
 	key := client.ObjectKeyFromObject(desired)
 
-	if !shouldExist {
+	if opts.EnsureAbsent {
 		if err := c.Get(ctx, key, live); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
@@ -93,7 +96,7 @@ func SyncObject(ctx context.Context, c client.Client, owner, desired, live clien
 		return err
 	}
 
-	if opts.CreateOnly {
+	if opts.SkipUpdateIfExists {
 		return nil
 	}
 
@@ -102,8 +105,8 @@ func SyncObject(ctx context.Context, c client.Client, owner, desired, live clien
 		return nil
 	}
 
-	if opts.PreserveLiveFields != nil {
-		opts.PreserveLiveFields(desired, live)
+	if opts.Mutate != nil {
+		opts.Mutate(desired, live)
 	}
 	desired.SetResourceVersion(live.GetResourceVersion())
 
