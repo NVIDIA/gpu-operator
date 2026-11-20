@@ -108,6 +108,10 @@ spec:
               fieldPath: metadata.namespace
         - name: IMAGE_NAME
           value: {{ .DRADriver.ImagePath | quote }}
+        {{- if .DRADriver.Spec.ImagePullSecrets }}
+        - name: CD_DAEMON_IMAGE_PULL_SECRET_NAMES
+          value: {{ join "," .DRADriver.Spec.ImagePullSecrets | quote }}
+        {{- end }}
         - name: NVIDIA_VISIBLE_DEVICES
           value: void
         - name: LEADER_ELECTION_ENABLED
