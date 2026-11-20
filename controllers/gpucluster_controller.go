@@ -120,6 +120,12 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
+	if adopted, err := observeSourceAdoption(ctx, r.Client, instance); err != nil {
+		return ctrl.Result{}, err
+	} else if !adopted {
+		return ctrl.Result{RequeueAfter: lifecycleRetry}, nil
+	}
+
 	// The operand states render ResourceClaimTemplates with adminAccess: true, which the
 	// kube-scheduler only admits from a labeled namespace; label it before syncing states.
 	if err := r.ensureAdminAccessLabel(ctx); err != nil {

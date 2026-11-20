@@ -32,3 +32,14 @@
 {{- if and (hasKey .Values.operator "replicaCount") (lt (int .Values.operator.replicaCount) 1) }}
 {{- fail "operator.replicaCount must be at least 1" }}
 {{- end }}
+
+{{- if ne .Values.operator.defaultGPUAllocationStack nil }}
+{{- if not (has .Values.operator.defaultGPUAllocationStack (list "device-plugin" "dra")) }}
+{{ fail "operator.defaultGPUAllocationStack must be null, device-plugin, or dra" }}
+{{- end }}
+{{- end }}
+{{- range .Values.operator.env }}
+{{- if eq .name "DEFAULT_GPU_ALLOCATION_STACK" }}
+{{ fail "use operator.defaultGPUAllocationStack instead of operator.env for DEFAULT_GPU_ALLOCATION_STACK" }}
+{{- end }}
+{{- end }}

@@ -49,6 +49,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	driverconfig "github.com/NVIDIA/gpu-operator/internal/config"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
@@ -789,7 +790,9 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 
 	// apply custom labels and pod annotations
 	applyCommonDaemonsetMetadata(obj, &n.singleton.Spec.Daemonsets, logger)
-
+	if obj.Name != "nvidia-driver-daemonset" && obj.Name != "nvidia-vgpu-manager-daemonset" {
+		coexistence.ConstrainMode(&obj.Spec.Template.Spec, coexistence.DP)
+	}
 	return nil
 }
 

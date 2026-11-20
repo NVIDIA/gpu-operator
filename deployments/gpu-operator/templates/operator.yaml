@@ -81,6 +81,10 @@ spec:
           value: "{{ include "driver-manager.fullimage" . }}"
         - name: "VALIDATOR_IMAGE"
           value: "{{ include "validator.fullimage" . }}"
+        {{- if ne .Values.operator.defaultGPUAllocationStack nil }}
+        - name: DEFAULT_GPU_ALLOCATION_STACK
+          value: {{ .Values.operator.defaultGPUAllocationStack | quote }}
+        {{- end }}
         {{- if .Values.operator.env }}
         {{- toYaml .Values.operator.env | nindent 8 }}
         {{- end }}

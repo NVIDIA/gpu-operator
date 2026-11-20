@@ -63,7 +63,7 @@ func TestNodeLabelingReconcileDefersDependentOperationsAfterGPULabelChanges(t *t
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 
 	clusterPolicy := &gpuv1.ClusterPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", Finalizers: []string{nodeCleanupFinalizer}},
 		Spec: gpuv1.ClusterPolicySpec{
 			Driver: gpuv1.DriverSpec{
 				UseNvidiaDriverCRD: new(true),
@@ -120,7 +120,7 @@ func TestNodeLabelingReconcileDoesNotDeferDependentOperationsForStateLabelChange
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 
 	clusterPolicy := &gpuv1.ClusterPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", Finalizers: []string{nodeCleanupFinalizer}},
 		Spec: gpuv1.ClusterPolicySpec{
 			Driver: gpuv1.DriverSpec{
 				UseNvidiaDriverCRD: new(true),
@@ -1325,7 +1325,7 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 	}
 
 	t.Run("GPUCluster present and no ClusterPolicy labels the GPU node with DRA stack", func(t *testing.T) {
-		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
+		gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config", Finalizers: []string{nodeCleanupFinalizer}}}
 		r, c := newReconciler(gc, gpuNode())
 
 		_, err := r.Reconcile(context.Background(), reconcile.Request{})
@@ -1341,7 +1341,7 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 	})
 
 	t.Run("ClusterPolicy present and no GPUCluster labels the GPU node with device-plugin stack", func(t *testing.T) {
-		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+		cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy", Finalizers: []string{nodeCleanupFinalizer}}}
 		r, c := newReconciler(cp, gpuNode())
 
 		_, err := r.Reconcile(context.Background(), reconcile.Request{})

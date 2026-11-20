@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
@@ -42,6 +43,7 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	nvidiadriverutil "github.com/NVIDIA/gpu-operator/internal/nvidiadriver"
 )
@@ -62,15 +64,17 @@ type NodeLabelingReconciler struct {
 }
 
 // nodeLabelingController holds per-reconcile state so that helper methods don't need to
-// re-receive that state as arguments. Exactly one of clusterPolicy (device-plugin stack)
-// or gpuCluster (DRA stack) is non-nil per reconcile; Reconcile returns an error if both
-// exist simultaneously.
+// re-receive that state as arguments. Both sources can be present; selectNode resolves
+// each node's allocator before applying the corresponding deployment labels.
 type nodeLabelingController struct {
 	client            client.Client
 	namespace         string
 	clusterPolicy     *gpuv1.ClusterPolicy
 	gpuCluster        *nvidiav1alpha1.GPUCluster
 	logger            logr.Logger
+	defaultStack      string
+	terminatingDP     bool
+	terminatingDRA    bool
 	skipStackLabeling bool
 
 	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
@@ -171,7 +175,18 @@ func (r *NodeLabelingReconciler) nodeUpdateRequiresReconcile(ctx context.Context
 		return true
 	}
 
-	needsUpdate := reasons.needsUpdate()
+	needsUpdate := reasons.needsUpdate() || annotationChanged(oldNode, newNode, coexistence.SelectionAnnotation)
+	for _, labels := range []map[string]string{oldLabels, newLabels} {
+		for key := range labels {
+			if strings.HasPrefix(key, "nvidia.com/gpu.deploy.") {
+				old, oldOK := oldLabels[key]
+				new, newOK := newLabels[key]
+				if old != new || oldOK != newOK {
+					needsUpdate = true
+				}
+			}
+		}
+	}
 	if needsUpdate {
 		r.Log.Info("Node needs an update",
 			"name", nodeName,
@@ -213,12 +228,23 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, fmt.Errorf("both ClusterPolicy and GPUCluster CRs exist; only one may be present at a time")
 	}
 
+	defaultStack, err := coexistence.DefaultStack()
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	terminatingDP := clusterPolicy != nil && !clusterPolicy.DeletionTimestamp.IsZero()
+	terminatingDRA := gpuCluster != nil && !gpuCluster.DeletionTimestamp.IsZero()
+	usesNvidiaDriverCRD := gpuCluster != nil ||
+		(clusterPolicy != nil && clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType())
 	nlc := &nodeLabelingController{
 		client:            r.Client,
 		namespace:         r.Namespace,
 		clusterPolicy:     clusterPolicy,
 		gpuCluster:        gpuCluster,
 		logger:            logger,
+		defaultStack:      defaultStack,
+		terminatingDP:     terminatingDP,
+		terminatingDRA:    terminatingDRA,
 		skipStackLabeling: skipStackLabeling,
 	}
 
@@ -245,8 +271,6 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Route each GPU node to its NVIDIADriver CR. Skipping this leaves the NVIDIADriver controller owning no nodes, and it
 	// then removes the driver DaemonSet.
-	usesNvidiaDriverCRD := nlc.gpuCluster != nil ||
-		(nlc.clusterPolicy != nil && nlc.clusterPolicy.Spec.Driver.UseNvidiaDriverCRDType())
 	if usesNvidiaDriverCRD {
 		if _, err := nvidiadriverutil.AssignOwners(ctx, r.Client); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to assign NVIDIADriver owners to nodes: %w", err)
@@ -288,6 +312,10 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 	for _, node := range nodeList.Items {
 		original := node.DeepCopy()
 		labels := node.GetLabels()
+		if labels == nil {
+			labels = map[string]string{}
+			node.SetLabels(labels)
+		}
 		gpuDiscoveryStateChanged := false
 		stateLabelsModified := false
 
@@ -296,14 +324,17 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 			gpuDiscoveryStateChanged = true
 		}
 
-		if !nlc.skipStackLabeling && nlc.updateGPUStateLabels(ctx, labels, node.Name) {
-			node.SetLabels(labels)
-			stateLabelsModified = true
+		if !nlc.skipStackLabeling {
+			selectionChanged, selectionErr := nlc.selectNode(ctx, &node)
+			if selectionErr != nil {
+				nlc.logger.Error(selectionErr, "Invalid allocator selection", "node", node.Name)
+			}
+			stateLabelsModified = selectionChanged
 		}
 
 		modified := gpuDiscoveryStateChanged || stateLabelsModified
 		if modified {
-			if err := nlc.client.Patch(ctx, &node, client.MergeFrom(original)); err != nil {
+			if err := nlc.client.Patch(ctx, &node, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
 				return result, fmt.Errorf("unable to label node %s: %w", node.Name, err)
 			}
 			result.totalPatchedNodeCount++
@@ -368,11 +399,9 @@ func (nlc *nodeLabelingController) updateGPUStateLabels(ctx context.Context, lab
 		node:        nodeName,
 		log:         nlc.logger,
 	}
-	// The kubelet-plugin must outlive every pod whose gpu.nvidia.com claims it has to
-	// unprepare: its DaemonSet gates only on gpu.deploy.dra-driver (not the mode label),
-	// so deferring this one key's removal keeps it running until the claim holders,
-	// drained by the mode flip, are gone. Without this the plugin unregisters first and
-	// the claim holders wedge in Terminating on unprepare.
+	// Preserve the existing plugin-removal deferral for claim consumers during
+	// mode-unlabeled recovery. Explicit mode affinity can revoke eligibility
+	// independently, so administrators must prepare nodes before changing mode.
 	draPluginLabel, draPluginWasSet := labels[draDriverDeployLabelKey]
 	modified := gpuWorkloadConfig.updateGPUStateLabels(labels)
 	if draPluginWasSet {
