@@ -24,8 +24,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const defaultMIGPartedConfigMapName = "default-mig-parted-config"
-
 type migPartedConfig struct {
 	MIGConfigs map[string][]migPartedEntry `json:"mig-configs"`
 }
@@ -36,14 +34,12 @@ type migPartedEntry struct {
 	MIGDevices   map[string]int `json:"mig-devices"`
 }
 
-// SelectSingleMIGProfile reads the mig-parted ConfigMap and finds the correct
+// SelectSingleMIGProfile reads the given mig-parted ConfigMap and finds the correct
 // single-strategy profile for the given PCI device ID. It uses the "all-balanced"
 // profile as a lookup table: each entry has device-filters for a GPU family and
 // lists the valid MIG slice types. The 1g slice type is extracted and returned
 // as a profile name (e.g. "all-1g.10gb").
-func (c *Clients) SelectSingleMIGProfile(ctx context.Context, namespace, pciDeviceID string) (string, error) {
-	configMapName := c.getMIGPartedConfigMapName(ctx)
-
+func (c *Clients) SelectSingleMIGProfile(ctx context.Context, namespace, configMapName, pciDeviceID string) (string, error) {
 	config, err := c.parseMIGPartedConfigMap(ctx, namespace, configMapName)
 	if err != nil {
 		return "", err
@@ -123,17 +119,17 @@ func (c *Clients) parseMIGPartedConfigMap(ctx context.Context, namespace, config
 	return &config, nil
 }
 
-// getMIGPartedConfigMapName reads the ClusterPolicy to find the mig-parted
-// ConfigMap name. Falls back to the default if not configured.
-func (c *Clients) getMIGPartedConfigMapName(ctx context.Context) string {
+// GetCustomMIGPartedConfigMapName returns the custom mig-parted ConfigMap name
+// set in the ClusterPolicy, or an empty string if none is set.
+func (c *Clients) GetCustomMIGPartedConfigMapName(ctx context.Context) (string, error) {
 	cp, err := c.GetClusterPolicy(ctx)
 	if err != nil {
-		return defaultMIGPartedConfigMapName
+		return "", err
 	}
-	if cp.Spec.MIGManager.Config != nil && cp.Spec.MIGManager.Config.Name != "" {
-		return cp.Spec.MIGManager.Config.Name
+	if cp.Spec.MIGManager.Config == nil {
+		return "", nil
 	}
-	return defaultMIGPartedConfigMapName
+	return cp.Spec.MIGManager.Config.Name, nil
 }
 
 // normalizeHexID strips the "0x" prefix and uppercases a PCI device ID.
