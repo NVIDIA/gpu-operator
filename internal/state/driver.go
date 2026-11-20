@@ -735,7 +735,7 @@ func getSanitizedKernelVersion(kernelVersion string) string {
 	return strings.ToLower(sanitizedVersion)
 }
 
-func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace string, configMapName string,
+func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace string, volumeName string, configMapName string,
 	destinationDir string) ([]corev1.VolumeMount, []corev1.KeyToPath, error) {
 	// get the ConfigMap
 	cm := &corev1.ConfigMap{}
@@ -756,7 +756,7 @@ func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace
 	var volumeMounts []corev1.VolumeMount
 	for _, filename := range filenames {
 		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{Name: configMapName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename),
+			corev1.VolumeMount{Name: volumeName, ReadOnly: true, MountPath: filepath.Join(destinationDir, filename),
 				SubPath: filename})
 		itemsToInclude = append(itemsToInclude, corev1.KeyToPath{
 			Key:  filename,
@@ -766,7 +766,7 @@ func (s *stateDriver) createConfigMapVolumeMounts(ctx context.Context, namespace
 	return volumeMounts, itemsToInclude, nil
 }
 
-func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
+func createConfigMapVolume(volumeName string, configMapName string, itemsToInclude []corev1.KeyToPath) corev1.Volume {
 	volumeSource := corev1.VolumeSource{
 		ConfigMap: &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{
@@ -775,7 +775,7 @@ func createConfigMapVolume(configMapName string, itemsToInclude []corev1.KeyToPa
 			Items: itemsToInclude,
 		},
 	}
-	return corev1.Volume{Name: configMapName, VolumeSource: volumeSource}
+	return corev1.Volume{Name: volumeName, VolumeSource: volumeSource}
 }
 
 // toConfigEnvVars converts API EnvVar slices to the config package's EnvVar type.

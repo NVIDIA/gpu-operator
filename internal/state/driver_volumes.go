@@ -157,12 +157,12 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
 			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
-				cr.Spec.RepoConfig.Name, destinationDir)
+				consts.RepoConfigVolumeName, cr.Spec.RepoConfig.Name, destinationDir)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom repo config: %w", err)
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
-			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.RepoConfig.Name, itemsToInclude))
+			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(consts.RepoConfigVolumeName, cr.Spec.RepoConfig.Name, itemsToInclude))
 		}
 
 		// set any custom ssl key/certificate configuration provided
@@ -172,12 +172,12 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 				return nil, fmt.Errorf("ERROR: failed to get destination directory for custom repo config: %w", err)
 			}
 			volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
-				cr.Spec.CertConfig.Name, destinationDir)
+				consts.CertConfigVolumeName, cr.Spec.CertConfig.Name, destinationDir)
 			if err != nil {
 				return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for custom certs: %w", err)
 			}
 			additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
-			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.CertConfig.Name, itemsToInclude))
+			additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(consts.CertConfigVolumeName, cr.Spec.CertConfig.Name, itemsToInclude))
 		}
 
 		runtime, err := info.GetContainerRuntime()
@@ -251,12 +251,12 @@ func (s *stateDriver) getDriverAdditionalConfigs(ctx context.Context, cr *v1alph
 	if cr.Spec.IsKernelModuleConfigEnabled() {
 		destinationDir := "/drivers"
 		volumeMounts, itemsToInclude, err := s.createConfigMapVolumeMounts(ctx, s.namespace,
-			cr.Spec.KernelModuleConfig.Name, destinationDir)
+			consts.KernelModuleConfigVolumeName, cr.Spec.KernelModuleConfig.Name, destinationDir)
 		if err != nil {
 			return nil, fmt.Errorf("ERROR: failed to create ConfigMap VolumeMounts for kernel module configuration: %w", err)
 		}
 		additionalCfgs.VolumeMounts = append(additionalCfgs.VolumeMounts, volumeMounts...)
-		additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(cr.Spec.KernelModuleConfig.Name, itemsToInclude))
+		additionalCfgs.Volumes = append(additionalCfgs.Volumes, createConfigMapVolume(consts.KernelModuleConfigVolumeName, cr.Spec.KernelModuleConfig.Name, itemsToInclude))
 	}
 
 	// set any licensing configuration required

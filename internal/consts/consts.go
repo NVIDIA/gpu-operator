@@ -75,3 +75,11 @@ const (
 	// MinimumGDSVersionForOpenRM indicates the minimum GDS version that is supported only with OpenRM driver
 	MinimumGDSVersionForOpenRM = "v2.17.5"
 )
+
+// ConfigMap-backed volumes use fixed names independent of the referenced ConfigMap.
+const (
+	RepoConfigVolumeName         = "repo-config"
+	CertConfigVolumeName         = "cert-config"
+	KernelModuleConfigVolumeName = "kernel-module-config"
+	OperandConfigVolumeName      = "operand-configs"
+)
