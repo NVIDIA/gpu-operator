@@ -20,10 +20,12 @@ import (
 	"context"
 	"sort"
 	"testing"
+	"time"
 
 	promcli "github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,9 +36,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	"github.com/NVIDIA/gpu-operator/internal/state"
 )
@@ -50,6 +54,7 @@ func newGPUClusterReconciler(t *testing.T, objs ...client.Object) (*GPUClusterRe
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, admissionv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	// The reconciler labels the operator namespace for adminAccess, so it must exist.
@@ -57,7 +62,7 @@ func newGPUClusterReconciler(t *testing.T, objs ...client.Object) (*GPUClusterRe
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(append([]client.Object{ns}, objs...)...).
-		WithStatusSubresource(&nvidiav1alpha1.GPUCluster{}).
+		WithStatusSubresource(&nvidiav1alpha1.GPUCluster{}, &gpuv1.ClusterPolicy{}).
 		Build()
 
 	return &GPUClusterReconciler{
@@ -327,19 +332,122 @@ func TestGPUClusterTeardownDrainsClaimConsumersFirst(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: plugin.Name, Namespace: "test-namespace"}, ds))
 }
 
-// A ClusterPolicy and GPUCluster CR cannot co-exist
-func TestGPUClusterCoexistsWithClusterPolicy(t *testing.T) {
+func TestGPUClusterWaitsForClusterPolicyWithEqualTimestamp(t *testing.T) {
 	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
-	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}
+	cp := testSourceCP()
+	cfg.CreationTimestamp = cp.CreationTimestamp
+	adopted := cp.Status.Conditions
+	cp.Status.Conditions = nil
 	r, c := newGPUClusterReconciler(t, cfg, cp)
 
 	gccReconcile(t, r, cfg.Name)
 	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
+	require.Contains(t, r.conditionUpdater.(*FakeConditionUpdater).LastErrorMessage, "NodeAdoptionPending")
 
-	// Deleting the ClusterPolicy instance satisfies the prerequisites on the next reconcile
-	require.NoError(t, c.Delete(t.Context(), cp))
+	cp.Status.Conditions = adopted
+	require.NoError(t, c.Status().Update(t.Context(), cp))
 	gccReconcile(t, r, cfg.Name)
 	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+}
+
+func TestGPUClusterRemainsReadyWithNewerClusterPolicy(t *testing.T) {
+	cfg := testSourceGC()
+	r, c := newGPUClusterReconciler(t, cfg)
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+
+	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{
+		Name: "cluster-policy", CreationTimestamp: metav1.NewTime(cfg.CreationTimestamp.Add(time.Second)),
+	}}
+	require.NoError(t, c.Create(t.Context(), cp))
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+}
+
+func TestGPUClusterRejectsCustomClusterPolicyHostRoot(t *testing.T) {
+	cp := testSourceCP()
+	cp.Spec.Driver.Enabled = new(true)
+	cp.Spec.Driver.UseNvidiaDriverCRD = new(true)
+	cp.Spec.HostPaths.RootFS = "/cp-root"
+	r, c := newGPUClusterReconciler(t, cp)
+	cfg := testSourceGC()
+	require.NoError(t, c.Create(t.Context(), cfg))
+
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
+	updater := r.conditionUpdater.(*FakeConditionUpdater)
+	require.Equal(t, conditions.PrerequisiteNotMet, updater.LastErrorReason)
+	require.Contains(t, updater.LastErrorMessage, "spec.hostPaths.rootFS")
+	require.Nil(t, r.stateManager.(*fakeStateManager).lastCatalog)
+
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(cp), cp))
+	cp.Spec.HostPaths.RootFS = "/"
+	require.NoError(t, c.Update(t.Context(), cp))
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+}
+
+func TestGPUClusterKeepsPlacementDuringLiveHostRootEdit(t *testing.T) {
+	cp, cfg := testSourceCP(), testSourceGC()
+	node := selectedNode(coexistence.DRA)
+	updateGPUClusterStateLabels(node.Labels)
+	r, c := newGPUClusterReconciler(t, cfg, cp, node)
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(cp), cp))
+	cp.Spec.HostPaths.RootFS = "/custom-root"
+	require.NoError(t, c.Update(t.Context(), cp))
+
+	labeler := &NodeLabelingReconciler{Client: c, Namespace: r.Namespace}
+	_, err := labeler.Reconcile(t.Context(), ctrl.Request{})
+	require.NoError(t, err)
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
+	require.Equal(t, coexistence.DRA, node.Annotations[coexistence.SelectionAnnotation])
+	require.Equal(t, "true", node.Labels[draDriverDeployLabelKey])
+	require.Equal(t, "true", node.Labels[draDCGMDeployLabelKey])
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.Ready, gccState(t, c, cfg.Name))
+}
+
+func TestGPUClusterWaitsWhenHostRootChangesDuringAdoption(t *testing.T) {
+	cp, cfg := testSourceCP(), testSourceGC()
+	cp.Spec.HostPaths.RootFS = "/"
+	node := selectedNode("")
+	node.Labels[coexistence.ModeLabel] = coexistence.DRA
+	r, c := newGPUClusterReconciler(t, cp, cfg, node)
+
+	updated := false
+	r.Client = interceptor.NewClient(c.(client.WithWatch), interceptor.Funcs{
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			if err := c.List(ctx, list, opts...); err != nil {
+				return err
+			}
+			if _, ok := list.(*gpuv1.ClusterPolicyList); ok && !updated {
+				// Let prerequisite validation see the old root and adoption see the edit.
+				updated = true
+				var current gpuv1.ClusterPolicy
+				if err := c.Get(ctx, client.ObjectKeyFromObject(cp), &current); err != nil {
+					return err
+				}
+				current.Spec.HostPaths.RootFS = "/custom-root"
+				return c.Update(ctx, &current)
+			}
+			return nil
+		},
+	})
+
+	result, err := r.Reconcile(t.Context(), gccRequest(cfg.Name))
+	require.NoError(t, err)
+	require.Equal(t, lifecycleRetry, result.RequeueAfter)
+	require.True(t, updated)
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(cfg), cfg))
+	require.False(t, nodeSelectionInitializedTrue(cfg))
+
+	gccReconcile(t, r, cfg.Name)
+	require.Equal(t, nvidiav1alpha1.NotReady, gccState(t, c, cfg.Name))
+	require.Contains(t, r.conditionUpdater.(*FakeConditionUpdater).LastErrorMessage, "spec.hostPaths.rootFS")
+	require.Nil(t, r.stateManager.(*fakeStateManager).lastCatalog)
 }
 
 func TestEnqueueAllGPUClusters(t *testing.T) {

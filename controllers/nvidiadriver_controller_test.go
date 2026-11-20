@@ -244,46 +244,42 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
-// TestReconcileStandalone covers the no-ClusterPolicy path: the controller falls back
-// to the GPUCluster for the cluster-wide configuration, and fails early when
-// neither object exists.
-func TestReconcileStandalone(t *testing.T) {
+func TestNVIDIADriverReconcileHostRoot(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
 
-	cp := &gpuv1.ClusterPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"},
-		Spec: gpuv1.ClusterPolicySpec{
-			Driver: gpuv1.DriverSpec{
-				UseNvidiaDriverCRD: new(true),
-			},
-			HostPaths: gpuv1.HostPathsSpec{RootFS: "/cp-root"},
-		},
-	}
-	gpuCluster := &nvidiav1alpha1.GPUCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "gpu-cluster-config"},
-	}
+	cp := testSourceCP()
+	cp.Spec.Driver.Enabled = new(true)
+	cp.Spec.Driver.UseNvidiaDriverCRD = new(true)
+	cp.Spec.HostPaths.RootFS = "/cp-root"
+	gpuCluster := testSourceGC()
+	gpuCluster.Finalizers = nil
+	initializedGPUCluster := testSourceGC()
+	initializedGPUCluster.Status.State = nvidiav1alpha1.NotReady
+	initializedGPUCluster.Status.Conditions = []metav1.Condition{{Type: nodeSelectionInitialized, Status: metav1.ConditionTrue, Reason: "AdoptionComplete"}}
 
 	tests := []struct {
 		name             string
 		objects          []client.Object
 		expectedHostRoot string
+		addGPUCluster    bool
 	}{
 		{
 			name:             "GPUCluster present, host root hardcoded",
-			objects:          []client.Object{gpuCluster},
+			objects:          []client.Object{gpuCluster.DeepCopy()},
 			expectedHostRoot: "/",
 		},
 		{
-			name:             "GPUCluster present alongside ClusterPolicy, host root hardcoded",
-			objects:          []client.Object{cp, gpuCluster},
-			expectedHostRoot: "/",
-		},
-		{
-			name:             "ClusterPolicy only, host root from spec.hostPaths.rootFS",
+			name:             "adding or removing GPUCluster preserves ClusterPolicy host root",
 			objects:          []client.Object{cp},
 			expectedHostRoot: "/cp-root",
+			addGPUCluster:    true,
+		},
+		{
+			name:             "an initialized GPUCluster keeps the default host root even when temporarily NotReady",
+			objects:          []client.Object{cp.DeepCopy(), initializedGPUCluster},
+			expectedHostRoot: "/",
 		},
 		{
 			name:             "neither ClusterPolicy nor GPUCluster, host root defaults to /",
@@ -315,13 +311,22 @@ func TestReconcileStandalone(t *testing.T) {
 			}
 
 			req := ctrl.Request{NamespacedName: types.NamespacedName{Name: driver.Name}}
-			_, err := reconciler.Reconcile(context.Background(), req)
-
-			require.NoError(t, err)
-
-			hostRoot, ok := stateManager.lastCatalog.Get(state.InfoTypeHostRoot).(string)
-			require.True(t, ok, "info catalog must hold a host root string")
-			require.Equal(t, tc.expectedHostRoot, hostRoot)
+			assertHostRoot := func() {
+				t.Helper()
+				stateManager.lastCatalog = nil
+				_, err := reconciler.Reconcile(t.Context(), req)
+				require.NoError(t, err)
+				require.NotNil(t, stateManager.lastCatalog)
+				require.Equal(t, tc.expectedHostRoot, stateManager.lastCatalog.Get(state.InfoTypeHostRoot))
+			}
+			assertHostRoot()
+			if tc.addGPUCluster {
+				gc := gpuCluster.DeepCopy()
+				require.NoError(t, c.Create(t.Context(), gc))
+				assertHostRoot()
+				require.NoError(t, c.Delete(t.Context(), gc))
+				assertHostRoot()
+			}
 
 			instance := &nvidiav1alpha1.NVIDIADriver{}
 			require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: driver.Name}, instance))

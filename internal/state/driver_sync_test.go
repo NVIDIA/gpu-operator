@@ -427,7 +427,7 @@ func TestHandleDefaultImagesInObjectsManagerImageSet(t *testing.T) {
 	renderData := getMinimalDriverRenderData()
 	objects := []*unstructured.Unstructured{newDaemonSetUnstructured("ds-a", "test-operator")}
 
-	objectsWithDefaultImages, err := driverState.handleDefaultImagesInObjects(context.Background(), objects, driverCR, *renderData)
+	objectsWithDefaultImages, err := driverState.preserveDriverDaemonSetConfig(context.Background(), objects, driverCR, *renderData)
 	require.NoError(t, err)
 	assert.Equal(t, objects, objectsWithDefaultImages)
 }
@@ -442,7 +442,7 @@ func TestHandleDefaultImagesInObjectsCurrentDaemonSetNotFound(t *testing.T) {
 	renderData := getMinimalDriverRenderData()
 	objects := []*unstructured.Unstructured{newDaemonSetUnstructured("nvidia-gpu-driver-test", "test-operator")}
 
-	objectsWithDefaultImages, err := driverState.handleDefaultImagesInObjects(context.Background(), objects, driverCR, *renderData)
+	objectsWithDefaultImages, err := driverState.preserveDriverDaemonSetConfig(context.Background(), objects, driverCR, *renderData)
 	require.NoError(t, err)
 	assert.Equal(t, objects, objectsWithDefaultImages)
 }

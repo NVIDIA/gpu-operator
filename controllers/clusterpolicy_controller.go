@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -71,6 +72,7 @@ type ClusterPolicyReconciler struct {
 	OperatorMetrics  *OperatorMetrics
 	DefaultStack     string
 	conditionUpdater conditions.Updater
+	recorder         events.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=nvidia.com,resources=*,verbs=get;list;watch;create;update;patch;delete
@@ -140,14 +142,18 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	// TODO: remove the below code block once both ClusterPolicy and GPUCluster can co-exist
+	// Admission registration and parameter discovery can lag behind source creation.
 	gpuClusters := &nvidiav1alpha1.GPUClusterList{}
 	if err := r.List(ctx, gpuClusters); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list GPUCluster objects: %w", err)
 	}
+	var gpuCluster *nvidiav1alpha1.GPUCluster
 	if len(gpuClusters.Items) > 0 {
-		err := fmt.Errorf("conflicting GPUCluster resource %q detected; ClusterPolicy and GPUCluster cannot co-exist", gpuClusters.Items[0].Name)
-		logger.Error(err, "only one CR may be present at a time")
+		gpuCluster = &gpuClusters.Items[0]
+	}
+	if clusterPolicyCreatedAfterGPUCluster(instance, gpuCluster) {
+		err := fmt.Errorf("GPUCluster resource %q exists; ClusterPolicy must be created before GPUCluster", gpuCluster.Name)
+		logger.Error(err, "ClusterPolicy must be created before GPUCluster")
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
 			logger.Error(condErr, "failed to set condition")
@@ -165,7 +171,17 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{RequeueAfter: lifecycleRetry}, nil
 	}
 
-	if err := clusterPolicyCtrl.init(ctx, r, instance); err != nil {
+	operandConfig := instance
+	if hostRoot := clusterPolicyHostRoot(instance, gpuCluster); hostRoot != instance.Spec.HostPaths.RootFS {
+		if r.recorder != nil {
+			r.recorder.Eventf(instance, nil, corev1.EventTypeWarning, "HostRootIgnored", "Reconcile",
+				"spec.hostPaths.rootFS %q is ignored while GPUCluster %q is active. Using %q. The saved path can take effect after GPUCluster removal and trigger a driver rollout.",
+				instance.Spec.HostPaths.RootFS, gpuCluster.Name, hostRoot)
+		}
+		operandConfig = instance.DeepCopy()
+		operandConfig.Spec.HostPaths.RootFS = hostRoot
+	}
+	if err := clusterPolicyCtrl.init(ctx, r, operandConfig); err != nil {
 		logger.Error(err, "unable to initialize ClusterPolicy controller")
 		updateCRState(ctx, r, req.NamespacedName, gpuv1.NotReady)
 		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
@@ -478,6 +494,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 
 	// initialize condition updater
 	r.conditionUpdater = conditions.NewClusterPolicyUpdater(mgr.GetClient())
+	r.recorder = mgr.GetEventRecorder("nvidia-gpu-operator")
 
 	// Watch for changes to primary resource ClusterPolicy
 	err = c.Watch(source.Kind(
@@ -512,7 +529,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 		return err
 	}
 
-	// Watch GPUCluster: its existence gates the resource-allocation mode nodeSelector on operands.
+	// GPUCluster initialization and removal can change the effective host root.
 	gpuClusterMapFn := func(ctx context.Context, _ *nvidiav1alpha1.GPUCluster) []reconcile.Request {
 		return r.enqueueAllClusterPolicies(ctx)
 	}
@@ -520,7 +537,7 @@ func (r *ClusterPolicyReconciler) SetupWithManager(ctx context.Context, mgr ctrl
 		mgr.GetCache(),
 		&nvidiav1alpha1.GPUCluster{},
 		handler.TypedEnqueueRequestsFromMapFunc(gpuClusterMapFn),
-		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{},
+		predicate.Or(predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{}, sourceAdoptionPredicate[*nvidiav1alpha1.GPUCluster]()),
 	))
 	if err != nil {
 		return err

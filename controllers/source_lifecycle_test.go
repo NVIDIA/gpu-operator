@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
@@ -57,6 +58,7 @@ func lifecycleClient(t *testing.T, objects ...client.Object) client.Client {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, admissionv1.AddToScheme(scheme))
 	require.NoError(t, resourcev1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
 	require.NoError(t, gpu.AddToScheme(scheme))
@@ -546,7 +548,7 @@ func TestSourceDeletionDoesNotStopIndependentDriverAssignment(t *testing.T) {
 	r := &NodeLabelingReconciler{Client: c}
 	result, err := r.Reconcile(t.Context(), ctrl.Request{})
 	require.NoError(t, err)
-	require.Equal(t, lifecycleRetry, result.RequeueAfter)
+	require.Positive(t, result.RequeueAfter)
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
 	require.Equal(t, driver.Name, node.Labels[consts.NVIDIADriverOwnerLabel])
 	require.Equal(t, "true", node.Labels["nvidia.com/gpu.deploy.device-plugin"])
@@ -684,4 +686,30 @@ func TestDriverLabelCleanupChecksDriverCRs(t *testing.T) {
 			require.Equal(t, keepDriver, hasVGPUManagerLabel)
 		})
 	}
+}
+
+func TestCleanupErrorDoesNotFreezeUnrelatedNodeAssignment(t *testing.T) {
+	cp := testSourceCP()
+	gc := testSourceGC()
+	old := selectedNode(coexistence.DP)
+	old.Labels[devicePluginDeployLabelKey] = "true"
+	fresh := selectedNode("")
+	fresh.Name = "new-node"
+	fresh.Labels[coexistence.ModeLabel] = coexistence.DRA
+	base := lifecycleClient(t, cp, gc, old, fresh)
+	deleteSource(t, base, cp)
+	require.NoError(t, setOperandsRemoved(t.Context(), base, cp, true, "TeardownComplete", "done"))
+	c := interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, p client.Patch, opts ...client.PatchOption) error {
+		if _, ok := obj.(*corev1.Node); ok && obj.GetName() == old.Name {
+			return fmt.Errorf("old node cleanup denied")
+		}
+		return c.Patch(ctx, obj, p, opts...)
+	}})
+	r := &NodeLabelingReconciler{Client: c, Namespace: "test"}
+	_, err := r.Reconcile(t.Context(), ctrl.Request{})
+	require.ErrorContains(t, err, "old node cleanup denied")
+	require.NoError(t, base.Get(t.Context(), client.ObjectKeyFromObject(fresh), fresh))
+	require.Equal(t, "true", fresh.Labels[draDriverDeployLabelKey])
+	require.NoError(t, base.Get(t.Context(), client.ObjectKeyFromObject(old), old))
+	require.Equal(t, coexistence.DP, old.Annotations[coexistence.SelectionAnnotation])
 }

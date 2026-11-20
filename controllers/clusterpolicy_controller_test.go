@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -445,20 +446,53 @@ func TestClusterPolicyReconcileSkipsNonSingleton(t *testing.T) {
 
 func TestClusterPolicyBlockedByGPUCluster(t *testing.T) {
 	cp := clusterPolicyForUpgradeTest(true)
+	gc := testSourceGC()
+	gc.Finalizers = nil
+	cp.CreationTimestamp = metav1.NewTime(gc.CreationTimestamp.Add(time.Second))
 	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp)
 
-	gc := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
 	require.NoError(t, c.Create(t.Context(), gc))
 
 	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
 	require.Equal(t, gpuv1.NotReady, clusterPolicyState(t, c, cp.Name))
-	require.ErrorContains(t, err, "ClusterPolicy and GPUCluster cannot co-exist")
+	require.ErrorContains(t, err, "ClusterPolicy must be created before GPUCluster")
 
 	// Deleting the GPUCluster instance unblocks the next reconcile
 	require.NoError(t, c.Delete(t.Context(), gc))
 	_, err = r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
 	require.NoError(t, err)
 	require.Equal(t, gpuv1.Ready, clusterPolicyState(t, c, cp.Name))
+}
+
+func TestClusterPolicyAllowedWithEqualGPUClusterTimestamp(t *testing.T) {
+	cp := clusterPolicyForUpgradeTest(true)
+	gc := testSourceGC()
+	cp.CreationTimestamp = gc.CreationTimestamp
+	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp)
+	require.NoError(t, c.Create(t.Context(), gc))
+
+	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+	require.NoError(t, err)
+	require.Equal(t, gpuv1.Ready, clusterPolicyState(t, c, cp.Name))
+}
+
+func TestClusterPolicyWarnsWhenIgnoringLiveHostRootEdit(t *testing.T) {
+	cp := clusterPolicyForUpgradeTest(true)
+	cp.Spec.HostPaths.RootFS = "/custom-root"
+	gc := testSourceGC()
+	gc.Status.Conditions = []metav1.Condition{{Type: nodeSelectionInitialized, Status: metav1.ConditionTrue, Reason: "AdoptionComplete"}}
+	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp)
+	recorder := events.NewFakeRecorder(1)
+	r.recorder = recorder
+	require.NoError(t, c.Create(t.Context(), gc))
+
+	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+	require.NoError(t, err)
+	require.Equal(t, "/", clusterPolicyCtrl.singleton.Spec.HostPaths.RootFS)
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(cp), cp))
+	require.Equal(t, "/custom-root", cp.Spec.HostPaths.RootFS)
+	require.Len(t, recorder.Events, 1)
+	require.Contains(t, <-recorder.Events, "Warning HostRootIgnored")
 }
 
 func newClusterPolicyUpgradeTestReconciler(t *testing.T, cp *gpuv1.ClusterPolicy, nodes ...*corev1.Node) (*ClusterPolicyReconciler, client.Client, *OperatorMetrics) {

@@ -243,6 +243,78 @@ func TestDriverGDSKernelModuleType(t *testing.T) {
 	}
 }
 
+func TestGetManifestObjectsEquivalentDefaultHostRoots(t *testing.T) {
+	scheme := driverTestScheme(t)
+	driver := newDriverCR("driver-a")
+	c := newDriverFakeClient(scheme, newGPUNode("gpu-node", driver.Name))
+	driverState := newTestStateDriver(t, c, scheme)
+	catalog := driverInfoCatalog(fakeClusterInfo{})
+
+	catalog.Add(InfoTypeHostRoot, "")
+	objects, err := driverState.getManifestObjects(t.Context(), driver, catalog)
+	require.NoError(t, err)
+	before, err := getDaemonsetFromObjects(objects)
+	require.NoError(t, err)
+
+	catalog.Add(InfoTypeHostRoot, "/")
+	objects, err = driverState.getManifestObjects(t.Context(), driver, catalog)
+	require.NoError(t, err)
+	after, err := getDaemonsetFromObjects(objects)
+	require.NoError(t, err)
+	require.Equal(t, before.Spec.Template, after.Spec.Template)
+}
+
+func TestPreserveDriverDaemonSetLegacyHostRootDigest(t *testing.T) {
+	for name, newDefaultManagerImage := range map[string]string{
+		"same manager image":        "",
+		"new default manager image": "nvcr.io/nvidia/cloud-native/k8s-driver-manager:updated",
+	} {
+		t.Run(name, func(t *testing.T) {
+			scheme := driverTestScheme(t)
+			driver := newDriverCR("driver-a")
+			c := newDriverFakeClient(scheme)
+			driverState := newTestStateDriver(t, c, scheme)
+			data := getMinimalDriverRenderData()
+			legacyDigest := data.ConfigDigest()
+			objects, err := driverState.renderManifestObjects(t.Context(), data)
+			require.NoError(t, err)
+			obj, err := getObjectOfKind(objects, "DaemonSet")
+			require.NoError(t, err)
+			require.NoError(t, controllerutil.SetControllerReference(driver, obj, scheme))
+			driverState.addStateSpecificLabels(obj)
+			hash := utils.GetObjectHash(obj)
+			legacy, err := getDaemonsetFromObjects(objects)
+			require.NoError(t, err)
+			legacy.Annotations[consts.NvidiaAnnotationHashKey] = hash
+			require.NoError(t, c.Create(t.Context(), legacy))
+
+			data.HostRoot = "/"
+			if newDefaultManagerImage != "" {
+				driver.Spec.Manager.Image = ""
+				data.Driver.ManagerImagePath = newDefaultManagerImage
+			}
+			render := func() *appsv1.DaemonSet {
+				t.Helper()
+				desired, err := driverState.renderManifestObjects(t.Context(), data)
+				require.NoError(t, err)
+				desired, err = driverState.preserveDriverDaemonSetConfig(t.Context(), desired, driver, *data)
+				require.NoError(t, err)
+				ds, err := getDaemonsetFromObjects(desired)
+				require.NoError(t, err)
+				return ds
+			}
+			preserved := render()
+			require.Equal(t, legacy.Spec.Template, preserved.Spec.Template)
+			require.Equal(t, legacyDigest, driverconfig.DriverConfigDigestFromPodSpec(&preserved.Spec.Template.Spec))
+
+			data.Driver.ImagePath = "nvcr.io/nvidia/driver:updated"
+			updated := render()
+			require.Equal(t, data.ConfigDigest(), driverconfig.DriverConfigDigestFromPodSpec(&updated.Spec.Template.Spec))
+			require.NotEqual(t, legacyDigest, data.ConfigDigest())
+		})
+	}
+}
+
 func TestNewStateDriverBadManifestDir(t *testing.T) {
 	_, err := NewStateDriver(nil, "", nil, "/nonexistent/manifest/dir")
 	require.ErrorContains(t, err, "failed to get files from manifest directory")
@@ -602,7 +674,7 @@ func TestGetManifestObjectsHandleDefaultImagesError(t *testing.T) {
 	driverState := newTestStateDriver(t, fakeClient, scheme)
 
 	// Clearing the Manager fields makes rendering fall back to DRIVER_MANAGER_IMAGE,
-	// which is the only path on which handleDefaultImagesInObjects Gets the
+	// which is the only path on which preserveDriverDaemonSetConfig Gets the
 	// current DaemonSet.
 	driverCR := newDriverCR("driver-a")
 	driverCR.Spec.Manager.Repository = ""
@@ -754,7 +826,7 @@ func TestHandleDefaultImagesNoDaemonSet(t *testing.T) {
 	renderData := getMinimalDriverRenderData()
 	objects := []*unstructured.Unstructured{newConfigMapUnstructured("cm", "test-operator")}
 
-	_, err := driverState.handleDefaultImagesInObjects(context.Background(), objects, driverCR, *renderData)
+	_, err := driverState.preserveDriverDaemonSetConfig(context.Background(), objects, driverCR, *renderData)
 
 	require.ErrorContains(t, err, "error getting DaemonSet from unstructured objects")
 }
@@ -772,7 +844,7 @@ func TestHandleDefaultImagesCurrentImageMatches(t *testing.T) {
 	driverCR := newDriverCR("driver-a")
 	driverCR.Spec.Manager.Image = ""
 
-	objectsWithDefaultImages, err := driverState.handleDefaultImagesInObjects(context.Background(), desiredObjects, driverCR, *renderData)
+	objectsWithDefaultImages, err := driverState.preserveDriverDaemonSetConfig(context.Background(), desiredObjects, driverCR, *renderData)
 
 	require.NoError(t, err)
 	assert.Equal(t, desiredObjects, objectsWithDefaultImages)
@@ -789,7 +861,7 @@ func TestHandleDefaultImagesCurrentGetError(t *testing.T) {
 	renderData := getMinimalDriverRenderData()
 	objects := []*unstructured.Unstructured{newDaemonSetUnstructured("ds-a", "test-operator")}
 
-	_, err := driverState.handleDefaultImagesInObjects(context.Background(), objects, driverCR, *renderData)
+	_, err := driverState.preserveDriverDaemonSetConfig(context.Background(), objects, driverCR, *renderData)
 
 	require.ErrorIs(t, err, errGet)
 	require.ErrorContains(t, err, "failed to get current driver DaemonSet")
@@ -812,7 +884,7 @@ func TestHandleDefaultImagesReRenderError(t *testing.T) {
 		Runtime: &driverRuntimeSpec{Namespace: "test-operator"},
 	}
 
-	_, err := driverState.handleDefaultImagesInObjects(context.Background(), desiredObjects, driverCR, *renderData)
+	_, err := driverState.preserveDriverDaemonSetConfig(context.Background(), desiredObjects, driverCR, *renderData)
 
 	require.ErrorContains(t, err, "failed to render kubernetes manifests")
 }
@@ -831,7 +903,7 @@ func TestHandleDefaultImagesReRenderSetRefError(t *testing.T) {
 	driverCR := newDriverCR("driver-a")
 	driverCR.Spec.Manager.Image = ""
 
-	_, err = driverState.handleDefaultImagesInObjects(context.Background(), desiredObjects, driverCR, *renderData)
+	_, err = driverState.preserveDriverDaemonSetConfig(context.Background(), desiredObjects, driverCR, *renderData)
 
 	require.ErrorContains(t, err, "failed to set controller reference")
 }
@@ -843,7 +915,7 @@ func TestHandleDefaultImagesUnchangedSpecKeepsCurrentImage(t *testing.T) {
 	const currentManagerImage = "custom-manager:1.0"
 
 	// Replicate the production hashing steps so the current DaemonSet carries the
-	// hash handleDefaultImagesInObjects recomputes, making newHash == currentHash.
+	// hash preserveDriverDaemonSetConfig recomputes, making newHash == currentHash.
 	hashDriverState := newTestStateDriver(t, nil, scheme)
 	hashRenderData := getMinimalDriverRenderData()
 	hashRenderData.Driver.ManagerImagePath = currentManagerImage
@@ -866,7 +938,7 @@ func TestHandleDefaultImagesUnchangedSpecKeepsCurrentImage(t *testing.T) {
 	currentDaemonSet.Annotations = map[string]string{consts.NvidiaAnnotationHashKey: unchangedSpecHash}
 	driverState := newTestStateDriver(t, newDriverFakeClient(scheme, currentDaemonSet), scheme)
 
-	objectsWithDefaultImages, err := driverState.handleDefaultImagesInObjects(context.Background(), desiredObjects, driverCR, *renderData)
+	objectsWithDefaultImages, err := driverState.preserveDriverDaemonSetConfig(context.Background(), desiredObjects, driverCR, *renderData)
 
 	require.NoError(t, err)
 	gotDaemonSet, err := getDaemonsetFromObjects(objectsWithDefaultImages)

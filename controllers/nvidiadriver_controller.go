@@ -49,9 +49,8 @@ import (
 	"github.com/NVIDIA/gpu-operator/internal/validator"
 )
 
-// defaultHostRoot is the host root mounted into the driver daemonset. It is
-// hard-coded to "/" to avoid a cross-CR dependency; only the legacy
-// ClusterPolicy-only path reads spec.hostPaths.rootFS instead.
+// defaultHostRoot is used by the driver DaemonSet when no active ClusterPolicy
+// supplies the host root. The DRA stack requires this root for coexistence.
 // TODO: support a custom host root via a new NVIDIADriver API field or an
 // operator environment variable.
 const defaultHostRoot = "/"
@@ -130,11 +129,6 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{}, nil
 	}
 
-	hostRoot := defaultHostRoot
-	if clusterPolicy != nil && gpuCluster == nil {
-		hostRoot = clusterPolicy.Spec.HostPaths.RootFS
-	}
-
 	// Create a new InfoCatalog which is a generic interface for passing information to state managers
 	infoCatalog := state.NewInfoCatalog()
 
@@ -142,7 +136,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	infoCatalog.Add(state.InfoTypeClusterInfo, r.ClusterInfo)
 
 	// Add the host root, which is needed to deploy the driver daemonset
-	infoCatalog.Add(state.InfoTypeHostRoot, hostRoot)
+	infoCatalog.Add(state.InfoTypeHostRoot, clusterPolicyHostRoot(clusterPolicy, gpuCluster))
 
 	// Verify the nodeSelector configured for this NVIDIADriver instance does
 	// not conflict with any other instances. This ensures only one driver
@@ -393,7 +387,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		return err
 	}
 
-	// Watch GPUCluster: its existence gates the resource-allocation mode nodeSelector on the driver.
+	// GPUCluster initialization and removal can change the effective host root.
 	gpuClusterMapFn := func(ctx context.Context, _ *nvidiav1alpha1.GPUCluster) []reconcile.Request {
 		return r.enqueueAllNVIDIADrivers(ctx)
 	}
@@ -403,7 +397,7 @@ func (r *NVIDIADriverReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			mgr.GetCache(),
 			&nvidiav1alpha1.GPUCluster{},
 			handler.TypedEnqueueRequestsFromMapFunc(gpuClusterMapFn),
-			predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{},
+			predicate.Or(predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{}, sourceAdoptionPredicate[*nvidiav1alpha1.GPUCluster]()),
 		),
 	)
 	if err != nil {

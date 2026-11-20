@@ -52,8 +52,51 @@ func getSingletonClusterPolicy(items []gpuv1.ClusterPolicy) *gpuv1.ClusterPolicy
 	return active
 }
 
-// resolveActiveConfig returns the active ClusterPolicy, selected with the same
-// getSingletonClusterPolicy rule the ClusterPolicy controller uses, and the GPUCluster.
+// clusterPolicyCreatedAfterGPUCluster implements the source ordering backstop.
+// Creation timestamps have second precision, so ties follow ClusterPolicy-first
+// ordering to allow a single install to create both sources.
+func clusterPolicyCreatedAfterGPUCluster(cp *gpuv1.ClusterPolicy, gc *nvidiav1alpha1.GPUCluster) bool {
+	return cp != nil && gc != nil && gc.CreationTimestamp.Before(&cp.CreationTimestamp)
+}
+
+// clusterPolicyHostRoot keeps the effective root stable after DRA has passed its
+// prerequisites, including during temporary readiness failures and teardown.
+func clusterPolicyHostRoot(cp *gpuv1.ClusterPolicy, gc *nvidiav1alpha1.GPUCluster) string {
+	if cp == nil {
+		return defaultHostRoot
+	}
+	root := cp.Spec.HostPaths.RootFS
+	if root != "" && root != defaultHostRoot && gc != nil && nodeSelectionInitializedTrue(gc) {
+		return defaultHostRoot
+	}
+	return root
+}
+
+// clusterPolicyCoexistenceBlocker reports why an active ClusterPolicy prevents DRA
+// activation. Reconciliation and node placement must enforce the same prerequisites.
+func clusterPolicyCoexistenceBlocker(cp *gpuv1.ClusterPolicy, gc *nvidiav1alpha1.GPUCluster) string {
+	if cp == nil {
+		return ""
+	}
+	// The shared driver still uses the ClusterPolicy host root during its teardown.
+	if root := clusterPolicyHostRoot(cp, gc); root != "" && root != defaultHostRoot {
+		return "HostRootPrerequisiteNotMet: coexistence requires ClusterPolicy spec.hostPaths.rootFS to be empty or /"
+	}
+	// Nodes owned by a deleting ClusterPolicy are reserved separately until cleanup.
+	if !cp.DeletionTimestamp.IsZero() {
+		return ""
+	}
+	if cp.Spec.Driver.IsEnabled() && !cp.Spec.Driver.UseNvidiaDriverCRDType() {
+		return "DriverPrerequisiteNotMet: coexistence requires independent NVIDIADriver ownership or host-installed drivers"
+	}
+	if !nodeSelectionInitializedTrue(cp) {
+		return "NodeAdoptionPending: waiting for ClusterPolicy node adoption"
+	}
+	return ""
+}
+
+// resolveActiveConfig returns the singleton sources that may supply cluster
+// configuration. A rejected ClusterPolicy cannot affect DRA placement or drivers.
 func resolveActiveConfig(ctx context.Context, c client.Reader) (*gpuv1.ClusterPolicy, *nvidiav1alpha1.GPUCluster, error) {
 	clusterPolicies := &gpuv1.ClusterPolicyList{}
 	if err := c.List(ctx, clusterPolicies); err != nil {
@@ -69,5 +112,9 @@ func resolveActiveConfig(ctx context.Context, c client.Reader) (*gpuv1.ClusterPo
 		gpuCluster = &gpuClusters.Items[0]
 	}
 
-	return getSingletonClusterPolicy(clusterPolicies.Items), gpuCluster, nil
+	clusterPolicy := getSingletonClusterPolicy(clusterPolicies.Items)
+	if clusterPolicyCreatedAfterGPUCluster(clusterPolicy, gpuCluster) {
+		clusterPolicy = nil
+	}
+	return clusterPolicy, gpuCluster, nil
 }

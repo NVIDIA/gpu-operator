@@ -108,6 +108,21 @@ func (d *driverRenderData) ConfigDigest() string {
 	return utils.GetObjectHashIgnoreEmptyKeys(buildDriverInstallConfig(d))
 }
 
+// preserveLegacyHostRoot keeps the digest on existing DaemonSets that mounted /
+// but hashed an empty root. A real driver configuration change uses the new digest.
+func (d *driverRenderData) preserveLegacyHostRoot(current *appsv1.DaemonSet, driver *nvidiav1alpha1.NVIDIADriver) bool {
+	if d.HostRoot != "/" || !metav1.IsControlledBy(current, driver) {
+		return false
+	}
+	legacy := *d
+	legacy.HostRoot = ""
+	if legacy.ConfigDigest() != driverconfig.DriverConfigDigestFromPodSpec(&current.Spec.Template.Spec) {
+		return false
+	}
+	d.HostRoot = legacy.HostRoot
+	return true
+}
+
 func NewStateDriver(
 	k8sClient client.Client,
 	namespace string,
@@ -312,6 +327,9 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 	if !ok {
 		return nil, fmt.Errorf("host root in info catalog has unexpected type %T", info)
 	}
+	if hostRoot == "" {
+		hostRoot = "/"
+	}
 
 	info = infoCatalog.Get(InfoTypeClusterInfo)
 	if info == nil {
@@ -394,9 +412,9 @@ func (s *stateDriver) getManifestObjects(ctx context.Context, cr *nvidiav1alpha1
 			logger.Error(err, "error rendering manifests for node pool", "NodePool", nodePool.name)
 			return nil, err
 		}
-		manifestObjs, err = s.handleDefaultImagesInObjects(ctx, manifestObjs, cr, *renderData)
+		manifestObjs, err = s.preserveDriverDaemonSetConfig(ctx, manifestObjs, cr, *renderData)
 		if err != nil {
-			logger.Error(err, "error handling default images in manifests", "NodePool", nodePool.name)
+			logger.Error(err, "error preserving driver DaemonSet configuration", "NodePool", nodePool.name)
 			return nil, err
 		}
 		objs = append(objs, manifestObjs...)
@@ -423,7 +441,7 @@ func (s *stateDriver) renderManifestObjects(ctx context.Context, renderData *dri
 	return objs, nil
 }
 
-func (s *stateDriver) handleDefaultImagesInObjects(
+func (s *stateDriver) preserveDriverDaemonSetConfig(
 	ctx context.Context,
 	desiredObjs []*unstructured.Unstructured,
 	cr *nvidiav1alpha1.NVIDIADriver,
@@ -433,15 +451,9 @@ func (s *stateDriver) handleDefaultImagesInObjects(
 	// If 'image' field is not set in spec, then the driver image path
 	// was determined via the DRIVER_MANAGER_IMAGE env var
 	managerImageEnvVarUsed := (cr.Spec.Manager.Image == "")
-	if !managerImageEnvVarUsed {
+	if !managerImageEnvVarUsed && renderData.HostRoot != "/" {
 		return desiredObjs, nil
 	}
-
-	// If the default image is used for driver-manager, make sure this image
-	// is only upgraded iff the driver spec has been updated. This avoids
-	// triggering undesired driver upgrades when the operator itself is upgraded
-	// but the NVIDIADriver spec is unmodified.
-	logger.V(consts.LogLevelDebug).Info("Default env var is being used for k8s-driver-manager image, checking for an updated default image")
 
 	desiredDs, err := getDaemonsetFromObjects(desiredObjs)
 	if err != nil {
@@ -457,6 +469,15 @@ func (s *stateDriver) handleDefaultImagesInObjects(
 		return nil, fmt.Errorf("failed to get current driver DaemonSet object: %w", err)
 	}
 
+	if renderData.preserveLegacyHostRoot(currentDs, cr) {
+		return s.renderManifestObjects(ctx, &renderData)
+	}
+	if !managerImageEnvVarUsed {
+		return desiredObjs, nil
+	}
+
+	// A new default driver-manager image can be rolled out with a driver
+	// configuration change. Keep the current image when it is the only difference.
 	currentManagerImage := ""
 	for _, container := range currentDs.Spec.Template.Spec.InitContainers {
 		if container.Name == "k8s-driver-manager" {
@@ -472,7 +493,10 @@ func (s *stateDriver) handleDefaultImagesInObjects(
 	}
 
 	// Render manifests again but with the current k8s-driver-manager being used
-	renderData.Driver.ManagerImagePath = currentManagerImage
+	driver := *renderData.Driver
+	driver.ManagerImagePath = currentManagerImage
+	renderData.Driver = &driver
+	renderData.preserveLegacyHostRoot(currentDs, cr)
 	desiredObjsWithCurrentImages, err := s.renderManifestObjects(ctx, &renderData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render kubernetes manifests: %w", err)

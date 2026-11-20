@@ -51,12 +51,15 @@ func TestNodeSelectionPolicy(t *testing.T) {
 		cp, gc                     bool
 		mode                       *string
 		record, defaultStack, want string
+		hostRoot                   string
 		dp, dra, invalid           bool
 	}{
 		"sole CP":          {cp: true, want: coexistence.DP, dp: true},
 		"sole GC":          {gc: true, want: coexistence.DRA, dra: true},
 		"both default DP":  {cp: true, gc: true, want: coexistence.DP, dp: true},
 		"both default DRA": {cp: true, gc: true, defaultStack: coexistence.DRA, want: coexistence.DRA, dra: true},
+		"custom CP host root blocks DRA placement":         {cp: true, gc: true, hostRoot: "/cp-root", mode: new(coexistence.DRA)},
+		"custom CP host root preserves DP placement":       {cp: true, gc: true, hostRoot: "/cp-root", record: coexistence.DP, want: coexistence.DP, dp: true},
 		"unavailable DRA default stays unrecorded":         {cp: true, defaultStack: coexistence.DRA},
 		"unavailable DP default stays unrecorded":          {gc: true, defaultStack: coexistence.DP},
 		"existing selection ignores new default":           {cp: true, gc: true, record: coexistence.DP, defaultStack: coexistence.DRA, want: coexistence.DP, dp: true},
@@ -73,6 +76,7 @@ func TestNodeSelectionPolicy(t *testing.T) {
 			nlc := &nodeLabelingController{client: lifecycleClient(t), logger: logr.Discard(), defaultStack: tc.defaultStack}
 			if tc.cp {
 				nlc.clusterPolicy = testSourceCP()
+				nlc.clusterPolicy.Spec.HostPaths.RootFS = tc.hostRoot
 			}
 			if tc.gc {
 				nlc.gpuCluster = testSourceGC()

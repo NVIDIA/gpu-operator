@@ -41,18 +41,10 @@ func annotationChanged(a, b client.Object, key string) bool {
 func allocationEligibility(cp *gpuv1.ClusterPolicy, gc *gpu.GPUCluster) (bool, bool) {
 	dp := cp != nil && cp.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(cp, nodeCleanupFinalizer)
 	dra := gc != nil && gc.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(gc, nodeCleanupFinalizer)
-	if cp != nil && gc != nil {
-		if !cp.CreationTimestamp.Before(&gc.CreationTimestamp) {
-			return false, false
-		}
-		// A deleting CP no longer gates surviving DRA activation. Its nodes remain
-		// reserved separately until that node's cleanup has been observed.
-		if cp.DeletionTimestamp.IsZero() {
-			independentDriver := !cp.Spec.Driver.IsEnabled() || cp.Spec.Driver.UseNvidiaDriverCRDType()
-			dra = dra && independentDriver && nodeSelectionInitializedTrue(cp)
-		}
+	if clusterPolicyCreatedAfterGPUCluster(cp, gc) {
+		return false, dra
 	}
-	return dp, dra
+	return dp, dra && clusterPolicyCoexistenceBlocker(cp, gc) == ""
 }
 
 func nodeSelection(node *corev1.Node, cp, gc bool, defaultStack string) (string, error) {
@@ -164,11 +156,17 @@ func sourceAdoptionPending(ctx context.Context, c client.Client, source client.O
 		return false, err
 	}
 	dp, dra := allocationEligibility(cp, gc)
+	target := sourceStack(source)
+	// A prerequisite can change after GPUCluster reconciliation checks it.
+	// Keep adoption pending even if no nodes are eligible for DRA placement.
+	if target == coexistence.DRA && !dra {
+		return true, nil
+	}
+
 	nodes := &corev1.NodeList{}
 	if err := c.List(ctx, nodes); err != nil {
 		return false, err
 	}
-	target := sourceStack(source)
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		// A source's DaemonSets can also match stale labels on nodes selected
@@ -183,7 +181,7 @@ func sourceAdoptionPending(ctx context.Context, c client.Client, source client.O
 		selected, selectionErr := nodeSelection(node, cp != nil && cp.DeletionTimestamp.IsZero(), gc != nil && gc.DeletionTimestamp.IsZero(), defaultStack)
 		// Invalid metadata excludes the node once labels that can still schedule
 		// this stack have been withdrawn.
-		if selectionErr != nil || selected != target || (selected == coexistence.DP && !dp) || (selected == coexistence.DRA && !dra) {
+		if selectionErr != nil || selected != target || (selected == coexistence.DP && !dp) {
 			if hasSchedulableStackLabel(node, target) {
 				return true, nil
 			}

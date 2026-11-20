@@ -389,7 +389,7 @@ func TestHandleDefaultImagesInObjectsReRender(t *testing.T) {
 	// image came from the DRIVER_MANAGER_IMAGE env var.
 	driverCR.Spec.Manager.Image = ""
 
-	objectsWithDefaultImages, err := driverState.handleDefaultImagesInObjects(context.Background(), desiredObjects, driverCR, *renderData)
+	objectsWithDefaultImages, err := driverState.preserveDriverDaemonSetConfig(context.Background(), desiredObjects, driverCR, *renderData)
 	require.NoError(t, err)
 	require.NotEmpty(t, objectsWithDefaultImages)
 
