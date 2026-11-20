@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -47,6 +48,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -1950,6 +1952,154 @@ func TestGetSanitizedKernelVersion(t *testing.T) {
 		require.NotEmpty(t, result)
 		require.Equal(t, test.expected, result)
 	}
+}
+
+func TestPrecompiledDriverDaemonSetsStayDistinctWhenKernelsSanitizeTogether(t *testing.T) {
+	ctx := context.Background()
+	// TestGetSanitizedKernelVersion treats these as one string. RHEL uname -r
+	// and the NFD kernel-version.full label include the architecture.
+	const (
+		x86Kernel = "5.14.0-427.37.1.el9_4.x86_64"
+		armKernel = "5.14.0-427.37.1.el9_4.aarch64"
+	)
+	require.Equal(t, getSanitizedKernelVersion(x86Kernel), getSanitizedKernelVersion(armKernel))
+
+	nodes := &corev1.NodeList{}
+	require.NoError(t, clusterPolicyController.client.List(ctx, nodes))
+	require.GreaterOrEqual(t, len(nodes.Items), 2)
+
+	savedLabels := map[string]map[string]string{}
+	savedMap := clusterPolicyController.kernelVersionMap
+	savedPolicy := clusterPolicyController.singleton.DeepCopy()
+	defer func() {
+		for name, labels := range savedLabels {
+			node := &corev1.Node{}
+			if err := clusterPolicyController.client.Get(ctx, types.NamespacedName{Name: name}, node); err != nil {
+				t.Errorf("restore node %s: %v", name, err)
+				continue
+			}
+			node.Labels = labels
+			if err := clusterPolicyController.client.Update(ctx, node); err != nil {
+				t.Errorf("restore node %s labels: %v", name, err)
+			}
+		}
+		clusterPolicyController.kernelVersionMap = savedMap
+		if err := updateClusterPolicy(&clusterPolicyController, savedPolicy); err != nil {
+			t.Errorf("restore ClusterPolicy: %v", err)
+		}
+	}()
+
+	kernels := []string{x86Kernel, armKernel}
+	for i := range kernels {
+		node := nodes.Items[i].DeepCopy()
+		savedLabels[node.Name] = maps.Clone(node.Labels)
+		node.Labels[nfdKernelLabelKey] = kernels[i]
+		require.NoError(t, clusterPolicyController.client.Update(ctx, node))
+	}
+
+	kernelVersionMap, err := clusterPolicyController.getKernelVersionsMap()
+	require.NoError(t, err)
+	require.Len(t, kernelVersionMap, 2)
+	clusterPolicyController.kernelVersionMap = kernelVersionMap
+
+	cp := getDriverTestInput("precompiled")
+	require.NoError(t, updateClusterPolicy(&clusterPolicyController, cp))
+	addState(&clusterPolicyController, filepath.Join(cfg.root, driverAssetsPath))
+	defer func() {
+		if err := removeState(&clusterPolicyController, clusterPolicyController.idx-1); err != nil {
+			t.Errorf("remove driver state: %v", err)
+			return
+		}
+		clusterPolicyController.idx--
+	}()
+
+	_, err = clusterPolicyController.step()
+	require.NoError(t, err)
+
+	list := &appsv1.DaemonSetList{}
+	require.NoError(t, clusterPolicyController.client.List(ctx, list, client.MatchingLabels{"app": "nvidia-driver-daemonset"}))
+	require.Len(t, list.Items, 2)
+
+	got := map[string]string{}
+	for i := range list.Items {
+		ds := &list.Items[i]
+		kernel := ds.Spec.Template.Spec.NodeSelector[nfdKernelLabelKey]
+		got[kernel] = ds.Name
+		driver := findContainerByName(ds.Spec.Template.Spec.Containers, "nvidia-driver-ctr")
+		require.NotNil(t, driver)
+		require.Contains(t, driver.Image, kernel)
+	}
+	require.NotEqual(t, got[x86Kernel], got[armKernel])
+	require.Contains(t, got[x86Kernel], "x86.64")
+	require.Contains(t, got[armKernel], "aarch64")
+}
+
+func TestKernelSuffixKeepsDotAndUnderscoreKernelsDistinct(t *testing.T) {
+	dotted := "5.14.0-427.el9.x86.64"
+	underscored := "5.14.0-427.el9.x86_64"
+	require.NotEqual(t,
+		kernelSuffixForPrecompiledDaemonSet(dotted),
+		kernelSuffixForPrecompiledDaemonSet(underscored))
+	require.Equal(t, "5.4.0-generic", kernelSuffixForPrecompiledDaemonSet("5.4.0-generic"))
+}
+
+func precompiledDriverDS(namespace, name string) *appsv1.DaemonSet {
+	return &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+			Labels: map[string]string{
+				precompiledIdentificationLabelKey: precompiledIdentificationLabelValue,
+			},
+		},
+	}
+}
+
+func TestDeleteUndesiredPrecompiledDaemonsets(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+
+	const (
+		operatorNS = "gpu-operator"
+		legacyName = "nvidia-driver-daemonset-5.14.0-427.37.1.el9.4-rhcos"
+		keepName   = "nvidia-driver-daemonset-5.14.0-427.37.1.el9.4.x86.64-rhcos"
+		otherName  = "nvidia-driver-daemonset-5.14.0-427.37.1.el9.4-rhcos"
+		failName   = "nvidia-driver-daemonset-fail"
+		laterName  = "nvidia-driver-daemonset-later"
+	)
+	legacy := precompiledDriverDS(operatorNS, legacyName)
+	keep := precompiledDriverDS(operatorNS, keepName)
+	otherNS := precompiledDriverDS("other", otherName)
+	k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacy, keep, otherNS).Build()
+	n := ClusterPolicyController{
+		client:            k8s,
+		operatorNamespace: operatorNS,
+		logger:            ctrl.Log.WithName("test"),
+	}
+	require.NoError(t, n.deleteUndesiredPrecompiledDaemonsets(ctx, map[string]struct{}{keepName: {}}))
+
+	err := k8s.Get(ctx, types.NamespacedName{Namespace: operatorNS, Name: legacyName}, &appsv1.DaemonSet{})
+	require.True(t, apierrors.IsNotFound(err))
+	require.NoError(t, k8s.Get(ctx, types.NamespacedName{Namespace: operatorNS, Name: keepName}, &appsv1.DaemonSet{}))
+	require.NoError(t, k8s.Get(ctx, types.NamespacedName{Namespace: "other", Name: otherName}, &appsv1.DaemonSet{}))
+
+	fail := precompiledDriverDS(operatorNS, failName)
+	later := precompiledDriverDS(operatorNS, laterName)
+	failing := fake.NewClientBuilder().WithScheme(scheme).WithObjects(fail, later).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+				if obj.GetName() == failName {
+					return fmt.Errorf("injected delete error")
+				}
+				return c.Delete(ctx, obj, opts...)
+			},
+		}).Build()
+	n.client = failing
+	err = n.deleteUndesiredPrecompiledDaemonsets(ctx, map[string]struct{}{})
+	require.ErrorContains(t, err, "injected delete error")
+	err = failing.Get(ctx, types.NamespacedName{Namespace: operatorNS, Name: laterName}, &appsv1.DaemonSet{})
+	require.True(t, apierrors.IsNotFound(err))
 }
 
 func TestServiceMonitor(t *testing.T) {
