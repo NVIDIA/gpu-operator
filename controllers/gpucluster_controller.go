@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -98,6 +97,10 @@ func (r *GPUClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if !instance.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, instance)
+	}
+
+	if err := utils.EnsureFinalizer(ctx, r.Client, instance, nodeCleanupFinalizer); err != nil {
+		return ctrl.Result{}, fmt.Errorf("add node cleanup finalizer: %w", err)
 	}
 
 	if err := utils.EnsureFinalizer(ctx, r.Client, instance, gpuClusterFinalizer); err != nil {
@@ -233,7 +236,13 @@ func (r *GPUClusterReconciler) reconcileDelete(ctx context.Context, instance *nv
 	logger := log.FromContext(ctx)
 
 	if !controllerutil.ContainsFinalizer(instance, gpuClusterFinalizer) {
-		return ctrl.Result{}, nil
+		return teardownSourceOperands(ctx, r.Client, r.Namespace, instance)
+	}
+
+	if controllerutil.ContainsFinalizer(instance, nodeCleanupFinalizer) {
+		if err := setSourceCondition(ctx, r.Client, instance, operandsRemoved, false, "OperandTeardownPending", "Draining claim consumers before remaining operands"); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	dsList := &appsv1.DaemonSetList{}
@@ -255,14 +264,19 @@ func (r *GPUClusterReconciler) reconcileDelete(ctx context.Context, instance *nv
 		}
 	}
 	if len(draining) > 0 {
-		r.recorder.Eventf(instance, nil, corev1.EventTypeNormal, "DrainingClaimConsumers", "Delete",
-			"Waiting for ResourceClaim-consuming DaemonSet(s) to terminate: %s", strings.Join(draining, ", "))
+		if r.recorder != nil {
+			r.recorder.Eventf(instance, nil, corev1.EventTypeNormal, "DrainingClaimConsumers", "Delete",
+				"Waiting for ResourceClaim-consuming DaemonSet(s) to terminate: %s", strings.Join(draining, ", "))
+		}
 		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	controllerutil.RemoveFinalizer(instance, gpuClusterFinalizer)
 	if err := r.Update(ctx, instance); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error removing finalizer: %w", err)
+	}
+	if controllerutil.ContainsFinalizer(instance, nodeCleanupFinalizer) {
+		return ctrl.Result{RequeueAfter: lifecycleRetry}, nil
 	}
 	return ctrl.Result{}, nil
 }
@@ -349,10 +363,15 @@ func (r *GPUClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		mgr.GetCache(),
 		&nvidiav1alpha1.GPUCluster{},
 		handler.TypedEnqueueRequestsFromMapFunc(r.enqueueAllGPUClusters),
-		predicate.TypedGenerationChangedPredicate[*nvidiav1alpha1.GPUCluster]{},
+		singletonCRPredicate[*nvidiav1alpha1.GPUCluster](),
 	),
 	)
 	if err != nil {
+		return err
+	}
+
+	// Deployment removal is part of source teardown (notably the DRA controller).
+	if err := c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}, handler.TypedEnqueueRequestForOwner[*appsv1.Deployment](mgr.GetScheme(), mgr.GetRESTMapper(), &nvidiav1alpha1.GPUCluster{}, handler.OnlyControllerOwner()))); err != nil {
 		return err
 	}
 
