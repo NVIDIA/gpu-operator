@@ -51,6 +51,7 @@ import (
 	"github.com/NVIDIA/gpu-operator/controllers"
 	operatorcache "github.com/NVIDIA/gpu-operator/controllers/cache"
 	"github.com/NVIDIA/gpu-operator/controllers/clusterinfo"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/info"
 	"github.com/NVIDIA/gpu-operator/internal/predicates"
 	// +kubebuilder:scaffold:imports
@@ -118,6 +119,11 @@ func main() {
 	webhookServer := webhook.NewServer(webhook.Options{
 		Port: 9443,
 	})
+
+	if _, err := coexistence.DefaultStack(); err != nil {
+		logger.Error(err, "Invalid allocator configuration")
+		os.Exit(1)
+	}
 
 	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
 

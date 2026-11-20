@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 
@@ -139,8 +140,7 @@ var gpuClusterStateLabels = map[string]string{
 
 // clusterPolicyStateLabelKeys returns every deploy-label key the ClusterPolicy
 // (device-plugin) stack may set on a node. The sandbox device-plugin keys are added
-// explicitly (and the result computed per call) because getEffectiveStateLabels
-// mutates the vm-passthrough map in place; mig-manager is added explicitly because
+// explicitly because the sandbox mode selects either key; mig-manager is added because
 // addGPUStateLabels sets it per MIG capability rather than via the workload-config maps.
 func clusterPolicyStateLabelKeys() map[string]bool {
 	keys := make(map[string]bool)
@@ -412,6 +412,9 @@ func getEffectiveStateLabels(config, mode string) map[string]string {
 		return labels
 	}
 
+	// Source adoption and node labeling read these maps concurrently. Keep
+	// sandbox-specific substitutions local to this reconciliation.
+	labels = maps.Clone(labels)
 	// update labels for the sandbox modes for passthrough
 	switch gpuv1.SandboxWorkloadsMode(mode) {
 	case gpuv1.Kata:

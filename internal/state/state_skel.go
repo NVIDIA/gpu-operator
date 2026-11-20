@@ -34,6 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	corev1 "k8s.io/api/core/v1"
+
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 	"github.com/NVIDIA/gpu-operator/internal/render"
 	"github.com/NVIDIA/gpu-operator/internal/utils"
@@ -103,6 +107,24 @@ func (s *stateSkel) renderObjects(ctx context.Context, data any) ([]*unstructure
 // collected when the owning CR is deleted.
 func (s *stateSkel) syncObjects(ctx context.Context, owner metav1.Object, objs []*unstructured.Unstructured) (SyncState, error) {
 	err := s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
+		if _, ok := owner.(*nvidiav1alpha1.GPUCluster); ok && obj.GetKind() == "DaemonSet" {
+			pod, _, err := unstructured.NestedMap(obj.Object, "spec", "template", "spec")
+			if err != nil {
+				return err
+			}
+			spec := &corev1.PodSpec{}
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(pod, spec); err != nil {
+				return err
+			}
+			coexistence.ConstrainMode(spec, coexistence.DRA)
+			affinity, err := runtime.DefaultUnstructuredConverter.ToUnstructured(spec.Affinity)
+			if err != nil {
+				return err
+			}
+			if err := unstructured.SetNestedMap(obj.Object, affinity, "spec", "template", "spec", "affinity"); err != nil {
+				return err
+			}
+		}
 		if err := controllerutil.SetControllerReference(owner, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %w", err)
 		}

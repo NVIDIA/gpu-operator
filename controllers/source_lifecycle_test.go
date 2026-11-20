@@ -39,12 +39,14 @@ import (
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	gpu "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/coexistence"
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func testSourceCP() *gpuv1.ClusterPolicy {
 	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cp", UID: "cp-uid", CreationTimestamp: metav1.NewTime(time.Unix(1, 0)), Finalizers: []string{nodeCleanupFinalizer}}}
 	cp.Spec.Driver.Enabled = new(false)
+	cp.Status.Conditions = []metav1.Condition{{Type: nodeSelectionInitialized, Status: metav1.ConditionTrue, Reason: "AdoptionComplete"}}
 	return cp
 }
 func testSourceGC() *gpu.GPUCluster {
@@ -77,8 +79,9 @@ func deleteSource(t *testing.T, c client.Client, obj client.Object) {
 
 func TestDeletionWaitsForOperandsAndMetadataObservation(t *testing.T) {
 	cp := testSourceCP()
-	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node", Labels: map[string]string{}, Annotations: map[string]string{}}}
-	node.Labels["nvidia.com/gpu.deploy.device-plugin"] = "paused-for-driver-upgrade"
+	node := selectedNode(coexistence.DP)
+	node.Labels[devicePluginDeployLabelKey] = "paused-for-driver-upgrade"
+	node.Labels[coexistence.ModeLabel] = coexistence.DRA
 	node.Labels["nvidia.com/gpu.deploy.dcgm-exporter"] = "false"
 	node.Labels[consts.NVIDIADriverOwnerLabel] = "driver"
 	node.Labels[driverDeployLabelKey] = "false"
@@ -98,7 +101,13 @@ func TestDeletionWaitsForOperandsAndMetadataObservation(t *testing.T) {
 	_, err = r.cleanupDeletedSources(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
-	require.Contains(t, node.Labels, "nvidia.com/gpu.deploy.device-plugin")
+	require.Equal(t, coexistence.DP, node.Annotations[coexistence.SelectionAnnotation])
+	require.Contains(t, node.Labels, devicePluginDeployLabelKey)
+	// Even an explicit mode change must not bypass the reservation.
+	nlc := &nodeLabelingController{client: c, clusterPolicy: cp, gpuCluster: testSourceGC(), terminatingDP: true}
+	changed, err := nlc.selectNode(t.Context(), node)
+	require.NoError(t, err)
+	require.False(t, changed)
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(ds), ds))
 	require.NotNil(t, ds.DeletionTimestamp)
 	// Fake clients have no GC: simulate observed foreground completion.
@@ -121,7 +130,9 @@ func TestDeletionWaitsForOperandsAndMetadataObservation(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(cp), cp))
 	require.Contains(t, cp.Finalizers, nodeCleanupFinalizer, "a successful patch is not observation")
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
-	require.NotContains(t, node.Labels, "nvidia.com/gpu.deploy.device-plugin")
+	require.NotContains(t, node.Annotations, coexistence.SelectionAnnotation)
+	require.NotContains(t, node.Labels, devicePluginDeployLabelKey)
+	require.Equal(t, coexistence.DRA, node.Labels[coexistence.ModeLabel])
 	require.Equal(t, "false", node.Labels["nvidia.com/gpu.deploy.dcgm-exporter"])
 	require.Equal(t, "false", node.Labels[driverDeployLabelKey])
 	require.Equal(t, "true", node.Annotations[driverAutoUpgradeAnnotationKey])
@@ -276,11 +287,44 @@ func TestDirectPodDeletionBatches(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(other), other))
 }
 
+func TestCleanupRetriesPreserveSurvivingSelections(t *testing.T) {
+	for _, defaultStack := range []string{"", coexistence.DP, coexistence.DRA} {
+		t.Run("default="+defaultStack, func(t *testing.T) {
+			cp := testSourceCP()
+			gc := testSourceGC()
+			node := selectedNode(coexistence.DP)
+			node.Labels[devicePluginDeployLabelKey] = ""
+			c := lifecycleClient(t, cp, gc, node)
+			deleteSource(t, c, cp)
+			require.NoError(t, setOperandsRemoved(t.Context(), c, cp, true, "TeardownComplete", "done"))
+			r := &NodeLabelingReconciler{Client: c}
+			_, err := r.cleanupDeletedSources(t.Context())
+			require.NoError(t, err)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
+			// Surviving DRA may activate before the terminating CP disappears.
+			nlc := &nodeLabelingController{client: c, clusterPolicy: cp, gpuCluster: gc, terminatingDP: true, defaultStack: defaultStack}
+			_, err = nlc.selectNode(t.Context(), node)
+			require.NoError(t, err)
+			want := coexistence.DRA
+			if defaultStack == coexistence.DP {
+				want = ""
+			}
+			require.Equal(t, want, node.Annotations[coexistence.SelectionAnnotation])
+			require.NoError(t, c.Update(t.Context(), node))
+			_, err = r.cleanupDeletedSources(t.Context())
+			require.NoError(t, err)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
+			require.Equal(t, want, node.Annotations[coexistence.SelectionAnnotation])
+			require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(cp), cp)))
+		})
+	}
+}
+
 func TestCleanupFailureAndRestart(t *testing.T) {
 	cp := testSourceCP()
-	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node", Labels: map[string]string{}, Annotations: map[string]string{}}}
+	node := selectedNode(coexistence.DP)
 	// Cleanup includes nodes that no longer have discovery labels.
-	node.Labels = map[string]string{"nvidia.com/gpu.deploy.device-plugin": "true"}
+	node.Labels = map[string]string{devicePluginDeployLabelKey: "true"}
 	base := lifecycleClient(t, cp, node)
 	deleteSource(t, base, cp)
 	require.NoError(t, setOperandsRemoved(t.Context(), base, cp, true, "TeardownComplete", "done"))
@@ -338,6 +382,58 @@ func TestGPUClusterContinuesAfterOldFinalizerRemoved(t *testing.T) {
 	require.True(t, operandsRemovedTrue(gc))
 }
 
+func TestAdoptionConditionIsObservedAndLatched(t *testing.T) {
+	cp := testSourceCP()
+	cp.Status.Conditions = nil
+	c := lifecycleClient(t, cp)
+	ready, err := observeSourceAdoption(t.Context(), c, cp)
+	require.NoError(t, err)
+	require.False(t, ready)
+	actual := &gpuv1.ClusterPolicy{}
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(cp), actual))
+	require.True(t, nodeSelectionInitializedTrue(actual))
+	t.Setenv(coexistence.DefaultStackEnv, coexistence.DRA)
+	ready, err = observeSourceAdoption(t.Context(), c, actual)
+	require.NoError(t, err)
+	require.True(t, ready)
+}
+
+func TestGPUClusterAdoptionInitializesRequiredState(t *testing.T) {
+	for _, initial := range []gpu.State{"", gpu.Ready} {
+		t.Run(string(initial), func(t *testing.T) {
+			gc := testSourceGC()
+			gc.Status.State = initial
+			c := lifecycleClient(t, gc)
+			observed, err := observeSourceAdoption(t.Context(), c, gc)
+			require.NoError(t, err)
+			require.False(t, observed)
+			require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(gc), gc))
+			require.True(t, nodeSelectionInitializedTrue(gc))
+			if initial == "" {
+				require.Equal(t, gpu.NotReady, gc.Status.State, "the CRD requires state on the first status write")
+			} else {
+				require.Equal(t, initial, gc.Status.State)
+			}
+		})
+	}
+}
+
+func TestModeCannotBypassTerminatingSource(t *testing.T) {
+	for _, stack := range []string{coexistence.DP, coexistence.DRA} {
+		n := selectedNode(stack)
+		n.Labels[coexistence.ModeLabel] = coexistence.DP
+		if stack == coexistence.DP {
+			n.Labels[coexistence.ModeLabel] = coexistence.DRA
+		}
+		n.Labels[commonGPULabelKey] = "false"
+		nlc := &nodeLabelingController{terminatingDP: stack == coexistence.DP, terminatingDRA: stack == coexistence.DRA}
+		changed, err := nlc.selectNode(t.Context(), n)
+		require.NoError(t, err)
+		require.False(t, changed)
+		require.Equal(t, stack, n.Annotations[coexistence.SelectionAnnotation])
+	}
+}
+
 func TestCleanupSameNameNewUIDIsNotOwned(t *testing.T) {
 	gc := testSourceGC()
 	old := gc.DeepCopy()
@@ -347,6 +443,59 @@ func TestCleanupSameNameNewUIDIsNotOwned(t *testing.T) {
 	workloads, _, err := ownedWorkloads(t.Context(), c, "test", gc)
 	require.NoError(t, err)
 	require.Empty(t, workloads)
+}
+
+func TestCleanupPatchConflictPreservesConcurrentMode(t *testing.T) {
+	cp := testSourceCP()
+	node := selectedNode(coexistence.DP)
+	base := lifecycleClient(t, cp, node)
+	deleteSource(t, base, cp)
+	require.NoError(t, setOperandsRemoved(t.Context(), base, cp, true, "TeardownComplete", "done"))
+	racing := interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, p client.Patch, opts ...client.PatchOption) error {
+		if _, ok := obj.(*corev1.Node); ok {
+			latest := &corev1.Node{}
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(obj), latest))
+			latest.Labels[coexistence.ModeLabel] = coexistence.DRA
+			require.NoError(t, c.Update(ctx, latest))
+		}
+		return c.Patch(ctx, obj, p, opts...)
+	}})
+	r := &NodeLabelingReconciler{Client: racing}
+	pending, err := r.cleanupDeletedSources(t.Context())
+	require.NoError(t, err)
+	require.True(t, pending)
+	require.NoError(t, base.Get(t.Context(), client.ObjectKeyFromObject(cp), cp))
+	require.Contains(t, cp.Finalizers, nodeCleanupFinalizer)
+	r.Client = base
+	_, err = r.cleanupDeletedSources(t.Context())
+	require.NoError(t, err)
+	require.NoError(t, base.Get(t.Context(), client.ObjectKeyFromObject(node), node))
+	require.Equal(t, coexistence.DRA, node.Labels[coexistence.ModeLabel])
+	require.NotContains(t, node.Annotations, coexistence.SelectionAnnotation)
+}
+
+func TestSimultaneousSourceDeletionConverges(t *testing.T) {
+	cp := testSourceCP()
+	gc := testSourceGC()
+	node := selectedNode(coexistence.DRA)
+	node.Labels[devicePluginDeployLabelKey] = "true"
+	node.Labels[draDriverDeployLabelKey] = "false"
+	c := lifecycleClient(t, cp, gc, node)
+	deleteSource(t, c, cp)
+	deleteSource(t, c, gc)
+	require.NoError(t, setOperandsRemoved(t.Context(), c, cp, true, "TeardownComplete", "done"))
+	require.NoError(t, setOperandsRemoved(t.Context(), c, gc, true, "TeardownComplete", "done"))
+	r := &NodeLabelingReconciler{Client: c}
+	for range 4 {
+		_, err := r.cleanupDeletedSources(t.Context())
+		require.NoError(t, err)
+	}
+	require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(cp), cp)))
+	require.True(t, apierrors.IsNotFound(c.Get(t.Context(), client.ObjectKeyFromObject(gc), gc)))
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(node), node))
+	require.NotContains(t, node.Labels, devicePluginDeployLabelKey)
+	require.Equal(t, "false", node.Labels[draDriverDeployLabelKey])
+	require.NotContains(t, node.Annotations, coexistence.SelectionAnnotation)
 }
 
 func TestTeardownAPIFailureKeepsReservation(t *testing.T) {
