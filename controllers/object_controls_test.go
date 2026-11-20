@@ -1194,9 +1194,19 @@ func TestDevicePlugin(t *testing.T) {
 				return
 			}
 
-			// Without a GPUCluster in the cluster, scheduling gates on the deploy label
-			// alone; the mode nodeSelector is rendered only once the DRA stack coexists.
+			// Every DP operand requires its component label and mode absent or device-plugin.
 			require.Equal(t, "true", ds.Spec.Template.Spec.NodeSelector["nvidia.com/gpu.deploy.device-plugin"])
+			require.NotNil(t, ds.Spec.Template.Spec.Affinity)
+			for _, term := range ds.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				found := false
+				for _, expr := range term.MatchExpressions {
+					if expr.Key == "nvidia.com/gpu.deploy.mode" {
+						found = true
+						require.True(t, expr.Operator == corev1.NodeSelectorOpDoesNotExist || (expr.Operator == corev1.NodeSelectorOpIn && len(expr.Values) == 1 && expr.Values[0] == "device-plugin"))
+					}
+				}
+				require.True(t, found, "each affinity alternative must constrain mode")
+			}
 			require.NotContains(t, ds.Spec.Template.Spec.NodeSelector, "nvidia.com/gpu-operator.resource-allocation.mode")
 
 			configManagerInitPresent := false

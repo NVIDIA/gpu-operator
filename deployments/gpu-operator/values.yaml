@@ -88,6 +88,11 @@ operator:
   leaderElection:
     # renewDeadline: 60s
     warmup: false
+  # Optional default for unrecorded nodes, including after source-CR cleanup.
+  # null: use the sole stack, or device-plugin when both stacks exist.
+  # device-plugin/dra: wait without recording if the chosen stack is unavailable.
+  # Changing this value preserves existing recorded selections.
+  defaultGPUAllocationStack: null
   env: []
   priorityClassName: system-node-critical
   runtimeClass: nvidia

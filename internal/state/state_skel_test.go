@@ -635,3 +635,33 @@ func TestGetSyncStateWaitsForDaemonSetController(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, SyncState(SyncStateReady), state)
 }
+
+func TestGPUClusterModeAffinityAppliedDuringSync(t *testing.T) {
+	for _, mode := range []string{"dra", "independent-driver"} {
+		t.Run(mode, func(t *testing.T) {
+			scheme := driverTestScheme(t)
+			c := fake.NewClientBuilder().WithScheme(scheme).Build()
+			skel := &stateSkel{name: "test", namespace: "test-ns", client: c, scheme: scheme}
+			var owner client.Object = &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "gc", UID: "gc-uid"}}
+			if mode == "independent-driver" {
+				owner = &nvidiav1alpha1.NVIDIADriver{ObjectMeta: metav1.ObjectMeta{Name: "driver", UID: "driver-uid"}}
+			}
+			ds := newDaemonSetUnstructured("test-ds", "test-ns")
+			require.NoError(t, unstructured.SetNestedStringMap(ds.Object, map[string]string{"component": "true"}, "spec", "template", "spec", "nodeSelector"))
+			_, err := skel.syncObjects(t.Context(), owner, []*unstructured.Unstructured{ds})
+			require.NoError(t, err)
+			actual := &appsv1.DaemonSet{}
+			require.NoError(t, c.Get(t.Context(), client.ObjectKey{Name: "test-ds", Namespace: "test-ns"}, actual))
+			require.Equal(t, "true", actual.Spec.Template.Spec.NodeSelector["component"])
+			if mode == "independent-driver" {
+				require.Nil(t, actual.Spec.Template.Spec.Affinity)
+				return
+			}
+			terms := actual.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+			require.Len(t, terms, 2)
+			require.Equal(t, "nvidia.com/gpu.deploy.mode", terms[0].MatchExpressions[0].Key)
+			require.Equal(t, corev1.NodeSelectorOpDoesNotExist, terms[0].MatchExpressions[0].Operator)
+			require.Equal(t, []string{"dra"}, terms[1].MatchExpressions[0].Values)
+		})
+	}
+}

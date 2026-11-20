@@ -87,8 +87,11 @@ func (f *fakeStateManager) SyncState(_ context.Context, _ any, catalog state.Inf
 
 func gccReconcile(t *testing.T, r *GPUClusterReconciler, name string) {
 	t.Helper()
-	_, err := r.Reconcile(t.Context(), gccRequest(name))
-	require.NoError(t, err)
+	// Observe initial adoption on the second pass.
+	for range 2 {
+		_, err := r.Reconcile(t.Context(), gccRequest(name))
+		require.NoError(t, err)
+	}
 }
 
 func gccRequest(name string) ctrl.Request {

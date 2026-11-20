@@ -158,6 +158,11 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := utils.EnsureFinalizer(ctx, r.Client, instance, nodeCleanupFinalizer); err != nil {
 		return ctrl.Result{}, fmt.Errorf("add node cleanup finalizer: %w", err)
 	}
+	if adopted, err := observeSourceAdoption(ctx, r.Client, instance); err != nil {
+		return ctrl.Result{}, err
+	} else if !adopted {
+		return ctrl.Result{RequeueAfter: lifecycleRetry}, nil
+	}
 
 	if err := clusterPolicyCtrl.init(ctx, r, instance); err != nil {
 		logger.Error(err, "unable to initialize ClusterPolicy controller")

@@ -468,6 +468,8 @@ func newClusterPolicyUpgradeTestReconciler(t *testing.T, cp *gpuv1.ClusterPolicy
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 
+	// These tests exercise driver-upgrade readiness after initial adoption.
+	cp.Status.Conditions = []metav1.Condition{{Type: nodeSelectionInitialized, Status: metav1.ConditionTrue, Reason: "AdoptionComplete"}}
 	objects := []client.Object{cp}
 	for _, node := range nodes {
 		objects = append(objects, node)
