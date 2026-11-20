@@ -24,6 +24,7 @@ import (
 	promcli "github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,6 +51,7 @@ func newGPUClusterReconciler(t *testing.T, objs ...client.Object) (*GPUClusterRe
 	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
 	require.NoError(t, gpuv1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, admissionv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	// The reconciler labels the operator namespace for adminAccess, so it must exist.
@@ -327,7 +329,7 @@ func TestGPUClusterTeardownDrainsClaimConsumersFirst(t *testing.T) {
 	require.NoError(t, c.Get(t.Context(), types.NamespacedName{Name: plugin.Name, Namespace: "test-namespace"}, ds))
 }
 
-// A ClusterPolicy and GPUCluster CR cannot co-exist
+// A GPUCluster cannot activate alongside a CP with invalid creation order.
 func TestGPUClusterCoexistsWithClusterPolicy(t *testing.T) {
 	cfg := &nvidiav1alpha1.GPUCluster{ObjectMeta: metav1.ObjectMeta{Name: "config"}}
 	cp := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "cluster-policy"}}

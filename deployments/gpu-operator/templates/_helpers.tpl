@@ -103,3 +103,8 @@ this name.
 {{- define "gpu-operator.gpucluster-name" -}}
 gpu-cluster
 {{- end }}
+
+{{/* Keep standalone CP installs independent of DRA admission infrastructure. */}}
+{{- define "gpu-operator.allocatorAdmission" -}}
+{{- if or (.Capabilities.APIVersions.Has "resource.k8s.io/v1/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta2/DeviceClass") (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta1/DeviceClass") -}}true{{- end -}}
+{{- end -}}
