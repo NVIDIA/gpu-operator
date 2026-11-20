@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	upgrade_v1alpha1 "github.com/NVIDIA/k8s-operator-libs/api/upgrade/v1alpha1"
 	"github.com/NVIDIA/k8s-operator-libs/pkg/upgrade"
@@ -39,6 +40,71 @@ import (
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
 )
+
+func TestUpgradePodReadyPredicate(t *testing.T) {
+	newPod := func(labels map[string]string, status corev1.ConditionStatus) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "gpu-operator", Labels: labels},
+			Spec:       corev1.PodSpec{NodeName: "gpu-node"},
+			Status: corev1.PodStatus{Conditions: []corev1.PodCondition{
+				{Type: corev1.PodReady, Status: status},
+			}},
+		}
+	}
+	for name, labels := range map[string]map[string]string{
+		"ClusterPolicy driver": {DriverLabelKey: DriverLabelValue},
+		"NVIDIADriver":         {AppComponentLabelKey: DriverAppComponentLabelValue},
+		"OpenShift driver":     {ocpDriverToolkitIdentificationLabel: ocpDriverToolkitIdentificationValue},
+		// Both ClusterPolicy and DRA validators use this app label.
+		"validator": {"app": "nvidia-operator-validator"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := upgradePodReadyPredicate("gpu-operator")
+			ready := newPod(labels, corev1.ConditionTrue)
+			pending := newPod(labels, corev1.ConditionFalse)
+			unknown := newPod(labels, corev1.ConditionUnknown)
+			missing := ready.DeepCopy()
+			missing.Status.Conditions = nil
+			for state, old := range map[string]*corev1.Pod{"not ready": pending, "unknown": unknown, "missing": missing} {
+				t.Run(state+" to ready", func(t *testing.T) {
+					require.True(t, p.Update(event.TypedUpdateEvent[*corev1.Pod]{ObjectOld: old, ObjectNew: ready}))
+				})
+			}
+			require.True(t, p.Create(event.TypedCreateEvent[*corev1.Pod]{Object: ready}), "observe already-ready Pods on informer startup")
+			require.False(t, p.Create(event.TypedCreateEvent[*corev1.Pod]{Object: pending}))
+			require.False(t, p.Update(event.TypedUpdateEvent[*corev1.Pod]{ObjectOld: ready, ObjectNew: pending}))
+			require.False(t, p.Update(event.TypedUpdateEvent[*corev1.Pod]{ObjectOld: pending, ObjectNew: unknown}))
+			updated := ready.DeepCopy()
+			updated.ResourceVersion = "2"
+			updated.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "driver", RestartCount: 1}}
+			require.False(t, p.Update(event.TypedUpdateEvent[*corev1.Pod]{ObjectOld: ready, ObjectNew: updated}), "ignore status churn while Ready")
+			require.False(t, p.Delete(event.TypedDeleteEvent[*corev1.Pod]{Object: ready}))
+			require.False(t, p.Generic(event.TypedGenericEvent[*corev1.Pod]{Object: ready}))
+		})
+	}
+
+	t.Run("ignore unrelated and unusable Pods", func(t *testing.T) {
+		p := upgradePodReadyPredicate("gpu-operator")
+		for name, mutate := range map[string]func(*corev1.Pod){
+			"different namespace": func(p *corev1.Pod) { p.Namespace = "user-workload" },
+			"unrelated operand":   func(p *corev1.Pod) { p.Labels = map[string]string{"app": "nvidia-dcgm-exporter-dra"} },
+			"no labels":           func(p *corev1.Pod) { p.Labels = nil },
+			"unscheduled":         func(p *corev1.Pod) { p.Spec.NodeName = "" },
+			"terminating":         func(p *corev1.Pod) { now := metav1.Now(); p.DeletionTimestamp = &now },
+		} {
+			t.Run(name, func(t *testing.T) {
+				ready := newPod(map[string]string{DriverLabelKey: DriverLabelValue}, corev1.ConditionTrue)
+				mutate(ready)
+				pending := ready.DeepCopy()
+				pending.Status.Conditions[0].Status = corev1.ConditionFalse
+				require.False(t, p.Create(event.TypedCreateEvent[*corev1.Pod]{Object: ready}))
+				require.False(t, p.Update(event.TypedUpdateEvent[*corev1.Pod]{ObjectOld: pending, ObjectNew: ready}))
+			})
+		}
+		require.False(t, p.Create(event.TypedCreateEvent[*corev1.Pod]{}))
+		require.False(t, p.Update(event.TypedUpdateEvent[*corev1.Pod]{}))
+	})
+}
 
 func TestSetDrainSpecPodSelector(t *testing.T) {
 	tests := []struct {
