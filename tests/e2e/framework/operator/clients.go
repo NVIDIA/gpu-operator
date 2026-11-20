@@ -32,6 +32,7 @@ type Clients struct {
 	Nodes           *helpers.NodeClient
 	DaemonSets      *helpers.DaemonSetClient
 	ClusterPolicies *helpers.ClusterPolicyClient
+	GPUClusters     *helpers.GPUClusterClient
 	Drivers         *helpers.NvidiaDriverClient
 	Workloads       *helpers.WorkloadClient
 }
@@ -54,6 +55,7 @@ func NewClients() Clients {
 		Nodes:           helpers.NewNodeClient(kubeClient),
 		DaemonSets:      helpers.NewDaemonSetClient(kubeClient),
 		ClusterPolicies: helpers.NewClusterPolicyClient(gpuClient),
+		GPUClusters:     helpers.NewGPUClusterClient(gpuClient),
 		Drivers:         helpers.NewNvidiaDriverClient(gpuClient, kubeClient),
 		Workloads:       helpers.NewWorkloadClient(kubeClient),
 	}
