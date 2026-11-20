@@ -725,7 +725,7 @@ func preprocessService(obj *corev1.Service, n ClusterPolicyController) error {
 
 	t, ok := transformations[obj.Name]
 	if !ok {
-		logger.V(2).Info(fmt.Sprintf("No transformation for Service '%s'", obj.Name))
+		logger.V(2).Info("No transformation for Service", "name", obj.Name)
 		return nil
 	}
 
@@ -763,7 +763,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 
 	t, ok := transformations[obj.Name]
 	if !ok {
-		logger.Info(fmt.Sprintf("No transformation for Daemonset '%s'", obj.Name))
+		logger.Info("No transformation for Daemonset", "name", obj.Name)
 		return nil
 	}
 

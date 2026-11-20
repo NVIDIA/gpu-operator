@@ -19,7 +19,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -109,7 +108,7 @@ func main() {
 	logger := zap.New(zap.UseFlagOptions(&opts))
 	ctrl.SetLogger(logger)
 
-	ctrl.Log.Info(fmt.Sprintf("version: %s", info.GetVersionString()))
+	ctrl.Log.Info("Starting GPU Operator", "version", info.GetVersionString())
 
 	metricsOptions := metricsserver.Options{
 		BindAddress: metricsAddr,

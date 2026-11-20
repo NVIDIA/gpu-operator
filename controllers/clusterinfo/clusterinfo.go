@@ -228,7 +228,8 @@ func getContainerRuntime(ctx context.Context, config *rest.Config) (string, erro
 
 	ocpVersion, err := getOpenshiftVersion(ctx, config)
 	if err != nil {
-		logger.Error(err, "failed to retrieve")
+		logger.Error(err, "failed to retrieve OpenShift version")
+		return "", err
 	}
 	if ocpVersion != "" {
 		return consts.CRIO, nil
@@ -249,7 +250,7 @@ func getContainerRuntime(ctx context.Context, config *rest.Config) (string, erro
 	for _, node := range list.Items {
 		rt, err := getRuntimeString(node)
 		if err != nil {
-			logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
+			logger.Info("Unable to get runtime info for node", "node", node.Name, "error", err)
 			continue
 		}
 		runtime = rt

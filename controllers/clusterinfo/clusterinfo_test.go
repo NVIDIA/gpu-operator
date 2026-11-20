@@ -17,10 +17,14 @@
 package clusterinfo
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
 
 	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
@@ -79,4 +83,44 @@ func TestGetRuntimeString(t *testing.T) {
 			require.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func TestGetContainerRuntimeOpenShiftDiscoveryFailure(t *testing.T) {
+	nodeListRequested := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/apis/config.openshift.io/v1/clusterversions/version":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{
+				"apiVersion": "v1",
+				"kind": "Status",
+				"status": "Failure",
+				"message": "simulated OpenShift discovery failure",
+				"reason": "InternalError",
+				"code": 500
+			}`))
+
+		case "/api/v1/nodes":
+			nodeListRequested = true
+			http.Error(w, "unexpected node listing", http.StatusInternalServerError)
+
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	config := &rest.Config{
+		Host: server.URL,
+	}
+
+	runtime, err := getContainerRuntime(context.Background(), config)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "simulated OpenShift discovery failure")
+	require.Empty(t, runtime)
+	require.False(t, nodeListRequested,
+		"node listing should not happen when OpenShift discovery fails")
 }

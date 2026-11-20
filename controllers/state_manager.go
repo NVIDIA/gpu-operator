@@ -746,7 +746,7 @@ func (n *ClusterPolicyController) getRuntime() error {
 	for _, node := range list.Items {
 		rt, err := getRuntimeString(node)
 		if err != nil {
-			n.logger.Info(fmt.Sprintf("Unable to get runtime info for node %s: %v", node.Name, err))
+			n.logger.Info("Unable to get runtime info for node", "node", node.Name, "error", err)
 			continue
 		}
 		runtime = rt
@@ -887,8 +887,7 @@ func (n *ClusterPolicyController) init(ctx context.Context, reconciler *ClusterP
 	if err != nil {
 		return err
 	}
-	n.logger.Info(fmt.Sprintf("Using container runtime: %s", n.runtime.String()))
-
+	n.logger.Info("Using container runtime", "runtime", n.runtime.String())
 	// fetch all kernel versions from the GPU nodes in the cluster
 	if n.singleton.Spec.Driver.IsEnabled() && n.singleton.Spec.Driver.UsePrecompiledDrivers() {
 		kernelVersionMap, err := n.getKernelVersionsMap()
