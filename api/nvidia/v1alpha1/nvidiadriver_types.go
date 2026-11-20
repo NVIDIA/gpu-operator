@@ -523,7 +523,7 @@ type NVIDIADriverStatus struct {
 //+kubebuilder:resource:scope=Cluster,shortName={"nvd","nvdriver","nvdrivers"}
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.state`,priority=0
 //+kubebuilder:printcolumn:name="Default",type=boolean,JSONPath=`.spec.default`,priority=0
-//+kubebuilder:printcolumn:name="Age",type=string,JSONPath=`.metadata.creationTimestamp`,priority=0
+//+kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`,priority=0
 
 // NVIDIADriver is the Schema for the nvidiadrivers API
 type NVIDIADriver struct {
