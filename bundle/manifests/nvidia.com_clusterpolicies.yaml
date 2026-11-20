@@ -2513,6 +2513,12 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  runtimeClassName:
+                    description: |-
+                      RuntimeClassName selects an existing RuntimeClass for the Container Toolkit pod.
+                      A class backed by a non-NVIDIA runtime allows the toolkit to start when the
+                      host NVIDIA runtime is unavailable. If empty, the node's default runtime is used.
+                    type: string
                   version:
                     description: NVIDIA Container Toolkit image tag
                     type: string
