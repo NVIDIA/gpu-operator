@@ -117,11 +117,10 @@ operator:
                 values: [""]
   podAntiAffinity:
     enabled: true
-  podDisruptionBudget:
-    # Created when operator.replicaCount > 1.
-    # If only one node can run operator pods, this budget can block draining that node.
-    # Set operator.replicaCount to 1 or disable this podDisruptionBudget to allow draining.
-    enabled: true
+  # Created when operator.replicaCount > 1.
+  # If only one node can run operator pods, this budget can block draining that node.
+  # Set operator.replicaCount to 1 or disable this podDisruptionBudget to allow draining.
+  podDisruptionBudget: {}
   logging:
     # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 'rfc3339nano')
     timeEncoding: epoch

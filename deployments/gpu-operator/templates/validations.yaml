@@ -32,3 +32,8 @@
 {{- if and (hasKey .Values.operator "replicaCount") (lt (int .Values.operator.replicaCount) 1) }}
 {{- fail "operator.replicaCount must be at least 1" }}
 {{- end }}
+
+{{- $pdb := .Values.operator.podDisruptionBudget | default dict }}
+{{- if and (dig "enabled" false $pdb) (le (int .Values.operator.replicaCount) 1) }}
+{{- fail "operator.podDisruptionBudget.enabled=true requires operator.replicaCount to be at least 2" }}
+{{- end }}
