@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -514,3 +515,19 @@ func clusterPolicyState(t *testing.T, c client.Client, name string) gpuv1.State 
 	require.NoError(t, c.Get(t.Context(), client.ObjectKey{Name: name}, cp))
 	return cp.Status.State
 }
+
+func TestClusterPolicyReconcileGetFailureDoesNotUpdateCondition(t *testing.T) {
+	cp := clusterPolicyForUpgradeTest(true)
+	r, c, _ := newClusterPolicyUpgradeTestReconciler(t, cp)
+	updater := &FakeConditionUpdater{}
+	r.conditionUpdater = updater
+	r.Client = &getFailingClient{
+		Client: c,
+		getErr: errors.New("simulated API server connection failure"),
+	}
+
+	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+	require.ErrorContains(t, err, "simulated API server connection failure")
+	require.Empty(t, updater.LastErrorReason)
+}
+

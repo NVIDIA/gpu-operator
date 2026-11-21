@@ -113,10 +113,8 @@ func (r *ClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, err.Error()); condErr != nil {
-			logger.Error(condErr, "failed to set condition")
-		}
+		// instance was not populated by the failed Get, so there is no object to
+		// update status on; just surface the error for requeue.
 		return reconcile.Result{}, err
 	}
 
