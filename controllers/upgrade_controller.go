@@ -79,7 +79,7 @@ const (
 //nolint
 // +kubebuilder:rbac:groups=mellanox.com,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups="",resources=pods,verbs=list
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=resource.k8s.io,resources=resourceclaims,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments;daemonsets;replicasets;statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
@@ -393,6 +393,20 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: upgradeControllerSingletonName}}}
 	}
 
+	// Pod readiness does not change the driver DaemonSet's generation. Observe
+	// both gates so completed restarts and validation do not wait for the timer.
+	err = c.Watch(source.Kind(
+		mgr.GetCache(),
+		&corev1.Pod{},
+		handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, pod *corev1.Pod) []reconcile.Request {
+			return mapToSingleton(ctx, pod)
+		}),
+		upgradePodReadyPredicate(r.OperatorNamespace),
+	))
+	if err != nil {
+		return err
+	}
+
 	// Watch ClusterPolicy; its deletion switches reconciliation to the NVIDIADriver path.
 	cpMapFn := func(ctx context.Context, cp *gpuv1.ClusterPolicy) []reconcile.Request {
 		return mapToSingleton(ctx, cp)
@@ -507,4 +521,36 @@ func (r *UpgradeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 func upgradeNodeLabelsChanged(oldLabels, newLabels map[string]string) bool {
 	return oldLabels[upgrade.GetUpgradeStateLabelKey()] != newLabels[upgrade.GetUpgradeStateLabelKey()] ||
 		oldLabels[upgrade.GetUpgradeSkipNodeLabelKey()] != newLabels[upgrade.GetUpgradeSkipNodeLabelKey()]
+}
+
+// upgradePodReadyPredicate wakes the singleton only when a driver or validator
+// becomes usable. Filtering status updates avoids reconciling for every Pod event
+// during a fleet rollout; the periodic requeue remains a fallback.
+func upgradePodReadyPredicate(namespace string) predicate.TypedFuncs[*corev1.Pod] {
+	ready := func(pod *corev1.Pod) bool {
+		if pod == nil || pod.Namespace != namespace || pod.Spec.NodeName == "" || pod.DeletionTimestamp != nil {
+			return false
+		}
+		if pod.Labels[AppComponentLabelKey] != DriverAppComponentLabelValue &&
+			pod.Labels[DriverLabelKey] != DriverLabelValue &&
+			pod.Labels[ocpDriverToolkitIdentificationLabel] != ocpDriverToolkitIdentificationValue &&
+			pod.Labels["app"] != "nvidia-operator-validator" {
+			return false
+		}
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady {
+				return condition.Status == corev1.ConditionTrue
+			}
+		}
+		return false
+	}
+	return predicate.TypedFuncs[*corev1.Pod]{
+		// An informer may first observe a Pod after it has already become Ready.
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Pod]) bool { return ready(e.Object) },
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Pod]) bool {
+			return ready(e.ObjectNew) && !ready(e.ObjectOld)
+		},
+		DeleteFunc:  func(event.TypedDeleteEvent[*corev1.Pod]) bool { return false },
+		GenericFunc: func(event.TypedGenericEvent[*corev1.Pod]) bool { return false },
+	}
 }
