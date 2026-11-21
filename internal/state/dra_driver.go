@@ -132,7 +132,7 @@ func (s *stateDRADriver) getManifestObjects(ctx context.Context, cr *nvidiav1alp
 			cr.Spec.DRADriver.ComputeDomains.KubeletPlugin.Healthcheck, defaultComputeDomainsHealthcheckPort),
 	}
 
-	return s.renderObjects(ctx, renderData)
+	return s.renderGPUClusterObjects(ctx, cr, renderData)
 }
 
 // getDRADriverSpec builds the render-time DRA driver spec, resolving the DRA driver
