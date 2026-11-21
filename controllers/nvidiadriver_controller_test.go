@@ -87,6 +87,18 @@ func (c *patchFailingClient) Patch(ctx context.Context, obj client.Object, patch
 	return c.patchErr
 }
 
+type getFailingClient struct {
+	client.Client
+	getErr error
+}
+
+func (c *getFailingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if c.getErr != nil {
+		return c.getErr
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
 // newTestLogger creates a zap.Logger that writes to an in-memory buffer for testing
 func newTestLogger() (logr.Logger, *bytes.Buffer) {
 	buf := &bytes.Buffer{}
@@ -678,3 +690,29 @@ func TestEnqueueNVIDIADriverReconcilersDedupesEventDriver(t *testing.T) {
 	require.Len(t, requests, 1)
 	require.Equal(t, "default/driver-a", requests[0].String())
 }
+
+func TestNVIDIADriverReconcileGetFailureDoesNotUpdateCondition(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, nvidiav1alpha1.AddToScheme(scheme))
+
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-driver"},
+	}
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(driver).Build()
+	updater := &FakeConditionUpdater{}
+	reconciler := &NVIDIADriverReconciler{
+		Client: &getFailingClient{
+			Client: baseClient,
+			getErr: errors.New("simulated API server connection failure"),
+		},
+		Scheme:           scheme,
+		conditionUpdater: updater,
+	}
+
+	_, err := reconciler.Reconcile(t.Context(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: driver.Name},
+	})
+	require.ErrorContains(t, err, "simulated API server connection failure")
+	require.Empty(t, updater.LastErrorReason)
+}
+
