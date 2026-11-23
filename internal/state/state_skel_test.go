@@ -19,6 +19,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 
@@ -339,6 +340,9 @@ func TestCreateOrUpdateObjsSkipsUnchangedSCC(t *testing.T) {
 			[]*unstructured.Unstructured{newSCC()})
 		require.NoError(t, err)
 	}
+	stored := &secv1.SecurityContextConstraints{}
+	require.NoError(t, fakeClient.Get(context.Background(), client.ObjectKey{Name: "scc-a"}, stored))
+	assert.NotEmpty(t, stored.Annotations[consts.NvidiaAnnotationHashKey], "the first sync must create the SCC with its hash")
 	assert.Zero(t, updates, "the second sync must not update an SCC whose manifest did not change")
 }
 
@@ -642,6 +646,47 @@ func TestSyncObjects(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, SyncState(SyncStateNotReady), syncState)
 		assert.Equal(t, 1, reads, "readiness should reuse the update response")
+	})
+
+	t.Run("keeps the Deployment revision so a ready Deployment stays ready", func(t *testing.T) {
+		scheme := driverTestScheme(t)
+		live := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "dep-a", Namespace: "test-ns", Generation: 3,
+				Annotations: map[string]string{deploymentRevisionAnnotation: "2"},
+			},
+			Status: appsv1.DeploymentStatus{ObservedGeneration: 3, UpdatedReplicas: 1, AvailableReplicas: 1},
+		}
+		updates := 0
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(live).
+			WithStatusSubresource(&appsv1.Deployment{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+					updates++
+					// The API server keeps a Deployment's generation and bumps it when its annotations change.
+					stored := &appsv1.Deployment{}
+					if err := wrappedClient.Get(ctx, client.ObjectKeyFromObject(object), stored); err != nil {
+						return err
+					}
+					generation := stored.Generation
+					if !maps.Equal(stored.Annotations, object.GetAnnotations()) {
+						generation++
+					}
+					object.SetGeneration(generation)
+					return wrappedClient.Update(ctx, object, opts...)
+				},
+			}).Build()
+		skel := &stateSkel{name: "state-driver", namespace: "test-ns", client: fakeClient, scheme: scheme}
+
+		syncState, err := skel.syncObjects(t.Context(), ownerDriverCR,
+			[]*unstructured.Unstructured{newDeploymentUnstructured(live.Name, live.Namespace)})
+		require.NoError(t, err)
+		assert.Equal(t, 1, updates, "the Deployment must be updated, so the merge runs")
+		assert.Equal(t, SyncState(SyncStateReady), syncState)
+		stored := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKeyFromObject(live), stored))
+		assert.Equal(t, "2", stored.Annotations[deploymentRevisionAnnotation])
+		assert.Equal(t, int64(3), stored.Generation, "keeping the annotation must not bump the generation")
 	})
 
 	t.Run("set controller reference error", func(t *testing.T) {

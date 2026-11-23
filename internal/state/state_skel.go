@@ -465,12 +465,26 @@ func (s *stateSkel) mergeObjects(updated, current *unstructured.Unstructured) er
 	// when two PUT requests are specifying the resourceVersion, one of the PUTs will fail.
 	updated.SetResourceVersion(current.GetResourceVersion())
 
+	// API server bumps the generation of a Deployment whose annotations change, so dropping it would leave the
+	// Deployment not ready after every update.
+	if revision, ok := current.GetAnnotations()[deploymentRevisionAnnotation]; ok {
+		annotations := updated.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[deploymentRevisionAnnotation] = revision
+		updated.SetAnnotations(annotations)
+	}
+
 	gvk := updated.GroupVersionKind()
 	if gvk.Group == "" && gvk.Kind == "ServiceAccount" {
 		return s.mergeServiceAccount(updated, current)
 	}
 	return nil
 }
+
+// deploymentRevisionAnnotation is set on a Deployment by the Deployment controller.
+const deploymentRevisionAnnotation = "deployment.kubernetes.io/revision"
 
 // For Service Account, keep secrets if exists
 func (s *stateSkel) mergeServiceAccount(updated, current *unstructured.Unstructured) error {
