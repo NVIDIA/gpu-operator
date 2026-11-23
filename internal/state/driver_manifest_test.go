@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -682,8 +683,8 @@ func TestSyncCreateOrUpdateError(t *testing.T) {
 
 func TestSyncGetSyncStateError(t *testing.T) {
 	scheme := driverTestScheme(t)
-	// createOrUpdateObjs reads the ServiceAccount once before creating it, and getSyncState
-	// reads it back next, so failing only the second read leaves the earlier Sync steps working.
+	// The cache misses the ServiceAccount and the API reports it already exists.
+	// getSyncState must read it again because Create returned no object.
 	serviceAccountReads := 0
 	fakeClient := newDriverClientWithInterceptors(scheme, interceptor.Funcs{
 		Get: func(ctx context.Context, wrappedClient client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
@@ -694,6 +695,12 @@ func TestSyncGetSyncStateError(t *testing.T) {
 				}
 			}
 			return wrappedClient.Get(ctx, key, object, opts...)
+		},
+		Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+			if object.GetObjectKind().GroupVersionKind() == corev1.SchemeGroupVersion.WithKind("ServiceAccount") {
+				return apierrors.NewAlreadyExists(schema.GroupResource{Resource: "serviceaccounts"}, object.GetName())
+			}
+			return wrappedClient.Create(ctx, object, opts...)
 		},
 	}, newGPUNode("gpu-node", "driver-a"))
 	driverState := newTestStateDriver(t, fakeClient, scheme)

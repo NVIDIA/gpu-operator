@@ -133,9 +133,11 @@ func TestCreateObj(t *testing.T) {
 	skel := newTestSkel(t, fakeClient)
 
 	configMap := newConfigMapUnstructured("cm-new", "test-ns")
-	require.NoError(t, skel.createObj(context.Background(), configMap))
+	_, err := skel.createObj(context.Background(), configMap)
+	require.NoError(t, err)
 
-	assert.True(t, apierrors.IsAlreadyExists(skel.createObj(context.Background(), configMap)))
+	_, err = skel.createObj(context.Background(), configMap)
+	assert.True(t, apierrors.IsAlreadyExists(err))
 }
 
 func TestCheckDeleteSupported(t *testing.T) {
@@ -186,7 +188,8 @@ func TestUpdateObj(t *testing.T) {
 	currentConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
 	require.NoError(t, skel.getObj(context.Background(), currentConfigMap))
 	require.NoError(t, unstructured.SetNestedStringMap(currentConfigMap.Object, map[string]string{"key": "updated"}, "data"))
-	require.NoError(t, skel.updateObj(context.Background(), currentConfigMap))
+	_, err := skel.updateObj(context.Background(), currentConfigMap)
+	require.NoError(t, err)
 
 	storedConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
 	require.NoError(t, skel.getObj(context.Background(), storedConfigMap))
@@ -203,7 +206,7 @@ func TestUpdateObj(t *testing.T) {
 			},
 		}).Build()
 	failingUpdateSkel := newTestSkel(t, failingUpdateClient)
-	err = failingUpdateSkel.updateObj(context.Background(), newConfigMapUnstructured("cm-a", "test-ns"))
+	_, err = failingUpdateSkel.updateObj(context.Background(), newConfigMapUnstructured("cm-a", "test-ns"))
 	require.ErrorContains(t, err, "failed to update resource")
 }
 
@@ -255,8 +258,9 @@ func TestCreateOrUpdateObjsCreatesNewObject(t *testing.T) {
 
 	desiredDaemonSet := newDaemonSetUnstructured("ds-a", "test-ns")
 
-	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
-		[]*unstructured.Unstructured{desiredDaemonSet}))
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{desiredDaemonSet})
+	require.NoError(t, err)
 
 	storedDaemonSet := newDaemonSetUnstructured("ds-a", "test-ns")
 	require.NoError(t, skel.getObj(context.Background(), storedDaemonSet))
@@ -272,8 +276,9 @@ func TestCreateOrUpdateObjsUpdatesExistingObject(t *testing.T) {
 	desiredConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
 	require.NoError(t, unstructured.SetNestedStringMap(desiredConfigMap.Object, map[string]string{"key": "new"}, "data"))
 
-	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
-		[]*unstructured.Unstructured{desiredConfigMap}))
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{desiredConfigMap})
+	require.NoError(t, err)
 
 	storedConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
 	require.NoError(t, skel.getObj(context.Background(), storedConfigMap))
@@ -304,8 +309,9 @@ func TestCreateOrUpdateObjsSkipsUnchangedDaemonSet(t *testing.T) {
 		}).Build()
 
 	skel := newTestSkel(t, fakeClient)
-	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
-		[]*unstructured.Unstructured{desiredDaemonSet}))
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{desiredDaemonSet})
+	require.NoError(t, err)
 }
 
 func TestCreateOrUpdateObjsDoesNotCreateExistingObject(t *testing.T) {
@@ -318,8 +324,9 @@ func TestCreateOrUpdateObjsDoesNotCreateExistingObject(t *testing.T) {
 		}).Build()
 	skel := newTestSkel(t, fakeClient)
 
-	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
-		[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")}))
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")})
+	require.NoError(t, err)
 }
 
 func TestCreateOrUpdateObjsIgnoresAlreadyExistsAfterStaleRead(t *testing.T) {
@@ -339,8 +346,9 @@ func TestCreateOrUpdateObjsIgnoresAlreadyExistsAfterStaleRead(t *testing.T) {
 		}).Build()
 	skel := newTestSkel(t, fakeClient)
 
-	require.NoError(t, skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
-		[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")}))
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")})
+	require.NoError(t, err)
 }
 
 func TestCreateOrUpdateObjsUpdatesOnlyChangedObject(t *testing.T) {
@@ -372,8 +380,9 @@ func TestCreateOrUpdateObjsUpdatesOnlyChangedObject(t *testing.T) {
 			desiredConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
 			require.NoError(t, unstructured.SetNestedStringMap(desiredConfigMap.Object, testCase.desiredData, "data"))
 
-			require.NoError(t, newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
-				[]*unstructured.Unstructured{desiredConfigMap}))
+			_, err := newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
+				[]*unstructured.Unstructured{desiredConfigMap})
+			require.NoError(t, err)
 			assert.Equal(t, testCase.wantUpdates, updates)
 		})
 	}
@@ -397,8 +406,9 @@ func TestCreateOrUpdateObjsSkipsServiceAccountWithLiveSecrets(t *testing.T) {
 			},
 		}).Build()
 
-	require.NoError(t, newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
-		[]*unstructured.Unstructured{newServiceAccountUnstructured("sa-a", "test-ns")}))
+	_, err := newTestSkel(t, fakeClient).createOrUpdateObjs(context.Background(), noopSetControllerReference,
+		[]*unstructured.Unstructured{newServiceAccountUnstructured("sa-a", "test-ns")})
+	require.NoError(t, err)
 	assert.Zero(t, updates)
 }
 
@@ -409,7 +419,7 @@ func TestCreateOrUpdateObjsSetControllerReferenceError(t *testing.T) {
 	configMap := newConfigMapUnstructured("cm-a", "test-ns")
 	failingSetControllerReference := func(_ *unstructured.Unstructured) error { return fmt.Errorf("ref error") }
 
-	err := skel.createOrUpdateObjs(context.Background(), failingSetControllerReference,
+	_, err := skel.createOrUpdateObjs(context.Background(), failingSetControllerReference,
 		[]*unstructured.Unstructured{configMap})
 	require.ErrorContains(t, err, "failed to set controller reference")
 }
@@ -424,7 +434,7 @@ func TestCreateOrUpdateObjsCreateError(t *testing.T) {
 	skel := newTestSkel(t, fakeClient)
 
 	configMap := newConfigMapUnstructured("cm-a", "test-ns")
-	err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
 		[]*unstructured.Unstructured{configMap})
 	require.ErrorContains(t, err, "injected create error")
 }
@@ -438,7 +448,7 @@ func TestGetSyncState(t *testing.T) {
 		skel := newTestSkel(t, fakeClient)
 
 		syncState, err := skel.getSyncState(context.Background(),
-			[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns"), newDaemonSetUnstructured("ds-a", "test-ns")})
+			[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns"), newDaemonSetUnstructured("ds-a", "test-ns")}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateReady), syncState)
 	})
@@ -447,7 +457,7 @@ func TestGetSyncState(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).Build()
 		skel := newTestSkel(t, fakeClient)
 		syncState, err := skel.getSyncState(context.Background(),
-			[]*unstructured.Unstructured{newConfigMapUnstructured("cm-missing", "test-ns")})
+			[]*unstructured.Unstructured{newConfigMapUnstructured("cm-missing", "test-ns")}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateNotReady), syncState)
 	})
@@ -458,7 +468,7 @@ func TestGetSyncState(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(daemonSet).Build()
 		skel := newTestSkel(t, fakeClient)
 		syncState, err := skel.getSyncState(context.Background(),
-			[]*unstructured.Unstructured{newDaemonSetUnstructured("ds-a", "test-ns")})
+			[]*unstructured.Unstructured{newDaemonSetUnstructured("ds-a", "test-ns")}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateNotReady), syncState)
 	})
@@ -472,7 +482,7 @@ func TestGetSyncState(t *testing.T) {
 			}).Build()
 		skel := newTestSkel(t, fakeClient)
 		syncState, err := skel.getSyncState(context.Background(),
-			[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")})
+			[]*unstructured.Unstructured{newConfigMapUnstructured("cm-a", "test-ns")}, nil)
 		require.Error(t, err)
 		assert.Equal(t, SyncState(SyncStateNotReady), syncState)
 	})
@@ -486,7 +496,7 @@ func TestGetSyncState(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(deployment).Build()
 		skel := newTestSkel(t, fakeClient)
 		syncState, err := skel.getSyncState(context.Background(),
-			[]*unstructured.Unstructured{newDeploymentUnstructured("dep-a", "test-ns")})
+			[]*unstructured.Unstructured{newDeploymentUnstructured("dep-a", "test-ns")}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateReady), syncState)
 	})
@@ -500,7 +510,7 @@ func TestGetSyncState(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(skelTestScheme(t)).WithObjects(deployment).Build()
 		skel := newTestSkel(t, fakeClient)
 		syncState, err := skel.getSyncState(context.Background(),
-			[]*unstructured.Unstructured{newDeploymentUnstructured("dep-a", "test-ns")})
+			[]*unstructured.Unstructured{newDeploymentUnstructured("dep-a", "test-ns")}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, SyncState(SyncStateNotReady), syncState)
 	})
@@ -565,6 +575,45 @@ func TestSyncObjects(t *testing.T) {
 		_, err = skel.syncObjects(context.Background(), ownerDriverCR, desiredObjects())
 		require.NoError(t, err)
 		assert.Zero(t, writes, "the second sync must not write objects that did not change")
+	})
+
+	t.Run("uses the updated DaemonSet while the cache is stale", func(t *testing.T) {
+		scheme := driverTestScheme(t)
+		cached := &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "ds-a", Namespace: "test-ns", ResourceVersion: "1", Generation: 1},
+			Spec: appsv1.DaemonSetSpec{
+				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.OnDeleteDaemonSetStrategyType},
+			},
+			Status: appsv1.DaemonSetStatus{
+				ObservedGeneration:     1,
+				DesiredNumberScheduled: 2,
+				NumberAvailable:        2,
+				UpdatedNumberScheduled: 2,
+			},
+		}
+		reads := 0
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cached).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, object client.Object, _ ...client.GetOption) error {
+					reads++
+					cached.DeepCopyInto(object.(*appsv1.DaemonSet))
+					return nil
+				},
+				Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+					// The API advances the generation while the cache still holds the old object.
+					object.SetGeneration(cached.Generation + 1)
+					return wrappedClient.Update(ctx, object, opts...)
+				},
+			}).Build()
+		skel := &stateSkel{name: "state-driver", namespace: "test-ns", client: fakeClient, scheme: scheme}
+		desired := newDaemonSetUnstructured(cached.Name, cached.Namespace)
+		require.NoError(t, unstructured.SetNestedField(desired.Object, string(appsv1.RollingUpdateDaemonSetStrategyType),
+			"spec", "updateStrategy", "type"))
+
+		syncState, err := skel.syncObjects(t.Context(), ownerDriverCR, []*unstructured.Unstructured{desired})
+		require.NoError(t, err)
+		require.Equal(t, SyncState(SyncStateNotReady), syncState)
+		assert.Equal(t, 1, reads, "readiness should reuse the update response")
 	})
 
 	t.Run("set controller reference error", func(t *testing.T) {
@@ -758,7 +807,7 @@ func TestGetSyncStateWaitsForDaemonSetController(t *testing.T) {
 	skel := newTestSkel(t, k8sClient)
 	objects := []*unstructured.Unstructured{newDaemonSetUnstructured(ds.Name, ds.Namespace)}
 
-	state, err := skel.getSyncState(context.Background(), objects)
+	state, err := skel.getSyncState(context.Background(), objects, nil)
 	require.NoError(t, err)
 	require.Equal(t, SyncState(SyncStateNotReady), state)
 
@@ -767,7 +816,7 @@ func TestGetSyncStateWaitsForDaemonSetController(t *testing.T) {
 	current.Status.ObservedGeneration = current.Generation
 	require.NoError(t, k8sClient.Status().Update(context.Background(), current))
 
-	state, err = skel.getSyncState(context.Background(), objects)
+	state, err = skel.getSyncState(context.Background(), objects, nil)
 	require.NoError(t, err)
 	require.Equal(t, SyncState(SyncStateReady), state)
 }

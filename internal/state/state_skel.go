@@ -102,7 +102,7 @@ func (s *stateSkel) renderObjects(ctx context.Context, data any) ([]*unstructure
 // state. Owner references make every object (including cluster-scoped ones) garbage
 // collected when the owning CR is deleted.
 func (s *stateSkel) syncObjects(ctx context.Context, owner metav1.Object, objs []*unstructured.Unstructured) (SyncState, error) {
-	err := s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
+	latest, err := s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(owner, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %w", err)
 		}
@@ -112,7 +112,7 @@ func (s *stateSkel) syncObjects(ctx context.Context, owner metav1.Object, objs [
 		return SyncStateNotReady, fmt.Errorf("failed to create/update objects: %w", err)
 	}
 
-	syncState, err := s.getSyncState(ctx, objs)
+	syncState, err := s.getSyncState(ctx, objs, latest)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to get sync state: %w", err)
 	}
@@ -286,7 +286,8 @@ func (s *stateSkel) getTypedObj(ctx context.Context, key types.NamespacedName, t
 	return nil
 }
 
-func (s *stateSkel) createObj(ctx context.Context, obj *unstructured.Unstructured) error {
+// createObj creates obj and returns the object that the API server stored.
+func (s *stateSkel) createObj(ctx context.Context, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	reqLogger := log.FromContext(ctx)
 
 	s.checkDeleteSupported(ctx, obj)
@@ -296,10 +297,10 @@ func (s *stateSkel) createObj(ctx context.Context, obj *unstructured.Unstructure
 		if apierrors.IsAlreadyExists(err) {
 			reqLogger.V(consts.LogLevelInfo).Info("Object Already Exists")
 		}
-		return err
+		return nil, err
 	}
 	reqLogger.V(consts.LogLevelInfo).Info("Object created successfully")
-	return nil
+	return toCreate, nil
 }
 
 func (s *stateSkel) checkDeleteSupported(ctx context.Context, obj *unstructured.Unstructured) {
@@ -315,7 +316,8 @@ func (s *stateSkel) checkDeleteSupported(ctx context.Context, obj *unstructured.
 		"Namespace:", obj.GetNamespace(), "Name:", obj.GetName(), "GVK", obj.GroupVersionKind())
 }
 
-func (s *stateSkel) updateObj(ctx context.Context, obj *unstructured.Unstructured) error {
+// updateObj updates obj and returns the object that the API server stored.
+func (s *stateSkel) updateObj(ctx context.Context, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	reqLogger := log.FromContext(ctx)
 	reqLogger.V(consts.LogLevelInfo).Info("Updating Object", "Namespace:", obj.GetNamespace(), "Name:", obj.GetName())
 
@@ -323,23 +325,27 @@ func (s *stateSkel) updateObj(ctx context.Context, obj *unstructured.Unstructure
 	// TODO: using Patch preserves runtime attributes. In the future consider using patch if relevant
 	desired := obj.DeepCopy()
 	if err := s.client.Update(ctx, desired); err != nil {
-		return fmt.Errorf("failed to update resource: %w", err)
+		return nil, fmt.Errorf("failed to update resource: %w", err)
 	}
 	reqLogger.V(consts.LogLevelInfo).Info("Object updated successfully")
-	return nil
+	return desired, nil
 }
 
+// createOrUpdateObjs creates or updates each object in objs that is missing or
+// changed, and returns the latest known state of each. An entry is nil when
+// state is unknown.
 func (s *stateSkel) createOrUpdateObjs(
 	ctx context.Context,
 	setControllerReference func(obj *unstructured.Unstructured) error,
-	objs []*unstructured.Unstructured) error {
+	objs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
 	reqLogger := log.FromContext(ctx)
-	for _, desiredObj := range objs {
+	latest := make([]*unstructured.Unstructured, len(objs))
+	for i, desiredObj := range objs {
 		reqLogger.V(consts.LogLevelInfo).Info("Handling manifest object", "Kind:", desiredObj.GetKind(),
 			"Name", desiredObj.GetName())
 		// Set controller reference for object to allow cleanup on CR deletion
 		if err := setControllerReference(desiredObj); err != nil {
-			return fmt.Errorf("failed to set controller reference for object: %w", err)
+			return nil, fmt.Errorf("failed to set controller reference for object: %w", err)
 		}
 
 		s.addStateSpecificLabels(desiredObj)
@@ -358,14 +364,16 @@ func (s *stateSkel) createOrUpdateObjs(
 		currentObj := desiredObj.DeepCopy()
 		err := s.getObj(ctx, currentObj)
 		if apierrors.IsNotFound(err) {
-			if err := s.createObj(ctx, desiredObj); err != nil && !apierrors.IsAlreadyExists(err) {
-				return err
+			created, err := s.createObj(ctx, desiredObj)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return nil, err
 			}
+			latest[i] = created
 			continue
 		}
 		if err != nil {
 			// Some error occurred
-			return err
+			return nil, err
 		}
 
 		if desiredObj.GetKind() == "DaemonSet" {
@@ -373,6 +381,7 @@ func (s *stateSkel) createOrUpdateObjs(
 				if desiredObjectHash == currentObjHash {
 					reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
 						"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
+					latest[i] = currentObj
 					continue
 				}
 			}
@@ -381,21 +390,24 @@ func (s *stateSkel) createOrUpdateObjs(
 		// Merge before the comparison, so that the live fields the merge keeps, such as the
 		// secrets of a ServiceAccount, do not count as a change.
 		if err := s.mergeObjects(desiredObj, currentObj); err != nil {
-			return err
+			return nil, err
 		}
 
 		if utils.ContentEqual(s.client.Scheme(), desiredObj, currentObj) {
 			reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
 				"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
+			latest[i] = currentObj
 			continue
 		}
 
 		// Object found, Update it
-		if err := s.updateObj(ctx, desiredObj); err != nil {
-			return err
+		updated, err := s.updateObj(ctx, desiredObj)
+		if err != nil {
+			return nil, err
 		}
+		latest[i] = updated
 	}
-	return nil
+	return latest, nil
 }
 
 func (s *stateSkel) addStateSpecificLabels(obj *unstructured.Unstructured) {
@@ -506,23 +518,28 @@ func (s *stateSkel) mergeServiceAccount(updated, current *unstructured.Unstructu
 }
 
 // Iterate over objects and check for their readiness
-func (s *stateSkel) getSyncState(ctx context.Context, objs []*unstructured.Unstructured) (SyncState, error) {
+func (s *stateSkel) getSyncState(ctx context.Context, objs, latest []*unstructured.Unstructured) (SyncState, error) {
 	reqLogger := log.FromContext(ctx)
 	reqLogger.V(consts.LogLevelInfo).Info("Checking related object states")
 
-	for _, obj := range objs {
+	for i, obj := range objs {
 		reqLogger.V(consts.LogLevelInfo).Info("Checking object", "Kind:", obj.GetKind(), "Name", obj.GetName())
-		// Check if object exists
-		found := obj.DeepCopy()
-		err := s.getObj(ctx, found)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				// does not exist (yet)
-				reqLogger.V(consts.LogLevelInfo).Info("Object is not ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
-				return SyncStateNotReady, nil
+		var found *unstructured.Unstructured
+		if i < len(latest) {
+			found = latest[i]
+		}
+		if found == nil {
+			// Check if object exists
+			found = obj.DeepCopy()
+			if err := s.getObj(ctx, found); err != nil {
+				if apierrors.IsNotFound(err) {
+					// does not exist (yet)
+					reqLogger.V(consts.LogLevelInfo).Info("Object is not ready", "Kind:", obj.GetKind(), "Name", obj.GetName())
+					return SyncStateNotReady, nil
+				}
+				// other error
+				return SyncStateNotReady, fmt.Errorf("failed to get object: %w", err)
 			}
-			// other error
-			return SyncStateNotReady, fmt.Errorf("failed to get object: %w", err)
 		}
 
 		// Object exists, check for Kind specific readiness

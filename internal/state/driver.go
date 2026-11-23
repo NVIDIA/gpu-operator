@@ -168,7 +168,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource any, infoCatalog 
 	}
 
 	// Create objects if they don't exist, Update objects if they do exist
-	err = s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
+	latest, err := s.createOrUpdateObjs(ctx, func(obj *unstructured.Unstructured) error {
 		if err := controllerutil.SetControllerReference(cr, obj, s.scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for object: %v", err)
 		}
@@ -179,7 +179,7 @@ func (s *stateDriver) Sync(ctx context.Context, customResource any, infoCatalog 
 	}
 
 	// Check objects status
-	syncState, err := s.getSyncState(ctx, objs)
+	syncState, err := s.getSyncState(ctx, objs, latest)
 	if err != nil {
 		return SyncStateNotReady, fmt.Errorf("failed to get sync state: %v", err)
 	}

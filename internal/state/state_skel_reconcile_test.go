@@ -54,7 +54,7 @@ func TestCreateOrUpdateObjsGetError(t *testing.T) {
 	skel := newTestSkel(t, fakeClient)
 
 	desiredConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
-	err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
 		[]*unstructured.Unstructured{desiredConfigMap})
 	require.ErrorContains(t, err, "injected get error")
 }
@@ -82,7 +82,7 @@ func TestCreateOrUpdateObjsMergeError(t *testing.T) {
 	skel := newTestSkel(t, fakeClient)
 
 	desiredServiceAccount := newServiceAccountUnstructured("sa-a", "test-ns")
-	err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
 		[]*unstructured.Unstructured{desiredServiceAccount})
 	require.ErrorContains(t, err, ".secrets accessor error")
 }
@@ -150,7 +150,7 @@ func TestCreateOrUpdateObjsUpdateError(t *testing.T) {
 	skel := newTestSkel(t, fakeClient)
 
 	desiredConfigMap := newConfigMapUnstructured("cm-a", "test-ns")
-	err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
 		[]*unstructured.Unstructured{desiredConfigMap})
 	require.ErrorContains(t, err, "failed to update resource")
 	require.ErrorContains(t, err, "injected update error")
