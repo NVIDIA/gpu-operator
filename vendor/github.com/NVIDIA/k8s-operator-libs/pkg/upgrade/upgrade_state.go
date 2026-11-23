@@ -45,8 +45,10 @@ type ClusterUpgradeStateManager interface {
 	// a nil predicate, the default, keeps the full upgrade flow for every out-of-sync node.
 	WithRestartOnlyPredicate(predicate RestartOnlyPredicate) ClusterUpgradeStateManager
 	// BuildState builds a point-in-time snapshot of the driver upgrade state in the cluster.
+	// Each non-nil filter must accept a DaemonSet, or BuildState skips that DaemonSet and its pods.
+	// Filters apply only to DaemonSets. BuildState always includes pods that have no controller.
 	BuildState(ctx context.Context, namespace string,
-		driverLabels map[string]string) (*ClusterUpgradeState, error)
+		driverLabels map[string]string, filters ...DaemonSetFilter) (*ClusterUpgradeState, error)
 	// ApplyState receives a complete cluster upgrade state and, based on upgrade policy, processes each node's state.
 	// Based on the current state of the node, it is calculated if the node can be moved to the next state right now
 	// or whether any actions need to be scheduled for the node to move to the next state.
@@ -99,9 +101,12 @@ type StateOptions struct {
 	Requestor RequestorOptions
 }
 
+// DaemonSetFilter returns whether a matching DaemonSet should be included in the upgrade state.
+type DaemonSetFilter func(*appsv1.DaemonSet) bool
+
 // BuildState builds a point-in-time snapshot of the driver upgrade state in the cluster.
 func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespace string,
-	driverLabels map[string]string) (*ClusterUpgradeState, error) {
+	driverLabels map[string]string, filters ...DaemonSetFilter) (*ClusterUpgradeState, error) {
 	m.Log.V(consts.LogLevelInfo).Info("Building state")
 
 	upgradeState := NewClusterUpgradeState()
@@ -110,6 +115,17 @@ func (m *ClusterUpgradeStateManagerImpl) BuildState(ctx context.Context, namespa
 	if err != nil {
 		m.Log.V(consts.LogLevelError).Error(err, "Failed to get driver DaemonSet list")
 		return nil, err
+	}
+
+	// Unrelated DaemonSets may be scaling down or terminating. Exclude them before
+	// comparing desired pod counts so they cannot block the caller's upgrades.
+	for uid, ds := range daemonSets {
+		for _, filter := range filters {
+			if filter != nil && !filter(ds) {
+				delete(daemonSets, uid)
+				break
+			}
+		}
 	}
 
 	m.Log.V(consts.LogLevelDebug).Info("Got driver DaemonSets", "length", len(daemonSets))
