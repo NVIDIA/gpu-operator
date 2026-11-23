@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	secv1 "github.com/openshift/api/security/v1"
+	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -81,6 +84,7 @@ func SyncObject(ctx context.Context, c client.Client, owner, desired, live clien
 	if err := controllerutil.SetControllerReference(owner, desired, c.Scheme()); err != nil {
 		return err
 	}
+	SetHashAnnotation(c.Scheme(), desired)
 
 	// Read from cache
 	err := c.Get(ctx, key, live)
@@ -133,20 +137,51 @@ var contentEqualKinds = map[schema.GroupKind]bool{
 	// Note: DRA API is still gaining fields: a DeviceClass field newer than the vendored
 	// k8s.io/api is dropped before comparison.
 	{Group: resourcev1.GroupName, Kind: "DeviceClass"}: true,
-	// ServiceMonitor and PrometheusRule are left out because their CRDs come from the
-	// Prometheus installation, so live objects can have fields and defaults that the
-	// vendored types do not.
-	// SecurityContextConstraints is left out because OpenShift fills in fields that the
-	// manifests leave empty, so a live SCC would never match its manifest.
 }
 
-// ContentEqual reports whether live has the labels, annotations, owner references, and
-// content of desired. desired and live can be typed or unstructured. For a kind that is not
-// in contentEqualKinds, ContentEqual returns false, because the API server adds defaults that
-// desired does not have.
+// hashComparedKinds lists the kinds whose live object never matches the manifest, so
+// ContentEqual compares them by a hash of the desired object instead. The API server fills
+// in DaemonSet defaults. The CRDs of ServiceMonitor and PrometheusRule come from the
+// Prometheus installation, so live objects can have fields and defaults that the vendored
+// types do not. OpenShift fills in SCC fields that the manifests leave empty.
+var hashComparedKinds = map[schema.GroupKind]bool{
+	{Group: appsv1.GroupName, Kind: "DaemonSet"}:                 true,
+	{Group: monitoring.GroupName, Kind: "ServiceMonitor"}:        true,
+	{Group: monitoring.GroupName, Kind: "PrometheusRule"}:        true,
+	{Group: secv1.GroupName, Kind: "SecurityContextConstraints"}: true,
+}
+
+// SetHashAnnotation stores a hash of obj in its annotations when ContentEqual compares its
+// kind by hash. Call it after obj is fully rendered and before it is created or updated.
+func SetHashAnnotation(scheme *runtime.Scheme, obj client.Object) {
+	gvk, err := apiutil.GVKForObject(obj, scheme)
+	if err != nil || !hashComparedKinds[gvk.GroupKind()] {
+		return
+	}
+	hash := GetObjectHash(obj)
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[consts.NvidiaAnnotationHashKey] = hash
+	obj.SetAnnotations(annotations)
+}
+
+// ContentEqual reports whether live matches desired. For a kind in contentEqualKinds, it
+// compares labels, annotations, owner references, and content. For a kind in
+// hashComparedKinds, it compares only the hash annotations. For any other kind, it returns
+// false, because the API server adds defaults that desired does not have. desired and live
+// can be typed or unstructured.
 func ContentEqual(scheme *runtime.Scheme, desired, live client.Object) bool {
 	gvk, err := apiutil.GVKForObject(desired, scheme)
-	if err != nil || !contentEqualKinds[gvk.GroupKind()] {
+	if err != nil {
+		return false
+	}
+	if hashComparedKinds[gvk.GroupKind()] {
+		hash := desired.GetAnnotations()[consts.NvidiaAnnotationHashKey]
+		return hash != "" && hash == live.GetAnnotations()[consts.NvidiaAnnotationHashKey]
+	}
+	if !contentEqualKinds[gvk.GroupKind()] {
 		return false
 	}
 	if !equality.Semantic.DeepEqual(desired.GetLabels(), live.GetLabels()) ||

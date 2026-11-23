@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	secv1 "github.com/openshift/api/security/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +42,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 func newTestRole(verbs ...string) *rbacv1.Role {
@@ -135,6 +138,19 @@ func TestContentEqual(t *testing.T) {
 	}
 	liveV1beta1DeviceClass := newV1beta1DeviceClass()
 	liveV1beta1DeviceClass.ResourceVersion = "3"
+	sccGVK := secv1.GroupVersion.WithKind("SecurityContextConstraints")
+	serviceMonitorGVK := schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "ServiceMonitor"}
+	newHashedObject := func(gvk schema.GroupVersionKind, hash string) *unstructured.Unstructured {
+		object := &unstructured.Unstructured{}
+		object.SetGroupVersionKind(gvk)
+		object.SetName("object-a")
+		if hash != "" {
+			object.SetAnnotations(map[string]string{consts.NvidiaAnnotationHashKey: hash})
+		}
+		return object
+	}
+	liveSCCWithDefaults := newHashedObject(sccGVK, "123")
+	liveSCCWithDefaults.Object["priority"] = int64(10)
 
 	testCases := map[string]struct {
 		// scheme defaults to the client-go scheme.
@@ -231,6 +247,26 @@ func TestContentEqual(t *testing.T) {
 		"v1beta1 DeviceClass with the same content": {
 			desired: toUnstructured(t, newV1beta1DeviceClass()),
 			live:    liveV1beta1DeviceClass,
+			want:    true,
+		},
+		"SCC with the same hash and fields that OpenShift filled in": {
+			desired: newHashedObject(sccGVK, "123"),
+			live:    liveSCCWithDefaults,
+			want:    true,
+		},
+		"SCC with a different hash": {
+			desired: newHashedObject(sccGVK, "123"),
+			live:    newHashedObject(sccGVK, "456"),
+			want:    false,
+		},
+		"SCC without a hash on live": {
+			desired: newHashedObject(sccGVK, "123"),
+			live:    newHashedObject(sccGVK, ""),
+			want:    false,
+		},
+		"ServiceMonitor with the same hash": {
+			desired: newHashedObject(serviceMonitorGVK, "123"),
+			live:    newHashedObject(serviceMonitorGVK, "123"),
 			want:    true,
 		},
 		"kind that the API server defaults": {
@@ -448,6 +484,44 @@ func TestSyncObject(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSyncObjectComparesSCCByHash(t *testing.T) {
+	testScheme := runtime.NewScheme()
+	require.NoError(t, secv1.Install(testScheme))
+	owner := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "owner", UID: "uid-owner"}}
+	newSCC := func(privileged bool) *secv1.SecurityContextConstraints {
+		return &secv1.SecurityContextConstraints{ObjectMeta: metav1.ObjectMeta{Name: "scc-a"}, AllowPrivilegedContainer: privileged}
+	}
+	updates := 0
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+				updates++
+				return wrappedClient.Update(ctx, object, opts...)
+			},
+		}).Build()
+	sync := func(desired *secv1.SecurityContextConstraints) {
+		t.Helper()
+		require.NoError(t, SyncObject(t.Context(), fakeClient, owner, desired, &secv1.SecurityContextConstraints{}, SyncOptions{}))
+	}
+
+	sync(newSCC(false))
+	stored := &secv1.SecurityContextConstraints{}
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKey{Name: "scc-a"}, stored))
+	require.NotEmpty(t, stored.Annotations[consts.NvidiaAnnotationHashKey], "the create must store the hash")
+
+	// OpenShift fills in a field that the manifest leaves empty.
+	priority := int32(10)
+	stored.Priority = &priority
+	require.NoError(t, fakeClient.Update(t.Context(), stored))
+	updates = 0
+
+	sync(newSCC(false))
+	assert.Zero(t, updates, "an SCC whose manifest did not change must not be updated")
+
+	sync(newSCC(true))
+	assert.Equal(t, 1, updates, "an SCC whose manifest changed must be updated")
 }
 
 func TestSyncObjectIgnoresAlreadyExistsAfterStaleRead(t *testing.T) {

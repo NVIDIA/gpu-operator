@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
+	secv1 "github.com/openshift/api/security/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -312,6 +313,33 @@ func TestCreateOrUpdateObjsSkipsUnchangedDaemonSet(t *testing.T) {
 	_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
 		[]*unstructured.Unstructured{desiredDaemonSet})
 	require.NoError(t, err)
+}
+
+func TestCreateOrUpdateObjsSkipsUnchangedSCC(t *testing.T) {
+	scheme := skelTestScheme(t)
+	require.NoError(t, secv1.Install(scheme))
+	updates := 0
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.UpdateOption) error {
+				updates++
+				return wrappedClient.Update(ctx, object, opts...)
+			},
+		}).Build()
+	skel := newTestSkel(t, fakeClient)
+	newSCC := func() *unstructured.Unstructured {
+		object := &unstructured.Unstructured{}
+		object.SetGroupVersionKind(secv1.GroupVersion.WithKind("SecurityContextConstraints"))
+		object.SetName("scc-a")
+		return object
+	}
+
+	for range 2 {
+		_, err := skel.createOrUpdateObjs(context.Background(), noopSetControllerReference,
+			[]*unstructured.Unstructured{newSCC()})
+		require.NoError(t, err)
+	}
+	assert.Zero(t, updates, "the second sync must not update an SCC whose manifest did not change")
 }
 
 func TestCreateOrUpdateObjsDoesNotCreateExistingObject(t *testing.T) {

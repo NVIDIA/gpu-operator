@@ -349,17 +349,7 @@ func (s *stateSkel) createOrUpdateObjs(
 		}
 
 		s.addStateSpecificLabels(desiredObj)
-
-		var desiredObjectHash string
-		if desiredObj.GetKind() == "DaemonSet" {
-			desiredObjectHash = utils.GetObjectHash(desiredObj)
-			annotations := desiredObj.GetAnnotations()
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-			annotations[consts.NvidiaAnnotationHashKey] = desiredObjectHash
-			desiredObj.SetAnnotations(annotations)
-		}
+		utils.SetHashAnnotation(s.client.Scheme(), desiredObj)
 
 		currentObj := desiredObj.DeepCopy()
 		err := s.getObj(ctx, currentObj)
@@ -374,17 +364,6 @@ func (s *stateSkel) createOrUpdateObjs(
 		if err != nil {
 			// Some error occurred
 			return nil, err
-		}
-
-		if desiredObj.GetKind() == "DaemonSet" {
-			if currentObjHash, ok := currentObj.GetAnnotations()[consts.NvidiaAnnotationHashKey]; ok {
-				if desiredObjectHash == currentObjHash {
-					reqLogger.V(consts.LogLevelDebug).Info("Object is unchanged, so skipping update",
-						"Kind", desiredObj.GetKind(), "Name", desiredObj.GetName())
-					latest[i] = currentObj
-					continue
-				}
-			}
 		}
 
 		// Merge before the comparison, so that the live fields the merge keeps, such as the
