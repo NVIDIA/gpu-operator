@@ -49,3 +49,14 @@ e2e-test:
 		-ginkgo.silence-skips \
 		-ginkgo.focus="gpu-operator-e2e" \
 		-ginkgo.label-filter="$(GINKGO_LABEL_FILTER)"
+
+MOKKA_CLUSTER_NAME ?= gpu-operator-mokka
+
+# Runs the suite on a kind cluster with simulated GPUs; needs docker, kind, helm, kubectl and go, but no GPU.
+.PHONY: mokka-e2e
+mokka-e2e:
+	MOKKA_CLUSTER_NAME=$(MOKKA_CLUSTER_NAME) $(CURDIR)/../scripts/run-mokka.sh
+
+.PHONY: mokka-clean
+mokka-clean:
+	kind delete cluster --name $(MOKKA_CLUSTER_NAME)
