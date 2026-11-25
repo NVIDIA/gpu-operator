@@ -36,6 +36,8 @@ import (
 
 const NVIDIADriverReconcileTimeout = 2 * time.Minute
 
+const gpuClusterReadyTimeout = 5 * time.Minute
+
 func WaitForDriverReady(ctx context.Context, clients Clients, driverName string) {
 	ginkgo.GinkgoHelper()
 	elapsed := framework.WaitFor(ctx, NVIDIADriverReconcileTimeout, fmt.Sprintf("Waiting for NVIDIADriver/%s to be ready", driverName), func(g gomega.Gomega) {
@@ -66,15 +68,19 @@ func WaitForDriverError(ctx context.Context, clients Clients, driverName, expect
 }
 
 func describeDriverStatus(driver *nvidiav1alpha1.NVIDIADriver) string {
-	driverStatus := fmt.Sprintf("NVIDIADriver/%s state is %q", driver.Name, driver.Status.State)
-	statusCondition := meta.FindStatusCondition(driver.Status.Conditions, conditions.Error)
+	return describeStatus("NVIDIADriver/"+driver.Name, driver.Status.State, driver.Status.Conditions)
+}
+
+func describeStatus(objectReference string, state nvidiav1alpha1.State, statusConditions []metav1.Condition) string {
+	objectStatus := fmt.Sprintf("%s state is %q", objectReference, state)
+	statusCondition := meta.FindStatusCondition(statusConditions, conditions.Error)
 	if statusCondition == nil || statusCondition.Status != metav1.ConditionTrue {
-		statusCondition = meta.FindStatusCondition(driver.Status.Conditions, conditions.Ready)
+		statusCondition = meta.FindStatusCondition(statusConditions, conditions.Ready)
 	}
 	if statusCondition == nil {
-		return driverStatus
+		return objectStatus
 	}
-	return fmt.Sprintf("%s, %s=%s %s: %s", driverStatus, statusCondition.Type, statusCondition.Status, statusCondition.Reason, statusCondition.Message)
+	return fmt.Sprintf("%s, %s=%s %s: %s", objectStatus, statusCondition.Type, statusCondition.Status, statusCondition.Reason, statusCondition.Message)
 }
 
 func WaitForSingleDefaultDriver(ctx context.Context, clients Clients, expectedName string, timeout time.Duration) {
@@ -135,4 +141,23 @@ func WaitForDriverDaemonSets(ctx context.Context, clients Clients, driverName st
 		g.Expect(daemonSetNames).NotTo(gomega.BeEmpty(), "NVIDIADriver/%s has no driver daemonsets", driverName)
 	})
 	ginkgo.GinkgoWriter.Printf("NVIDIADriver/%s has driver daemonset(s) %s (%s)\n", driverName, strings.Join(daemonSetNames, ", "), elapsed.Round(time.Second))
+}
+
+func WaitForGPUClusterReady(ctx context.Context, clients Clients, gpuClusterName string) {
+	ginkgo.GinkgoHelper()
+	elapsed := framework.WaitFor(ctx, gpuClusterReadyTimeout, fmt.Sprintf("Waiting for GPUCluster/%s to be ready", gpuClusterName), func(g gomega.Gomega) {
+		gpuCluster, err := clients.GPUClusters.Get(ctx, gpuClusterName)
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get GPUCluster/%s: %v", gpuClusterName, err)
+		g.Expect(gpuCluster.Status.State).To(gomega.Equal(nvidiav1alpha1.Ready), "%s", describeGPUClusterStatus(gpuCluster))
+		g.Expect(meta.IsStatusConditionTrue(gpuCluster.Status.Conditions, conditions.Ready)).To(gomega.BeTrue(), "%s", describeGPUClusterStatus(gpuCluster))
+		g.Expect(meta.IsStatusConditionTrue(gpuCluster.Status.Conditions, conditions.Error)).To(gomega.BeFalse(), "%s", describeGPUClusterStatus(gpuCluster))
+	})
+	ginkgo.GinkgoWriter.Printf("GPUCluster/%s is ready (%s)\n", gpuClusterName, elapsed.Round(time.Second))
+}
+
+func describeGPUClusterStatus(gpuCluster *nvidiav1alpha1.GPUCluster) string {
+	if gpuCluster.Status.State == "" && len(gpuCluster.Status.Conditions) == 0 {
+		return fmt.Sprintf("GPUCluster/%s has no status yet; the operator has not reconciled it", gpuCluster.Name)
+	}
+	return describeStatus("GPUCluster/"+gpuCluster.Name, gpuCluster.Status.State, gpuCluster.Status.Conditions)
 }
