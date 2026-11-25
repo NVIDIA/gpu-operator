@@ -2554,7 +2554,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vfio-pci":
 			// set/append environment variables for vfio-pci-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", getDefaultWorkloadConfig(&config.SandboxWorkloads))
 			if len(config.Validator.VFIOPCI.Env) > 0 {
 				for _, env := range config.Validator.VFIOPCI.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
@@ -2562,7 +2562,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vgpu-manager":
 			// set/append environment variables for vgpu-manager-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", getDefaultWorkloadConfig(&config.SandboxWorkloads))
 			if len(config.Validator.VGPUManager.Env) > 0 {
 				for _, env := range config.Validator.VGPUManager.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
@@ -2570,7 +2570,7 @@ func TransformValidatorComponent(config *gpuv1.ClusterPolicySpec, podSpec *corev
 			}
 		case "vgpu-devices":
 			// set/append environment variables for vgpu-devices-validation container
-			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", defaultGPUWorkloadConfig)
+			setContainerEnv(&(podSpec.InitContainers[i]), "DEFAULT_GPU_WORKLOAD_CONFIG", getDefaultWorkloadConfig(&config.SandboxWorkloads))
 			if len(config.Validator.VGPUDevices.Env) > 0 {
 				for _, env := range config.Validator.VGPUDevices.Env {
 					setContainerEnv(&(podSpec.InitContainers[i]), env.Name, env.Value)
