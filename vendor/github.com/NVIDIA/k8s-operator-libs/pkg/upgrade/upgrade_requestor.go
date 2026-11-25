@@ -190,8 +190,8 @@ func (m *RequestorNodeStateManagerImpl) createNodeMaintenance(ctx context.Contex
 	err := m.K8sClient.Create(ctx, nm, &client.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
-			m.Log.V(consts.LogLevelWarning).Info("nodeMaintenance", nm.Name, "already exists")
-			return nil
+			// The client did not show the object. The next pass reads it and adds this requestor if needed.
+			return fmt.Errorf("node maintenance %s already exists, retry on the next pass: %w", nm.Name, err)
 		}
 		return fmt.Errorf("failed to create node maintenance '%+v'. %v", nm, err)
 	}
@@ -319,17 +319,18 @@ func (m *RequestorNodeStateManagerImpl) ProcessUpgradeRequiredNodes(
 }
 func (m *RequestorNodeStateManagerImpl) createOrUpdateNodeMaintenance(ctx context.Context,
 	nodeState *NodeUpgradeState) error {
+	// skip re-creation of an object owned by the requestor, for any name prefix
+	if nm, ok := nodeState.NodeMaintenance.(*maintenancev1alpha1.NodeMaintenance); ok &&
+		nm.Spec.RequestorID == m.opts.MaintenanceOPRequestorID {
+		m.Log.V(consts.LogLevelInfo).Info("nodeMaintenance already exists", nm.Name, "skip creation")
+		return nil
+	}
 	// check for existing nodeMaintenance obj and if default prefix is used
 	if nodeState.NodeMaintenance != nil && m.opts.NodeMaintenanceNamePrefix == DefaultNodeMaintenanceNamePrefix {
 		// if exists append requestorID to spec.AdditionalRequestors list
 		nm, ok := nodeState.NodeMaintenance.(*maintenancev1alpha1.NodeMaintenance)
 		if !ok {
 			return fmt.Errorf("failed to cast object to NodeMaintenance. %v", nm)
-		}
-		// check if object is owned by the requestor, if so skip re-creation
-		if nm.Spec.RequestorID == m.opts.MaintenanceOPRequestorID {
-			m.Log.V(consts.LogLevelInfo).Info("nodeMaintenance already exists", nm.Name, "skip creation")
-			return nil
 		}
 
 		// check if requestor is already in AdditionalRequestors
@@ -434,6 +435,18 @@ func (m *RequestorNodeStateManagerImpl) ProcessNodeMaintenanceRequiredNodes(ctx 
 		if !ok {
 			return fmt.Errorf("failed to cast object to NodeMaintenance. %v", nodeState.NodeMaintenance)
 		}
+		if nm.Spec.RequestorID != m.opts.MaintenanceOPRequestorID &&
+			!slices.Contains(nm.Spec.AdditionalRequestors, m.opts.MaintenanceOPRequestorID) {
+			// The maintenance can end while this requestor still needs it, so request it again.
+			m.Log.V(consts.LogLevelWarning).Info("requestor is not in nodeMaintenance, moving node to upgrade-required",
+				"node", nodeState.Node.Name, "nodeMaintenance", client.ObjectKeyFromObject(nm))
+			err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node,
+				UpgradeStateUpgradeRequired)
+			if err != nil {
+				return fmt.Errorf("failed to update node state. %w", err)
+			}
+			continue
+		}
 		cond := meta.FindStatusCondition(nm.Status.Conditions, maintenancev1alpha1.ConditionReasonReady)
 		if cond != nil {
 			if cond.Reason == maintenancev1alpha1.ConditionReasonReady {
@@ -461,9 +474,16 @@ func (m *RequestorNodeStateManagerImpl) ProcessUncordonRequiredNodes(
 		if !IsNodeInRequestorMode(nodeState.Node) {
 			continue
 		}
+		// release the nodeMaintenance first, so that the next pass retries a failed release
+		err := m.deleteOrUpdateNodeMaintenance(ctx, nodeState)
+		if err != nil {
+			m.Log.V(consts.LogLevelWarning).Error(
+				err, "Node uncordon failed", "node", nodeState.Node)
+			return err
+		}
 		// change driver's operator node state to be updated 'upgrade-done'
 		// there could be cases
-		err := m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateDone)
+		err = m.NodeUpgradeStateProvider.ChangeNodeUpgradeState(ctx, nodeState.Node, UpgradeStateDone)
 		if err != nil {
 			m.Log.V(consts.LogLevelError).Error(
 				err, "Failed to change node upgrade state", "state", UpgradeStateDone)
@@ -475,13 +495,6 @@ func (m *RequestorNodeStateManagerImpl) ProcessUncordonRequiredNodes(
 			nodeState.Node, GetUpgradeRequestorModeAnnotationKey(), "null")
 		if err != nil {
 			return fmt.Errorf("failed to remove '%s' annotation . %v", GetUpgradeRequestorModeAnnotationKey(), err)
-		}
-
-		err = m.deleteOrUpdateNodeMaintenance(ctx, nodeState)
-		if err != nil {
-			m.Log.V(consts.LogLevelWarning).Error(
-				err, "Node uncordon failed", "node", nodeState.Node)
-			return err
 		}
 	}
 	return nil

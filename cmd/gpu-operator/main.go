@@ -181,6 +181,7 @@ func main() {
 	clusterUpgradeStateManager, err := upgrade.NewClusterUpgradeStateManager(
 		upgradeLogger,
 		mgr.GetConfig(),
+		mgr.GetClient(),
 		// nolint:staticcheck
 		// TODO: update k8s-operator-libs to leverage events.EventRecorder instead
 		mgr.GetEventRecorderFor("nvidia-gpu-operator"),
