@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -2641,7 +2642,7 @@ func TestTransformConfigManagerInitContainerWithResources(t *testing.T) {
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{Name: "config", MountPath: "/config"},
-				{Name: "plugin-config", MountPath: "/available-configs"},
+				{Name: "operand-configs", MountPath: "/available-configs"},
 			},
 		}).
 		WithInitContainer(corev1.Container{Name: "dummy"})
@@ -4634,7 +4635,7 @@ func TestTransformVGPUManager(t *testing.T) {
 			require.Len(t, container.VolumeMounts, 1)
 			require.EqualValues(t, resources, container.Resources)
 			require.Equal(t, corev1.VolumeMount{
-				Name:      "vgpu-kernel-module-config",
+				Name:      "kernel-module-config",
 				ReadOnly:  true,
 				MountPath: "/drivers/nvidia.conf",
 				SubPath:   "nvidia.conf",
@@ -4642,7 +4643,7 @@ func TestTransformVGPUManager(t *testing.T) {
 			// Verify the ConfigMap volume is added
 			require.Len(t, tc.daemonset.Spec.Template.Spec.Volumes, 1)
 			require.Equal(t, corev1.Volume{
-				Name: "vgpu-kernel-module-config",
+				Name: "kernel-module-config",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -4661,6 +4662,112 @@ func TestTransformVGPUManager(t *testing.T) {
 			driverManager := findContainerByName(tc.daemonset.Spec.Template.Spec.InitContainers, "k8s-driver-manager")
 			require.NotNil(t, driverManager)
 			require.EqualValues(t, resources, driverManager.Resources)
+		})
+	}
+}
+
+func TestTransformDriverConfigMapVolumeNames(t *testing.T) {
+	configMaps := map[string]struct {
+		name      string
+		filename  string
+		mountPath string
+	}{
+		"repo-config":          {"driver.repo", "custom.list", "/etc/apt/sources.list.d/custom.list"},
+		"cert-config":          {"driver-repo", "custom.crt", "/usr/local/share/ca-certificates/custom.crt"},
+		"kernel-module-config": {strings.Repeat("k", 253), "custom.conf", "/drivers/custom.conf"},
+	}
+	builder := fake.NewClientBuilder()
+	for _, configMap := range configMaps {
+		builder.WithObjects(&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: configMap.name, Namespace: "test-ns"},
+			Data:       map[string]string{configMap.filename: "configuration"},
+		})
+	}
+	ds := NewDaemonset().WithContainer(corev1.Container{Name: "nvidia-driver-ctr"}).
+		WithContainer(corev1.Container{Name: "nvidia-fs-ctr"}).
+		WithContainer(corev1.Container{Name: "nvidia-gdrcopy-ctr"}).
+		WithContainer(corev1.Container{Name: "nvidia-peermem-ctr"}).
+		WithInitContainer(corev1.Container{Name: "k8s-driver-manager"})
+	config := &gpuv1.ClusterPolicySpec{
+		Driver: gpuv1.DriverSpec{
+			Image:              "nvcr.io/nvidia/driver:580.126.16",
+			Manager:            gpuv1.DriverManagerSpec{Image: "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.8.0"},
+			RepoConfig:         &gpuv1.DriverRepoConfigSpec{ConfigMapName: configMaps["repo-config"].name},
+			CertConfig:         &gpuv1.DriverCertConfigSpec{Name: configMaps["cert-config"].name},
+			KernelModuleConfig: &gpuv1.KernelModuleConfigSpec{Name: configMaps["kernel-module-config"].name},
+			GPUDirectRDMA:      &gpuv1.GPUDirectRDMASpec{Enabled: new(true)},
+		},
+		GPUDirectStorage: &gpuv1.GPUDirectStorageSpec{
+			Enabled: new(true), Image: "nvcr.io/nvidia/cloud-native/nvidia-fs:2.20.5",
+		},
+		GDRCopy: &gpuv1.GDRCopySpec{
+			Enabled: new(true), Image: "nvcr.io/nvidia/cloud-native/gdrdrv:v2.5",
+		},
+	}
+	err := TransformDriver(ds.DaemonSet, config, ClusterPolicyController{
+		ctx: context.Background(), client: builder.Build(), runtime: gpuv1.Containerd,
+		operatorNamespace: "test-ns", logger: ctrl.Log.WithName("test"),
+		gpuNodeOSRelease: "ubuntu", gpuNodeOSTag: "ubuntu24.04",
+	})
+	require.NoError(t, err)
+	require.Len(t, ds.Spec.Template.Spec.Volumes, 3)
+	seen := make(map[string]bool)
+	for _, volume := range ds.Spec.Template.Spec.Volumes {
+		require.NotNil(t, volume.ConfigMap)
+		require.Contains(t, configMaps, volume.Name)
+		require.False(t, seen[volume.Name], "duplicate volume name")
+		seen[volume.Name] = true
+		configMap := configMaps[volume.Name]
+		require.Equal(t, configMap.name, volume.ConfigMap.Name)
+		require.Equal(t, []corev1.KeyToPath{{Key: configMap.filename, Path: configMap.filename}}, volume.ConfigMap.Items)
+	}
+	for containerName, volumeNames := range map[string][]string{
+		"nvidia-driver-ctr":  {"repo-config", "cert-config", "kernel-module-config"},
+		"nvidia-fs-ctr":      {"repo-config", "cert-config"},
+		"nvidia-gdrcopy-ctr": {"repo-config", "cert-config"},
+		"nvidia-peermem-ctr": {"kernel-module-config"},
+	} {
+		container := findContainerByName(ds.Spec.Template.Spec.Containers, containerName)
+		require.NotNil(t, container)
+		require.Len(t, container.VolumeMounts, len(volumeNames))
+		for _, volumeName := range volumeNames {
+			configMap := configMaps[volumeName]
+			require.Contains(t, container.VolumeMounts, corev1.VolumeMount{
+				Name: volumeName, ReadOnly: true, MountPath: configMap.mountPath, SubPath: configMap.filename,
+			})
+		}
+	}
+}
+
+func TestDevicePluginConfigMapVolumeNames(t *testing.T) {
+	for containerName, configMapName := range map[string]string{
+		"nvidia-device-plugin":   "plugin.config",
+		"gpu-feature-discovery":  strings.Repeat("p", 253),
+		"mps-control-daemon-ctr": "config",
+	} {
+		t.Run(containerName, func(t *testing.T) {
+			ds := NewDaemonset().WithContainer(corev1.Container{Name: containerName}).
+				WithContainer(corev1.Container{Name: "config-manager"}).
+				WithInitContainer(corev1.Container{Name: "config-manager-init"})
+			config := &gpuv1.ClusterPolicySpec{DevicePlugin: gpuv1.DevicePluginSpec{
+				Image:  "nvcr.io/nvidia/k8s-device-plugin:v0.17.3",
+				Config: &gpuv1.DevicePluginConfig{Name: configMapName},
+			}}
+			require.NoError(t, handleDevicePluginConfig(ds.DaemonSet, config))
+			require.ElementsMatch(t, []corev1.Volume{
+				{
+					Name: "operand-configs",
+					VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: configMapName},
+					}},
+				},
+				{Name: "config", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+			}, ds.Spec.Template.Spec.Volumes)
+			for _, containers := range [][]corev1.Container{ds.Spec.Template.Spec.Containers, ds.Spec.Template.Spec.InitContainers} {
+				for _, container := range containers {
+					require.Contains(t, container.VolumeMounts, corev1.VolumeMount{Name: "operand-configs", MountPath: "/available-configs"})
+				}
+			}
 		})
 	}
 }
@@ -4732,7 +4839,7 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "963428473",
+						Value: "3947386415",
 					},
 				},
 			}).WithInitContainer(corev1.Container{
@@ -4742,11 +4849,11 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "963428473",
+						Value: "3947386415",
 					},
 				},
 			}).WithVolume(corev1.Volume{
-				Name: "test-cert",
+				Name: "cert-config",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -4812,7 +4919,7 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "2050622367",
+						Value: "203563914",
 					},
 				},
 			}).WithInitContainer(corev1.Container{
@@ -4822,11 +4929,11 @@ func TestTransformDriverWithAdditionalConfig(t *testing.T) {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "DRIVER_CONFIG_DIGEST",
-						Value: "2050622367",
+						Value: "203563914",
 					},
 				},
 			}).WithVolume(corev1.Volume{
-				Name: "test-repo-config",
+				Name: "repo-config",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -4997,7 +5104,7 @@ func TestTransformDriverSubscriptionMounts(t *testing.T) {
 					"sl-micro": "/etc/zypp/repos.d/custom.repo",
 				}
 				expectedAdditionalMounts = append(expectedAdditionalMounts, corev1.VolumeMount{
-					Name: "test-repo-config", MountPath: repoPaths[tc.osRelease],
+					Name: "repo-config", MountPath: repoPaths[tc.osRelease],
 					SubPath: "custom.repo", ReadOnly: true,
 				})
 			}
