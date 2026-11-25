@@ -1550,7 +1550,11 @@ func transformRuntimeConfigAndSocketMounts(obj *appsv1.DaemonSet, runtime string
 		setContainerEnv(container, socketEnvvarName, DefaultRuntimeSocketTargetDir+sourceSocketFileName)
 
 		volMountSocketName := fmt.Sprintf("%s-socket", runtime)
-		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir}
+		// HostToContainer propagation lets host unmounts propagate into the
+		// toolkit container, so host mounts (e.g. ZFS datasets) mounted under
+		// the runtime socket directory are not pinned in the container's mount
+		// namespace after they are unmounted on the host. See issue #3083.
+		volMountSocket := corev1.VolumeMount{Name: volMountSocketName, MountPath: DefaultRuntimeSocketTargetDir, MountPropagation: ptr.To(corev1.MountPropagationHostToContainer)}
 		container.VolumeMounts = append(container.VolumeMounts, volMountSocket)
 
 		socketVol := corev1.Volume{Name: volMountSocketName, VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: path.Dir(runtimeSocketFile)}}}
