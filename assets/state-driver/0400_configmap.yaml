@@ -30,10 +30,23 @@ data:
       fi
     fi
 
+    if ! mkdir -p /dev/char; then
+      echo "Failed to create /dev/char"
+      exit 1
+    fi
+
     if ! nvidia-smi; then
       echo "nvidia-smi failed"
       exit 1
     fi
+
+    # A successful nvidia-smi can leave required control devices missing.
+    for device_node in /dev/nvidiactl /dev/nvidia-uvm /dev/nvidia-uvm-tools; do
+      if [ ! -c "$device_node" ]; then
+        echo "NVIDIA driver is not ready: missing character device $device_node"
+        exit 1
+      fi
+    done
 
     GPU_DIRECT_RDMA_ENABLED="${GPU_DIRECT_RDMA_ENABLED:-false}"
     GDS_ENABLED="${GDS_ENABLED:-false}"
