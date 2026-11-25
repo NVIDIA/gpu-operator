@@ -61,7 +61,8 @@ type Component interface {
 
 // Driver component
 type Driver struct {
-	ctx context.Context
+	ctx        context.Context
+	kubeClient kubernetes.Interface
 }
 
 // NvidiaFs GDS Driver component
@@ -96,22 +97,26 @@ type MOFED struct {
 
 // Metrics represents spec to run metrics exporter
 type Metrics struct {
-	ctx context.Context
+	ctx        context.Context
+	kubeClient kubernetes.Interface
 }
 
 // VfioPCI represents spec to validate vfio-pci driver
 type VfioPCI struct {
-	ctx context.Context
+	ctx        context.Context
+	kubeClient kubernetes.Interface
 }
 
 // VGPUManager represents spec to validate vGPU Manager installation
 type VGPUManager struct {
-	ctx context.Context
+	ctx        context.Context
+	kubeClient kubernetes.Interface
 }
 
 // VGPUDevices represents spec to validate vGPU device creation
 type VGPUDevices struct {
-	ctx context.Context
+	ctx        context.Context
+	kubeClient kubernetes.Interface
 }
 
 // CCManager represents spec to validate CC Manager installation
@@ -484,20 +489,10 @@ func isValidWorkloadConfig(config string) bool {
 		config == gpuWorkloadConfigVMVgpu
 }
 
-func getWorkloadConfig(ctx context.Context) (string, error) {
+func getWorkloadConfig(ctx context.Context, kubeClient kubernetes.Interface) (string, error) {
 	// check if default workload is overridden by flag
 	if isValidWorkloadConfig(defaultGPUWorkloadConfigFlag) {
 		defaultGPUWorkloadConfig = defaultGPUWorkloadConfigFlag
-	}
-
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return "", fmt.Errorf("error getting cluster config - %s", err.Error())
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		return "", fmt.Errorf("error getting k8s client - %w", err)
 	}
 
 	node, err := getNode(ctx, kubeClient)
@@ -536,14 +531,39 @@ func start(ctx context.Context, cli *cli.Command) error {
 		return err
 	}
 
-	return validateComponent(ctx, componentFlag)
+	client, err := initKubeClient(componentFlag)
+	if err != nil {
+		return err
+	}
+
+	return validateComponent(ctx, client, componentFlag)
 }
 
-func validateComponent(ctx context.Context, componentFlag string) error {
+func initKubeClient(componentFlag string) (kubernetes.Interface, error) {
+	switch componentFlag {
+	case "driver", "cuda", "plugin", "mofed", "metrics", "vfio-pci", "vgpu-manager", "vgpu-devices", "cc-manager":
+		kubeConfig, err := rest.InClusterConfig()
+		if err != nil {
+			log.Errorf("Error getting config cluster - %s\n", err.Error())
+			return nil, err
+		}
+
+		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+		if err != nil {
+			log.Errorf("Error getting k8s client - %s\n", err.Error())
+			return nil, err
+		}
+		return kubeClient, nil
+	}
+	return nil, nil
+}
+
+func validateComponent(ctx context.Context, client kubernetes.Interface, componentFlag string) error {
 	switch componentFlag {
 	case "driver":
 		driver := &Driver{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := driver.validate()
 		if err != nil {
@@ -580,7 +600,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "cuda":
 		cuda := &CUDA{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := cuda.validate()
 		if err != nil {
@@ -589,7 +610,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "plugin":
 		plugin := &Plugin{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := plugin.validate()
 		if err != nil {
@@ -598,7 +620,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "mofed":
 		mofed := &MOFED{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := mofed.validate()
 		if err != nil {
@@ -607,7 +630,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "metrics":
 		metrics := &Metrics{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := metrics.run()
 		if err != nil {
@@ -616,7 +640,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "vfio-pci":
 		vfioPCI := &VfioPCI{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := vfioPCI.validate()
 		if err != nil {
@@ -625,7 +650,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "vgpu-manager":
 		vGPUManager := &VGPUManager{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := vGPUManager.validate()
 		if err != nil {
@@ -634,7 +660,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "vgpu-devices":
 		vGPUDevices := &VGPUDevices{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := vGPUDevices.validate()
 		if err != nil {
@@ -643,7 +670,8 @@ func validateComponent(ctx context.Context, componentFlag string) error {
 		return nil
 	case "cc-manager":
 		CCManager := &CCManager{
-			ctx: ctx,
+			ctx:        ctx,
+			kubeClient: client,
 		}
 		err := CCManager.validate()
 		if err != nil {
@@ -699,19 +727,9 @@ func assertDriverContainerReady(silent bool) error {
 // isDriverManagedByOperator determines if the NVIDIA driver is managed by the GPU Operator.
 // We check if at least one driver DaemonSet exists in the operator namespace that is
 // owned by the ClusterPolicy or NVIDIADriver controllers.
-func isDriverManagedByOperator(ctx context.Context) (bool, error) {
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return false, fmt.Errorf("error getting cluster config: %w", err)
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		return false, fmt.Errorf("error getting k8s client: %w", err)
-	}
-
+func isDriverManagedByOperator(ctx context.Context, client kubernetes.Interface) (bool, error) {
 	opts := meta_v1.ListOptions{LabelSelector: labels.Set{appComponentLabelKey: "nvidia-driver"}.AsSelector().String()}
-	dsList, err := kubeClient.AppsV1().DaemonSets(namespaceFlag).List(ctx, opts)
+	dsList, err := client.AppsV1().DaemonSets(namespaceFlag).List(ctx, opts)
 	if err != nil {
 		return false, fmt.Errorf("error listing daemonsets: %w", err)
 	}
@@ -813,7 +831,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 
 	log.Info("Validating containerized driver installation")
 
-	driverManagedByOperator, err := isDriverManagedByOperator(d.ctx)
+	driverManagedByOperator, err := isDriverManagedByOperator(d.ctx, d.kubeClient)
 	if err != nil {
 		return driverInfo{}, fmt.Errorf("error checking if driver is managed by GPU Operator: %w", err)
 	}
@@ -824,7 +842,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 	}
 
 	if driverManagedByOperator {
-		err = validateAdditionalDriverComponents(d.ctx, driverContainerStatusFilePath)
+		err = validateAdditionalDriverComponents(d.ctx, d.kubeClient, driverContainerStatusFilePath)
 		if err != nil {
 			return driverInfo{}, err
 		}
@@ -834,7 +852,7 @@ func (d *Driver) runValidation(silent bool) (driverInfo, error) {
 
 // validateAdditionalDriverComponents validates additional driver components such as
 // gdrcopy, gds, nvidia-peermem(rdma) if they are enabled.
-func validateAdditionalDriverComponents(ctx context.Context, statusFilePath string) error {
+func validateAdditionalDriverComponents(ctx context.Context, client kubernetes.Interface, statusFilePath string) error {
 	data, err := os.ReadFile(statusFilePath)
 	if err != nil {
 		return err
@@ -864,7 +882,7 @@ func validateAdditionalDriverComponents(ctx context.Context, statusFilePath stri
 		}
 
 		log.Infof("Validating additional driver component: %s", component)
-		if err := validateComponent(ctx, component); err != nil {
+		if err := validateComponent(ctx, client, component); err != nil {
 			return err
 		}
 	}
@@ -1137,21 +1155,6 @@ func (p *Plugin) validate() error {
 	}
 
 	// enumerate node resources and ensure GPU devices are discovered.
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		log.Errorf("Error getting config cluster - %s\n", err.Error())
-		return err
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		log.Errorf("Error getting k8s client - %s\n", err.Error())
-		return err
-	}
-
-	// update k8s client for the plugin
-	p.setKubeClient(kubeClient)
-
 	err = p.validateGPUResource()
 	if err != nil {
 		return err
@@ -1181,21 +1184,6 @@ func (m *MOFED) validate() error {
 	}
 
 	// Check node labels for Mellanox devices and MOFED driver status file
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		log.Errorf("Error getting config cluster - %s\n", err.Error())
-		return err
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		log.Errorf("Error getting k8s client - %s\n", err.Error())
-		return err
-	}
-
-	// update k8s client for the mofed driver validation
-	m.setKubeClient(kubeClient)
-
 	present, err := m.isMellanoxDevicePresent()
 	if err != nil {
 		log.Errorf("Error trying to retrieve Mellanox device - %s\n", err.Error())
@@ -1238,10 +1226,6 @@ func (m *MOFED) runValidation(silent bool) error {
 		return runCommandWithWait(command, args, sleepIntervalSecondsFlag, silent)
 	}
 	return runCommand(command, args, silent)
-}
-
-func (m *MOFED) setKubeClient(kubeClient kubernetes.Interface) {
-	m.kubeClient = kubeClient
 }
 
 func (m *MOFED) isMellanoxDevicePresent() (bool, error) {
@@ -1478,10 +1462,6 @@ func (p *Plugin) getGPUResourceName() (corev1.ResourceName, error) {
 	return "", fmt.Errorf("unable to find any allocatable GPU resource")
 }
 
-func (p *Plugin) setKubeClient(kubeClient kubernetes.Interface) {
-	p.kubeClient = kubeClient
-}
-
 func getNode(ctx context.Context, kubeClient kubernetes.Interface) (*corev1.Node, error) {
 	node, err := kubeClient.CoreV1().Nodes().Get(ctx, nodeNameFlag, meta_v1.GetOptions{})
 	if err != nil {
@@ -1499,21 +1479,6 @@ func (c *CUDA) validate() error {
 	}
 
 	// deploy workload pod for cuda validation
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		log.Errorf("Error getting config cluster - %s\n", err.Error())
-		return err
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		log.Errorf("Error getting k8s client - %s\n", err.Error())
-		return err
-	}
-
-	// update k8s client for the plugin
-	c.setKubeClient(kubeClient)
-
 	if withWorkloadFlag {
 		// workload test
 		err = c.runWorkload()
@@ -1528,10 +1493,6 @@ func (c *CUDA) validate() error {
 		return err
 	}
 	return nil
-}
-
-func (c *CUDA) setKubeClient(kubeClient kubernetes.Interface) {
-	c.kubeClient = kubeClient
 }
 
 func (c *CUDA) runWorkload() error {
@@ -1610,15 +1571,16 @@ func (c *CUDA) runWorkload() error {
 }
 
 func (c *Metrics) run() error {
-	m := NewNodeMetrics(c.ctx, metricsPort)
+	m := NewNodeMetrics(c.ctx, c.kubeClient, metricsPort)
 
 	return m.Run()
 }
 
 func (v *VfioPCI) validate() error {
 	ctx := v.ctx
+	client := v.kubeClient
 
-	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
+	gpuWorkloadConfig, err := getWorkloadConfig(ctx, client)
 	if err != nil {
 		return fmt.Errorf("error getting gpu workload config: %w", err)
 	}
@@ -1677,8 +1639,9 @@ func (v *VfioPCI) runValidation() error {
 
 func (v *VGPUManager) validate() error {
 	ctx := v.ctx
+	client := v.kubeClient
 
-	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
+	gpuWorkloadConfig, err := getWorkloadConfig(ctx, client)
 	if err != nil {
 		return fmt.Errorf("error getting gpu workload config: %w", err)
 	}
@@ -1830,20 +1793,6 @@ func (c *CCManager) validate() error {
 		return err
 	}
 
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return fmt.Errorf("error getting cluster config - %w", err)
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		log.Errorf("Error getting k8s client - %v\n", err)
-		return err
-	}
-
-	// update k8s client for fetching node labels
-	c.setKubeClient(kubeClient)
-
 	err = c.runValidation(false)
 	if err != nil {
 		fmt.Println("CC Manager is not ready")
@@ -1880,10 +1829,6 @@ func (c *CCManager) runValidation(silent bool) error {
 	return nil
 }
 
-func (c *CCManager) setKubeClient(kubeClient kubernetes.Interface) {
-	c.kubeClient = kubeClient
-}
-
 // Check that the ccManager container is ready after applying required ccMode
 func assertCCManagerContainerReady(silent, withWaitFlag bool) error {
 	command := shell
@@ -1898,8 +1843,9 @@ func assertCCManagerContainerReady(silent, withWaitFlag bool) error {
 
 func (v *VGPUDevices) validate() error {
 	ctx := v.ctx
+	client := v.kubeClient
 
-	gpuWorkloadConfig, err := getWorkloadConfig(ctx)
+	gpuWorkloadConfig, err := getWorkloadConfig(ctx, client)
 	if err != nil {
 		return fmt.Errorf("error getting gpu workload config: %w", err)
 	}

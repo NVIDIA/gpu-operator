@@ -355,7 +355,7 @@ UNKNOWN_FEATURE: true`,
 				}
 			}
 
-			err := validateAdditionalDriverComponents(context.Background(), testStatusFile)
+			err := validateAdditionalDriverComponents(context.Background(), nil, testStatusFile)
 
 			if tt.wantErr {
 				if err == nil {

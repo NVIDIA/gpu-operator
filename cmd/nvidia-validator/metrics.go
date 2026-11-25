@@ -33,7 +33,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -50,7 +49,8 @@ const (
 type NodeMetrics struct {
 	ctx context.Context
 
-	port int
+	port       int
+	kubeClient kubernetes.Interface
 
 	metricsReady promcli.Gauge
 	driverReady  promcli.Gauge
@@ -68,10 +68,11 @@ type NodeMetrics struct {
 }
 
 // NewNodeMetrics creates a NodeMetrics with its Prometheus metrics objects initialized (and automatically registered by promauto)
-func NewNodeMetrics(ctx context.Context, port int) NodeMetrics {
+func NewNodeMetrics(ctx context.Context, client kubernetes.Interface, port int) NodeMetrics {
 	return NodeMetrics{
-		ctx:  ctx,
-		port: port,
+		ctx:        ctx,
+		kubeClient: client,
+		port:       port,
 		metricsReady: promauto.NewGaugeVec(
 			promcli.GaugeOpts{
 				Name: "gpu_operator_node_metrics_ready_ts_seconds",
@@ -184,23 +185,9 @@ func (nm *NodeMetrics) watchStatusFile(statusFile *promcli.Gauge, statusFileFile
 
 func (nm *NodeMetrics) watchDevicePluginValidation() {
 	p := &Plugin{
-		ctx: nm.ctx,
+		ctx:        nm.ctx,
+		kubeClient: nm.kubeClient,
 	}
-
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		log.Errorf("metrics: DevicePlugin validation: Error getting config cluster - %s\n", err.Error())
-		return
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		log.Errorf("metrics: DevicePlugin validation: Error getting k8s client - %s\n", err.Error())
-		return
-	}
-
-	// update k8s client for the plugin
-	p.setKubeClient(kubeClient)
 	log.Printf("metrics: DevicePlugin validation: node name is %s", nodeNameFlag)
 
 	prevCount := int64(-2)
@@ -229,7 +216,8 @@ func (nm *NodeMetrics) watchDevicePluginValidation() {
 
 func (nm *NodeMetrics) watchDriverValidation() {
 	driver := &Driver{
-		ctx: nm.ctx,
+		ctx:        nm.ctx,
+		kubeClient: nm.kubeClient,
 	}
 
 	for {
