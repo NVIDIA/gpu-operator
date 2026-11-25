@@ -1,0 +1,55 @@
+# Copyright NVIDIA CORPORATION
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Commit Verification
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  commit-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify triggering commit signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "Checking signature verification for commit ${COMMIT_SHA}..."
+
+          if ! VERIFICATION_JSON="$(gh api "repos/${REPOSITORY}/commits/${COMMIT_SHA}" --jq '.commit.verification')"; then
+            echo "::error::Could not retrieve verification metadata for commit ${COMMIT_SHA}."
+            exit 1
+          fi
+
+          echo "Verification metadata: ${VERIFICATION_JSON}"
+
+          VERIFIED="$(echo "${VERIFICATION_JSON}" | jq -r '.verified')"
+          REASON="$(echo "${VERIFICATION_JSON}" | jq -r '.reason')"
+
+          echo "Commit SHA: ${COMMIT_SHA}"
+          echo "Verified: ${VERIFIED}"
+          echo "Reason: ${REASON}"
+
+          if [ "${VERIFIED}" != "true" ]; then
+            echo "::error::Commit ${COMMIT_SHA} is not verified (reason: ${REASON})."
+            exit 1
+          fi
+
+          echo "::notice::Commit ${COMMIT_SHA} signature verified (reason: ${REASON})."
