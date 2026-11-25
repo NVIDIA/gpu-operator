@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -682,11 +683,26 @@ func TestSyncCreateOrUpdateError(t *testing.T) {
 
 func TestSyncGetSyncStateError(t *testing.T) {
 	scheme := driverTestScheme(t)
-	// getSyncState reads back the applied objects as unstructured, so failing only
-	// those Gets leaves the earlier Sync steps working.
-	fakeClient := newDriverClientWithInterceptors(scheme,
-		failingGetInterceptor[*unstructured.Unstructured](errors.New("injected get error")),
-		newGPUNode("gpu-node", "driver-a"))
+	// The cache misses the ServiceAccount and the API reports it already exists.
+	// getSyncState must read it again because Create returned no object.
+	serviceAccountReads := 0
+	fakeClient := newDriverClientWithInterceptors(scheme, interceptor.Funcs{
+		Get: func(ctx context.Context, wrappedClient client.WithWatch, key client.ObjectKey, object client.Object, opts ...client.GetOption) error {
+			if _, ok := object.(*corev1.ServiceAccount); ok {
+				serviceAccountReads++
+				if serviceAccountReads == 2 {
+					return errors.New("injected get error")
+				}
+			}
+			return wrappedClient.Get(ctx, key, object, opts...)
+		},
+		Create: func(ctx context.Context, wrappedClient client.WithWatch, object client.Object, opts ...client.CreateOption) error {
+			if object.GetObjectKind().GroupVersionKind() == corev1.SchemeGroupVersion.WithKind("ServiceAccount") {
+				return apierrors.NewAlreadyExists(schema.GroupResource{Resource: "serviceaccounts"}, object.GetName())
+			}
+			return wrappedClient.Create(ctx, object, opts...)
+		},
+	}, newGPUNode("gpu-node", "driver-a"))
 	driverState := newTestStateDriver(t, fakeClient, scheme)
 
 	syncState, err := driverState.Sync(context.Background(), newDriverCR("driver-a"), driverInfoCatalog(fakeClusterInfo{}))
