@@ -33,10 +33,10 @@ var _ = e2eoperator.Describe("clusterpolicy", "sandbox-workloads", ginkgo.Ordere
 	)
 
 	ginkgo.It("brings up every operand for container workloads", func(ctx context.Context) {
-		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
+		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultOperandSelectors))
 	})
 
-	ginkgo.It("runs a GPU workload", func(ctx context.Context) {
+	ginkgo.It("runs a GPU workload", ginkgo.Label("cuda-workload"), func(ctx context.Context) {
 		e2eworkload.RunGPUWorkload(ctx, install.Clients)
 	})
 })

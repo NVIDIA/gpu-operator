@@ -87,18 +87,18 @@ var _ = e2eoperator.Describe("nvidia-driver", "nvidia-driver", ginkgo.Ordered, g
 	)
 
 	ginkgo.It("brings up every operand", func(ctx context.Context) {
-		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
+		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultOperandSelectors))
 	})
 
 	ginkgo.It("does not restart operands repeatedly", func(ctx context.Context) {
-		e2eoperands.ExpectNoRepeatedOperandRestarts(ctx, install.Clients, e2eoperands.DefaultRestartCheckedOperandSelectors)
+		e2eoperands.ExpectNoRepeatedOperandRestarts(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultRestartCheckedOperandSelectors))
 	})
 
-	ginkgo.It("runs a GPU workload", func(ctx context.Context) {
+	ginkgo.It("runs a GPU workload", ginkgo.Label("cuda-workload"), func(ctx context.Context) {
 		e2eworkload.RunGPUWorkload(ctx, install.Clients)
 	})
 
-	ginkgo.It("moves the default to an arbitrarily named NVIDIADriver", func(ctx context.Context) {
+	ginkgo.It("moves the default to an arbitrarily named NVIDIADriver", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		ginkgo.By("Finding the default NVIDIADriver")
 		currentDefaultDriverName := singleDefaultDriverName(ctx, install.Clients)
 		ginkgo.GinkgoWriter.Printf("NVIDIADriver/%s is the default\n", currentDefaultDriverName)
@@ -117,7 +117,7 @@ var _ = e2eoperator.Describe("nvidia-driver", "nvidia-driver", ginkgo.Ordered, g
 		e2eoperator.WaitForDriverDaemonSets(ctx, install.Clients, defaultDriverName, nvidiaDriverOwnershipTimeout)
 	})
 
-	ginkgo.It("hands GPU nodes to a user-defined NVIDIADriver", func(ctx context.Context) {
+	ginkgo.It("hands GPU nodes to a user-defined NVIDIADriver", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		ginkgo.By("Finding the default NVIDIADriver")
 		sourceDriverName := singleDefaultDriverName(ctx, install.Clients)
 		ginkgo.GinkgoWriter.Printf("NVIDIADriver/%s is the default\n", sourceDriverName)
@@ -131,7 +131,7 @@ var _ = e2eoperator.Describe("nvidia-driver", "nvidia-driver", ginkgo.Ordered, g
 		e2eoperands.WaitForDriverPodsReady(ctx, install.Clients)
 	})
 
-	ginkgo.It("upgrades the driver of the user-defined NVIDIADriver", func(ctx context.Context) {
+	ginkgo.It("upgrades the driver of the user-defined NVIDIADriver", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Updating NVIDIADriver/%s to driver version %s", userDriverName, e2eoperator.TestContext.TargetDriverVersion))
 		framework.ExpectNoError(install.Drivers.UpdateDriverVersion(ctx, userDriverName, e2eoperator.TestContext.TargetDriverVersion), "failed to update the version of NVIDIADriver/%s", userDriverName)
 		waitForDriverImageVersion(ctx, install.Clients, userDriverName, e2eoperator.TestContext.TargetDriverVersion)
@@ -142,7 +142,7 @@ var _ = e2eoperator.Describe("nvidia-driver", "nvidia-driver", ginkgo.Ordered, g
 		e2eoperands.WaitForDriverPodsUpgraded(ctx, install.Clients)
 	})
 
-	ginkgo.It("applies custom labels to the driver pods", func(ctx context.Context) {
+	ginkgo.It("applies custom labels to the driver pods", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		customLabels := map[string]string{"cloudprovider": "aws", "platform": "kubernetes"}
 		customLabelSelector := labels.SelectorFromSet(customLabels).String()
 		ginkgo.By(fmt.Sprintf("Setting the custom labels %s on NVIDIADriver/%s", customLabelSelector, userDriverName))
@@ -178,7 +178,7 @@ var _ = e2eoperator.Describe("nvidia-driver", "nvidia-driver", ginkgo.Ordered, g
 		ginkgo.GinkgoWriter.Printf("All %d driver pods carry the custom labels %s\n", len(labeledDriverPods), customLabelSelector)
 	})
 
-	ginkgo.It("reports a node conflict when the default field is cleared", func(ctx context.Context) {
+	ginkgo.It("reports a node conflict when the default field is cleared", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Clearing the default field of NVIDIADriver/%s", defaultDriverName))
 		framework.ExpectNoError(install.Drivers.SetDefault(ctx, defaultDriverName, false), "failed to clear the default of NVIDIADriver/%s", defaultDriverName)
 		e2eoperator.WaitForDriverError(ctx, install.Clients, userDriverName, conditions.ConflictingNodeSelector, conflictingNodeMessage)
@@ -193,7 +193,7 @@ var _ = e2eoperator.Describe("nvidia-driver", "nvidia-driver", ginkgo.Ordered, g
 		e2eoperator.WaitForNodesOwnedByDriver(ctx, install.Clients, userDriverName, nvidiaDriverOwnershipTimeout)
 	})
 
-	ginkgo.It("reports multiple default NVIDIADrivers as not ready", func(ctx context.Context) {
+	ginkgo.It("reports multiple default NVIDIADrivers as not ready", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Creating NVIDIADriver/%s from NVIDIADriver/%s as a second default", duplicateDefaultDriverName, defaultDriverName))
 		framework.ExpectNoError(install.Drivers.Copy(ctx, defaultDriverName, duplicateDefaultDriverName, true), "failed to create NVIDIADriver/%s", duplicateDefaultDriverName)
 		e2eoperator.WaitForDriverError(ctx, install.Clients, defaultDriverName, conditions.ReconcileFailed, duplicateDefaultMessage)

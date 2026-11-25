@@ -55,19 +55,19 @@ var _ = e2eoperator.Describe("clusterpolicy", "clusterpolicy", ginkgo.Ordered, g
 	install := e2eoperator.NewInstall()
 
 	ginkgo.It("brings up every operand", func(ctx context.Context) {
-		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
+		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultOperandSelectors))
 	})
 
 	ginkgo.It("does not restart operands repeatedly", func(ctx context.Context) {
-		e2eoperands.ExpectNoRepeatedOperandRestarts(ctx, install.Clients, e2eoperands.DefaultRestartCheckedOperandSelectors)
+		e2eoperands.ExpectNoRepeatedOperandRestarts(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultRestartCheckedOperandSelectors))
 	})
 
-	ginkgo.It("runs a GPU workload", func(ctx context.Context) {
+	ginkgo.It("runs a GPU workload", ginkgo.Label("cuda-workload"), func(ctx context.Context) {
 		e2eworkload.RunGPUWorkload(ctx, install.Clients)
 	})
 
 	ginkgo.Context("when the ClusterPolicy changes", func() {
-		ginkgo.It("rolls out a new driver version", func(ctx context.Context) {
+		ginkgo.It("rolls out a new driver version", ginkgo.Label("driver-container"), func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("Updating the ClusterPolicy driver version to %s", e2eoperator.TestContext.TargetDriverVersion))
 			err := install.ClusterPolicies.UpdateDriverVersion(ctx, e2eoperator.ClusterPolicyName, e2eoperator.TestContext.TargetDriverVersion)
 			framework.ExpectNoError(err, "failed to update the ClusterPolicy driver version to %s", e2eoperator.TestContext.TargetDriverVersion)
@@ -182,7 +182,7 @@ var _ = e2eoperator.Describe("clusterpolicy", "clusterpolicy", ginkgo.Ordered, g
 			e2eoperands.WaitForPodsReady(ctx, install.Clients, e2eoperands.AppSelector("nvidia-dcgm-exporter"))
 		})
 
-		ginkgo.It("applies custom labels to every operand pod", func(ctx context.Context) {
+		ginkgo.It("applies custom labels to every operand pod", ginkgo.Label("driver-container"), func(ctx context.Context) {
 			customLabels := map[string]string{"cloudprovider": "aws", "platform": "kubernetes"}
 			ginkgo.By(fmt.Sprintf("Setting custom labels %s on the operand daemonsets", labels.Set(customLabels)))
 			err := install.ClusterPolicies.Modify(ctx, e2eoperator.ClusterPolicyName, func(clusterPolicy *nvidiav1.ClusterPolicy) {
@@ -190,9 +190,9 @@ var _ = e2eoperator.Describe("clusterpolicy", "clusterpolicy", ginkgo.Ordered, g
 			})
 			framework.ExpectNoError(err, "failed to set custom operand labels")
 
-			e2eoperands.WaitForOperandPodLabels(ctx, install.Clients, e2eoperands.DefaultOperandSelectors, customLabels)
+			e2eoperands.WaitForOperandPodLabels(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultOperandSelectors), customLabels)
 			e2eoperands.WaitForDriverUpgradeDone(ctx, install.Clients)
-			e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
+			e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultOperandSelectors))
 		})
 	})
 
@@ -244,10 +244,10 @@ var _ = e2eoperator.Describe("clusterpolicy", "clusterpolicy", ginkgo.Ordered, g
 			err = install.Nodes.LabelNode(ctx, originalNode.Name, deployOperandsLabel, "true")
 			framework.ExpectNoError(err, "failed to label node %s %s=true", originalNode.Name, deployOperandsLabel)
 		}
-		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.DefaultOperandSelectors)
+		e2eoperands.WaitForOperandsReady(ctx, install.Clients, e2eoperands.EnabledOperandSelectors(ctx, install.Clients, e2eoperands.DefaultOperandSelectors))
 	})
 
-	ginkgo.It("migrates driver management from the ClusterPolicy to NVIDIADriver", func(ctx context.Context) {
+	ginkgo.It("migrates driver management from the ClusterPolicy to NVIDIADriver", ginkgo.Label("driver-container"), func(ctx context.Context) {
 		ginkgo.By("Finding the ClusterPolicy-managed driver pod")
 		legacyDriverSelector := e2eoperands.AppSelector(legacyDriverApp)
 		legacyDriverPods, err := install.Pods.List(ctx, e2eoperator.TestContext.OperatorNamespace, legacyDriverSelector)
@@ -272,7 +272,7 @@ var _ = e2eoperator.Describe("clusterpolicy", "clusterpolicy", ginkgo.Ordered, g
 		e2eoperands.WaitForDriverPodsUpgraded(ctx, install.Clients)
 	})
 
-	ginkgo.It("runs a GPU workload after the migration", func(ctx context.Context) {
+	ginkgo.It("runs a GPU workload after the migration", ginkgo.Label("cuda-workload"), func(ctx context.Context) {
 		e2eworkload.RunGPUWorkload(ctx, install.Clients)
 	})
 })

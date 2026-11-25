@@ -1,0 +1,33 @@
+# Helm values for running the e2e suite on Mokka (NVIDIA/k8s-test-infra nvml-mock).
+# Mokka stages a mock driver under /run/nvidia/driver and configures the container
+# runtime itself, so the operands that need a real NVIDIA kernel module are disabled.
+driver:
+  enabled: false
+toolkit:
+  enabled: false
+migManager:
+  enabled: false
+
+mig:
+  strategy: none
+
+gfd:
+  env:
+    - name: GFD_MACHINE_TYPE_FILE
+      value: /etc/nvml-mock/machine-type
+
+validator:
+  driver:
+    env:
+      - name: DISABLE_DEV_CHAR_SYMLINK_CREATION
+        value: "true"
+  toolkit:
+    env:
+      # Runs toolkit-validation under the nvidia runtime so Mokka's CDI spec mounts
+      # its mock /sys/module/nvidia/initstate; the image default "void" never does.
+      - name: NVIDIA_VISIBLE_DEVICES
+        value: all
+  cuda:
+    env:
+      - name: WITH_WORKLOAD
+        value: "false"
