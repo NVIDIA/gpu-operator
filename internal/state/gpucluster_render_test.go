@@ -33,7 +33,7 @@ import (
 
 // fullSpecGPUCluster returns a CR exercising the optional DRA driver knobs: the
 // computeDomains capability with controller/kubelet-plugin overrides and per-container
-// env/resources on both kubelet plugins.
+// env/resources on both kubelet plugins, and the GPU configuration manager env passed to the gpu-config init container.
 func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 	cr := sampleGPUCluster()
 	cr.Spec.DRADriver.ImagePullSecrets = []string{"registry-secret", "other-secret"}
@@ -50,6 +50,9 @@ func fullSpecGPUCluster() *nvidiav1alpha1.GPUCluster {
 			},
 		},
 		Healthcheck: &nvidiav1alpha1.DRADriverHealthcheckSpec{Port: new(int32(52000))},
+	}
+	cr.Spec.GPUConfigManager = &nvidiav1.GPUConfigManagerSpec{
+		Env: []nvidiav1.EnvVar{{Name: "GPU_CONFIG_NO_MODULE_TIMEOUT", Value: "10m"}},
 	}
 	cr.Spec.DRADriver.ComputeDomains = nvidiav1alpha1.DRADriverComputeDomainsSpec{
 		Enabled: new(true),
@@ -81,6 +84,7 @@ func TestGPUClusterDaemonsetsPriorityClass(t *testing.T) {
 		"dcgm-exporter": newTestDCGMExporterState(t, false),
 		"dra-validator": newTestDRAValidationState(t),
 		"dra-driver":    newTestDRAState(t),
+		"gpu-config":    newTestGPUConfigManagerState(t),
 	}
 	tests := map[string]struct {
 		priorityClassName string
@@ -99,6 +103,7 @@ func TestGPUClusterDaemonsetsPriorityClass(t *testing.T) {
 					cr.Spec.DCGM = &nvidiav1.DCGMSpec{Enabled: new(true)}
 					cr.Spec.DCGMExporter = &nvidiav1.DCGMExporterSpec{Enabled: new(true)}
 					cr.Spec.DRADriver.ComputeDomains.Enabled = new(true)
+					cr.Spec.GPUConfigManager = &nvidiav1.GPUConfigManagerSpec{Enabled: new(true)}
 					cr.Spec.Daemonsets.PriorityClassName = tc.priorityClassName
 
 					objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
@@ -162,6 +167,17 @@ func TestGPUClusterRenderGolden(t *testing.T) {
 			render: func(t *testing.T) []*unstructured.Unstructured {
 				s := newTestDRAValidationState(t)
 				objs, err := s.getManifestObjects(context.Background(), sampleGPUCluster(), draSupportedCatalog())
+				require.NoError(t, err)
+				return objs
+			},
+		},
+		{
+			name: "gpucluster-gpu-config-manager",
+			render: func(t *testing.T) []*unstructured.Unstructured {
+				s := newTestGPUConfigManagerState(t)
+				cr := sampleGPUCluster()
+				cr.Spec.GPUConfigManager = &nvidiav1.GPUConfigManagerSpec{Enabled: new(true)}
+				objs, err := s.getManifestObjects(context.Background(), cr, draSupportedCatalog())
 				require.NoError(t, err)
 				return objs
 			},

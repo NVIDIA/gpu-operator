@@ -604,6 +604,21 @@ ccManager:
   resources: {}
   hostNetwork: false
 
+# GPU configuration manager: sets GPU power limit, locked clocks, ECC mode etc. on each node and
+# reapplies them after every driver load. Runs the validator image.
+gpuConfigManager:
+  enabled: false
+  config:
+    # Name of the ConfigMap (key config.yaml) with the GPU settings for all
+    # nodes. A gpu-config-node-<node name> or gpu-config-pool-<pool name>
+    # ConfigMap takes precedence for that node.
+    name: gpu-config
+  resources: {}
+  # The pool name is the value of the node label nvidia.com/gpu-config.pool.
+  # Set POOL_LABEL_KEY to use another node label, such as karpenter.sh/nodepool.
+  env: []
+  hostNetwork: false
+
 # The ClusterPolicy CR stores the desired state of the GPU
 # enablement stack based on the Kubernetes Device Plugin framework.
 clusterPolicy:

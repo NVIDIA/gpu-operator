@@ -179,6 +179,8 @@ const (
 	PodControllerRevisionHashLabelKey = "controller-revision-hash"
 	// DefaultCCModeEnvName is the name of the envvar for configuring default CC mode on all compatible GPUs on the node
 	DefaultCCModeEnvName = "DEFAULT_CC_MODE"
+	// GPUConfigClusterDocumentEnvName is the name of the GPU configuration manager envvar for the ConfigMap with the GPU settings for all nodes
+	GPUConfigClusterDocumentEnvName = "GPU_CONFIG_CLUSTER_DOCUMENT"
 	// OpenKernelModulesEnabledEnvName is the name of the driver-container envvar for enabling open GPU kernel module support
 	OpenKernelModulesEnabledEnvName = "OPEN_KERNEL_MODULES_ENABLED"
 	// KernelModuleTypeEnvName is the name of the driver-container envvar to set the desired kernel module type
@@ -759,6 +761,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) error
 		"nvidia-operator-validator":                   TransformValidator,
 		"nvidia-sandbox-validator":                    TransformSandboxValidator,
 		"nvidia-cc-manager":                           TransformCCManager,
+		"nvidia-gpu-config-manager":                   TransformGPUConfigManager,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -2215,6 +2218,40 @@ func TransformVFIOManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec
 	return nil
 }
 
+// TransformGPUConfigManager transforms the GPU configuration manager daemonset with required config as per ClusterPolicy
+func TransformGPUConfigManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	// update the driver-validation init container
+	if err := transformValidationInitContainer(obj, config); err != nil {
+		return err
+	}
+
+	ctr := findContainerByName(obj.Spec.Template.Spec.Containers, "nvidia-gpu-config-manager")
+	if ctr == nil {
+		return fmt.Errorf("failed to find container %q", "nvidia-gpu-config-manager")
+	}
+
+	// The manager ships in the validator image, which is the operator's own image.
+	image, err := gpuv1.ImagePath(&config.Validator)
+	if err != nil {
+		return err
+	}
+	ctr.Image = image
+	if config.Validator.ImagePullPolicy != "" {
+		ctr.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+	}
+
+	if config.GPUConfigManager.Resources != nil {
+		ctr.Resources.Requests = config.GPUConfigManager.Resources.Requests
+		ctr.Resources.Limits = config.GPUConfigManager.Resources.Limits
+	}
+
+	setContainerEnv(ctr, GPUConfigClusterDocumentEnvName, config.GPUConfigManager.ClusterDocumentName())
+	setGPUConfigManagerEnv(ctr, config.GPUConfigManager.Env)
+
+	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.GPUConfigManager.HostNetwork)
+	return nil
+}
+
 // TransformCCManager transforms CC Manager daemonset with required config as per ClusterPolicy
 func TransformCCManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update image
@@ -2392,10 +2429,48 @@ func TransformValidator(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, 
 		n.logger.Info("WARN: errors transforming the validator containers", "error", validatorErr)
 	}
 
+	if err := transformGPUConfigGate(config, &obj.Spec.Template.Spec); err != nil {
+		return err
+	}
+
 	// set hostNetwork for validator if specified
 	applyHostNetworkConfig(&obj.Spec.Template.Spec, config.Validator.HostNetwork)
 
 	return nil
+}
+
+// transformGPUConfigGate configures the validator's gpu-config init container. The manager looks it up by this name,
+// hence no -validation suffix; it runs as root to write the root-owned validations directory.
+func transformGPUConfigGate(config *gpuv1.ClusterPolicySpec, podSpec *corev1.PodSpec) error {
+	ctr := findContainerByName(podSpec.InitContainers, "gpu-config")
+	if ctr == nil {
+		return nil
+	}
+	image, err := gpuv1.ImagePath(&config.Validator)
+	if err != nil {
+		return err
+	}
+	ctr.Image = image
+	if config.Validator.ImagePullPolicy != "" {
+		ctr.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Validator.ImagePullPolicy)
+	}
+	applyResourceRequirements(ctr, config.Validator.Resources)
+	transformValidatorSecurityContext(ctr)
+	// spec.gpuConfigManager.env applies even when the manager is disabled.
+	setGPUConfigManagerEnv(ctr, config.GPUConfigManager.Env)
+	return nil
+}
+
+// setGPUConfigManagerEnv sets spec.gpuConfigManager.env on ctr. It drops ValueFrom: an env var with both is invalid.
+func setGPUConfigManagerEnv(ctr *corev1.Container, envs []gpuv1.EnvVar) {
+	for _, env := range envs {
+		setContainerEnv(ctr, env.Name, env.Value)
+		for i := range ctr.Env {
+			if ctr.Env[i].Name == env.Name {
+				ctr.Env[i].ValueFrom = nil
+			}
+		}
+	}
 }
 
 // TransformSandboxValidator transforms nvidia-sandbox-validator daemonset with required config as per ClusterPolicy

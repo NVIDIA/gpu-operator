@@ -12,6 +12,16 @@ rules:
   - daemonsets
   verbs:
   - list
+# The gpu-config init container reads the GPU configuration manager's
+# DaemonSet to learn whether the manager is enabled.
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  resourceNames:
+  - nvidia-gpu-config-manager-dra
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

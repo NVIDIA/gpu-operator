@@ -94,6 +94,10 @@ type ClusterPolicySpec struct {
 	KataManager KataManagerSpec `json:"kataManager,omitempty"`
 	// CCManager component spec
 	CCManager CCManagerSpec `json:"ccManager,omitempty"`
+	// GPUConfigManager component spec. The GPU configuration manager configures GPU settings
+	// such as the power limit, locked clocks and ECC mode on each node from ConfigMaps in the
+	// operator namespace, and applies them again after every driver load.
+	GPUConfigManager GPUConfigManagerSpec `json:"gpuConfigManager,omitempty"`
 	// HostPaths defines various paths on the host needed by GPU Operator components
 	HostPaths HostPathsSpec `json:"hostPaths,omitempty"`
 	// KataSandboxDevicePlugin component spec
@@ -1816,6 +1820,52 @@ type CCManagerSpec struct {
 	HostNetwork *bool `json:"hostNetwork,omitempty"`
 }
 
+// GPUConfigManagerSpec defines the properties for deploying the GPU configuration manager
+type GPUConfigManagerSpec struct {
+	// Enabled indicates if deployment of the GPU configuration manager is enabled
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable GPU Configuration Manager deployment through GPU Operator"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Config selects the ConfigMap (key config.yaml) in the operator namespace with the GPU settings for all nodes.
+	// For a node, gpu-config-node-<node name> wins over gpu-config-pool-<pool>, which wins over this one.
+	// <pool> is derived from the node's nvidia.com/gpu-config.pool label (lowercased, "_" to "-"; values that
+	// can't name a ConfigMap are ignored); set POOL_LABEL_KEY in spec.gpuConfigManager.env to use another label.
+	// +kubebuilder:validation:Optional
+	Config *GPUConfigManagerConfigSpec `json:"config,omitempty"`
+
+	// Optional: Define resources requests and limits for each pod
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Resource Requirements"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: List of environment variables. They are also passed to the gpu-config init container
+	// of the validator / DRA kubelet plugin, even when the manager is disabled. GPU_CONFIG_NO_MODULE_TIMEOUT
+	// sets how long that container waits for the nvidia module before letting allocators start (default 5m).
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Environment Variables"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:advanced,urn:alm:descriptor:com.tectonic.ui:text"
+	Env []EnvVar `json:"env,omitempty"`
+
+	// HostNetwork indicates whether the GPU configuration manager pod uses the host's network namespace.
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors=true
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.displayName="Enable hostNetwork for NVIDIA GPU Configuration Manager"
+	// +operator-sdk:gen-csv:customresourcedefinitions.specDescriptors.x-descriptors="urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+	HostNetwork *bool `json:"hostNetwork,omitempty"`
+}
+
+// GPUConfigManagerConfigSpec selects the ConfigMap with the GPU settings for all nodes
+type GPUConfigManagerConfigSpec struct {
+	// Name of the ConfigMap in the operator namespace with the GPU settings for nodes
+	// that have no per-node or per-pool ConfigMap
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="gpu-config"
+	Name string `json:"name,omitempty"`
+}
+
 // VFIOManagerSpec defines the properties for deploying VFIO-PCI manager
 type VFIOManagerSpec struct {
 	// Enabled indicates if deployment of VFIO Manager is enabled
@@ -2514,6 +2564,22 @@ func (c *CCManagerSpec) IsEnabled() bool {
 		return false
 	}
 	return *c.Enabled
+}
+
+// IsEnabled returns true if the GPU configuration manager is enabled; it is disabled by default
+func (g *GPUConfigManagerSpec) IsEnabled() bool {
+	if g.Enabled == nil {
+		return false
+	}
+	return *g.Enabled
+}
+
+// ClusterDocumentName returns the name of the ConfigMap with the GPU settings for all nodes
+func (g *GPUConfigManagerSpec) ClusterDocumentName() string {
+	if g.Config == nil || g.Config.Name == "" {
+		return "gpu-config"
+	}
+	return g.Config.Name
 }
 
 // +kubebuilder:object:generate=false

@@ -128,6 +128,20 @@ spec:
     config:
       name: {{ .Values.dcgmExporter.config.name }}
     {{- end }}
+  gpuConfigManager:
+    enabled: {{ .Values.gpuConfigManager.enabled }}
+    {{- if .Values.gpuConfigManager.config }}
+    config: {{ toYaml .Values.gpuConfigManager.config | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gpuConfigManager.resources }}
+    resources: {{ toYaml .Values.gpuConfigManager.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gpuConfigManager.env }}
+    env: {{ toYaml .Values.gpuConfigManager.env | nindent 6 }}
+    {{- end }}
+    {{- if .Values.gpuConfigManager.hostNetwork }}
+    hostNetwork: {{ .Values.gpuConfigManager.hostNetwork }}
+    {{- end }}
   hostPaths:
     driverInstallDir: {{ .Values.hostPaths.driverInstallDir }}
     {{- if .Values.hostPaths.kubeletRootDir }}
