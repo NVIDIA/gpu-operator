@@ -4,6 +4,13 @@ metadata:
   name: nvidia-mig-manager
   namespace: "FILLED BY THE OPERATOR"
 rules:
+# Driver validation discovers operator-managed driver installations.
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - list
 - apiGroups:
   - security.openshift.io
   resources:

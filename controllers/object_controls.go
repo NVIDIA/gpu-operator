@@ -2108,6 +2108,9 @@ func TransformMIGManager(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec,
 
 	setRuntimeClassName(&obj.Spec.Template.Spec, config, n.runtime)
 	setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, obj.Spec.Template.Spec.Containers[0].Name)
+	if ctr := findContainerByName(obj.Spec.Template.Spec.InitContainers, "toolkit-validation"); ctr != nil {
+		setNRIPluginAnnotation(&obj.Spec.Template.ObjectMeta, &config.CDI, ctr.Name)
+	}
 
 	// Set ConfigMap name for mig-parted-config volume
 	hasCustomConfig := config.MIGManager.Config != nil && config.MIGManager.Config.Name != ""
