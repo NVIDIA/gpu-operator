@@ -34,6 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
@@ -1461,4 +1463,52 @@ func TestReconcileGPUClusterNodeLabels(t *testing.T) {
 		_, err := r.Reconcile(context.Background(), reconcile.Request{})
 		require.ErrorContains(t, err, "both ClusterPolicy and GPUCluster CRs exist")
 	})
+}
+
+func TestSourcePredicates(t *testing.T) {
+	for name, tc := range map[string]struct {
+		update      func(*gpuv1.ClusterPolicy)
+		sourceWatch bool
+		labelWatch  bool
+	}{
+		"spec update": {
+			update:      func(cp *gpuv1.ClusterPolicy) { cp.Generation++ },
+			sourceWatch: true,
+			labelWatch:  true,
+		},
+		"deletion starts": {
+			update: func(cp *gpuv1.ClusterPolicy) {
+				cp.DeletionTimestamp = new(metav1.Now())
+				cp.Generation++
+			},
+			sourceWatch: true,
+			labelWatch:  true,
+		},
+		"operands removed": {
+			update: func(cp *gpuv1.ClusterPolicy) {
+				cp.Status.Conditions = []metav1.Condition{{Type: operandsRemoved, Status: metav1.ConditionTrue}}
+			},
+			labelWatch: true,
+		},
+		"ready status update": {
+			update: func(cp *gpuv1.ClusterPolicy) {
+				cp.Status.Conditions = []metav1.Condition{{Type: "Ready", Status: metav1.ConditionTrue}}
+			},
+		},
+		"unrelated finalizer": {
+			update: func(cp *gpuv1.ClusterPolicy) { cp.Finalizers = []string{"example.com/cleanup"} },
+		},
+		"cleanup finalizer added": {
+			update: func(cp *gpuv1.ClusterPolicy) { cp.Finalizers = []string{nodeCleanupFinalizer} },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			old := &gpuv1.ClusterPolicy{ObjectMeta: metav1.ObjectMeta{Generation: 1}}
+			updated := old.DeepCopy()
+			tc.update(updated)
+			update := event.TypedUpdateEvent[*gpuv1.ClusterPolicy]{ObjectOld: old, ObjectNew: updated}
+			require.Equal(t, tc.sourceWatch, predicate.TypedGenerationChangedPredicate[*gpuv1.ClusterPolicy]{}.Update(update))
+			require.Equal(t, tc.labelWatch, nodeLabelingSourcePredicate[*gpuv1.ClusterPolicy]().Update(update))
+		})
+	}
 }

@@ -26,12 +26,14 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	resourcev1 "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -65,11 +67,12 @@ type NodeLabelingReconciler struct {
 // or gpuCluster (DRA stack) is non-nil per reconcile; Reconcile returns an error if both
 // exist simultaneously.
 type nodeLabelingController struct {
-	client        client.Client
-	namespace     string
-	clusterPolicy *gpuv1.ClusterPolicy
-	gpuCluster    *nvidiav1alpha1.GPUCluster
-	logger        logr.Logger
+	client            client.Client
+	namespace         string
+	clusterPolicy     *gpuv1.ClusterPolicy
+	gpuCluster        *nvidiav1alpha1.GPUCluster
+	logger            logr.Logger
+	skipStackLabeling bool
 
 	// draPluginRemovalDeferred records that gpu.deploy.dra-driver removal was skipped on
 	// at least one node because pods holding gpu.nvidia.com claims are still present; the
@@ -195,21 +198,26 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	cleanupPending, cleanupErr := r.cleanupDeletedSources(ctx)
+	skipStackLabeling := cleanupPending || cleanupErr != nil ||
+		(clusterPolicy != nil && !clusterPolicy.DeletionTimestamp.IsZero()) ||
+		(gpuCluster != nil && !gpuCluster.DeletionTimestamp.IsZero())
 	if clusterPolicy == nil && gpuCluster == nil {
 		logger.Info("No ClusterPolicy or GPUCluster CR exists, skipping node labeling")
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, cleanupErr
 	}
 	// TODO: allow both CRs to co-exist
-	if clusterPolicy != nil && gpuCluster != nil {
+	if !skipStackLabeling && clusterPolicy != nil && gpuCluster != nil {
 		return reconcile.Result{}, fmt.Errorf("both ClusterPolicy and GPUCluster CRs exist; only one may be present at a time")
 	}
 
 	nlc := &nodeLabelingController{
-		client:        r.Client,
-		namespace:     r.Namespace,
-		clusterPolicy: clusterPolicy,
-		gpuCluster:    gpuCluster,
-		logger:        logger,
+		client:            r.Client,
+		namespace:         r.Namespace,
+		clusterPolicy:     clusterPolicy,
+		gpuCluster:        gpuCluster,
+		logger:            logger,
+		skipStackLabeling: skipStackLabeling,
 	}
 
 	gpuLabelUpdateResult, err := nlc.labelGPUNodes(ctx)
@@ -227,7 +235,10 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			"totalPatchedNodeCount", gpuLabelUpdateResult.totalPatchedNodeCount,
 			"gpuDiscoveryStateChangedNodeCount", gpuLabelUpdateResult.gpuDiscoveryStateChangedNodeCount,
 		)
-		return reconcile.Result{}, nil
+		if cleanupPending {
+			return reconcile.Result{RequeueAfter: lifecycleRetry}, cleanupErr
+		}
+		return reconcile.Result{}, cleanupErr
 	}
 
 	// Route each GPU node to its NVIDIADriver CR. Skipping this leaves the NVIDIADriver controller owning no nodes, and it
@@ -244,8 +255,16 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// The k8s-driver-manager init container consumes this annotation on either stack.
-	if err := nlc.applyDriverAutoUpgradeAnnotation(ctx); err != nil {
-		return reconcile.Result{}, err
+	if !skipStackLabeling || usesNvidiaDriverCRD {
+		if err := nlc.applyDriverAutoUpgradeAnnotation(ctx); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+	if cleanupErr != nil {
+		return reconcile.Result{}, cleanupErr
+	}
+	if cleanupPending {
+		return reconcile.Result{RequeueAfter: lifecycleRetry}, nil
 	}
 
 	if nlc.draPluginRemovalDeferred {
@@ -254,6 +273,89 @@ func (r *NodeLabelingReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *NodeLabelingReconciler) cleanupDeletedSources(ctx context.Context) (bool, error) {
+	cps := &gpuv1.ClusterPolicyList{}
+	gcs := &nvidiav1alpha1.GPUClusterList{}
+	if err := r.List(ctx, cps); err != nil {
+		return false, err
+	}
+	if err := r.List(ctx, gcs); err != nil {
+		return false, err
+	}
+	sources := []client.Object{}
+	for i := range cps.Items {
+		sources = append(sources, &cps.Items[i])
+	}
+	for i := range gcs.Items {
+		sources = append(sources, &gcs.Items[i])
+	}
+	var deleting []client.Object
+	keepDriver := false
+	for _, obj := range sources {
+		if obj.GetDeletionTimestamp().IsZero() {
+			keepDriver = true
+			continue
+		}
+		if !controllerutil.ContainsFinalizer(obj, nodeCleanupFinalizer) {
+			continue
+		}
+		deleting = append(deleting, obj)
+		// ClusterPolicy can still own a legacy driver during teardown.
+		if _, isClusterPolicy := obj.(*gpuv1.ClusterPolicy); isClusterPolicy && !operandsRemovedTrue(obj) {
+			keepDriver = true
+		}
+	}
+	if len(deleting) == 0 {
+		return false, nil
+	}
+	if !keepDriver {
+		drivers := &nvidiav1alpha1.NVIDIADriverList{}
+		if err := r.List(ctx, drivers); err != nil {
+			return true, err
+		}
+		keepDriver = len(drivers.Items) > 0
+	}
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes); err != nil {
+		return true, err
+	}
+	for _, obj := range deleting {
+		if !operandsRemovedTrue(obj) {
+			continue
+		}
+		needsAnotherPass := false
+		for i := range nodes.Items {
+			// Do not mutate the shared snapshot: a later source's patch must also be
+			// conditional on the resourceVersion actually observed in the cache.
+			node := nodes.Items[i].DeepCopy()
+			original := node.DeepCopy()
+			if !cleanSourceNode(node, obj, keepDriver) {
+				continue
+			}
+			if err := r.Patch(ctx, node, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				if apierrors.IsConflict(err) {
+					needsAnotherPass = true
+					continue
+				}
+				return true, fmt.Errorf("clean stack labels on node %q: %w", node.Name, err)
+			}
+			needsAnotherPass = true
+		}
+		if needsAnotherPass {
+			continue
+		}
+		original := obj.DeepCopyObject().(client.Object)
+		controllerutil.RemoveFinalizer(obj, nodeCleanupFinalizer)
+		if err := r.Patch(ctx, obj, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{})); err != nil && !apierrors.IsNotFound(err) {
+			return true, err
+		}
+	}
+	return true, nil
 }
 
 // labelGPUNodes reconciles GPU-related labels and reports which node labels were patched.
@@ -275,7 +377,7 @@ func (nlc *nodeLabelingController) labelGPUNodes(ctx context.Context) (gpuNodeLa
 			gpuDiscoveryStateChanged = true
 		}
 
-		if nlc.updateGPUStateLabels(ctx, labels, node.Name) {
+		if !nlc.skipStackLabeling && nlc.updateGPUStateLabels(ctx, labels, node.Name) {
 			node.SetLabels(labels)
 			stateLabelsModified = true
 		}
@@ -675,8 +777,21 @@ func singletonCRPredicate[T interface {
 	}
 }
 
+func nodeLabelingSourcePredicate[T client.Object]() predicate.TypedFuncs[T] {
+	p := singletonCRPredicate[T]()
+	update := p.Update
+	p.UpdateFunc = func(e event.TypedUpdateEvent[T]) bool {
+		// The source condition hands off teardown to the node-labeling controller.
+		return update(e) || (!operandsRemovedTrue(e.ObjectOld) && operandsRemovedTrue(e.ObjectNew))
+	}
+	return p
+}
+
 // SetupWithManager registers the NodeLabelingReconciler with the controller-runtime manager.
 func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	if err := registerWorkloadIndexes(ctx, mgr); err != nil {
+		return err
+	}
 	mapToSingleton := func(_ context.Context, _ client.Object) []reconcile.Request {
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: nodeLabelingControllerSingletonName}}}
 	}
@@ -708,7 +823,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		mgr.GetCache(),
 		&gpuv1.ClusterPolicy{},
 		handler.TypedEnqueueRequestsFromMapFunc(clusterPolicyMapFn),
-		singletonCRPredicate[*gpuv1.ClusterPolicy](),
+		nodeLabelingSourcePredicate[*gpuv1.ClusterPolicy](),
 	)); err != nil {
 		return fmt.Errorf("error watching ClusterPolicy: %w", err)
 	}
@@ -722,7 +837,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 		mgr.GetCache(),
 		&nvidiav1alpha1.GPUCluster{},
 		handler.TypedEnqueueRequestsFromMapFunc(gpuClusterMapFn),
-		singletonCRPredicate[*nvidiav1alpha1.GPUCluster](),
+		nodeLabelingSourcePredicate[*nvidiav1alpha1.GPUCluster](),
 	)); err != nil {
 		return fmt.Errorf("error watching GPUCluster: %w", err)
 	}
@@ -749,7 +864,7 @@ func (r *NodeLabelingReconciler) SetupWithManager(ctx context.Context, mgr ctrl.
 			return r.nodeUpdateRequiresReconcile(ctx, e.ObjectOld, e.ObjectNew)
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Node]) bool {
-			return false
+			return true
 		},
 	}
 	nodeMapFn := func(ctx context.Context, n *corev1.Node) []reconcile.Request {
