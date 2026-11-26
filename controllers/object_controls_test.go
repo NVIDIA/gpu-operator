@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
@@ -1415,6 +1416,116 @@ func TestOperandToolkitReadinessWaitsForLiveDriver(t *testing.T) {
 			expectedGate := "until [ -f /run/nvidia/validations/toolkit-ready ] && { grep -qsx live /sys/module/nvidia/initstate || [ -e /dev/dxg ]; }; do"
 			require.True(t, strings.HasPrefix(args, expectedGate),
 				"toolkit readiness and a supported live-driver check must gate operand startup")
+		})
+	}
+}
+
+func TestDCGMLivenessProbe(t *testing.T) {
+	manifestPath := filepath.Join(cfg.root, "assets/state-dcgm/0400_dcgm.yml")
+	buffer, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+
+	ds := appsv1.DaemonSet{}
+	ser := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: false})
+	_, _, err = ser.Decode(buffer, nil, &ds)
+	require.NoError(t, err)
+	require.Len(t, ds.Spec.Template.Spec.Containers, 1)
+
+	probe := ds.Spec.Template.Spec.Containers[0].LivenessProbe
+	require.NotNil(t, probe)
+	require.NotNil(t, probe.Exec)
+	require.Len(t, probe.Exec.Command, 3)
+	require.Equal(t, []string{"sh", "-c"}, probe.Exec.Command[:2])
+	probeCommand := probe.Exec.Command[2]
+	require.Contains(t, probeCommand, "/dev/dxg")
+	require.Contains(t, probeCommand, "/sys/module/nvidia/initstate")
+
+	binDir := t.TempDir()
+	dcgmiStub := `#!/bin/sh
+if [ "$#" -ne 2 ] || [ "$1" != "discovery" ] || [ "$2" != "-l" ]; then
+	exit 64
+fi
+: > "$DCGMI_TEST_MARKER"
+printf '%s\n' "$DCGMI_TEST_OUTPUT"
+`
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "dcgmi"), []byte(dcgmiStub), 0755))
+
+	tests := []struct {
+		name          string
+		initState     string
+		useDXG        bool
+		dcgmiOutput   string
+		wantSuccess   bool
+		wantDiscovery bool
+	}{
+		{
+			name:          "live driver with no GPUs fails",
+			initState:     "live\n",
+			dcgmiOutput:   "0 GPUs found (Active).",
+			wantSuccess:   false,
+			wantDiscovery: true,
+		},
+		{
+			name:          "live driver with one GPU succeeds",
+			initState:     "live\n",
+			dcgmiOutput:   "1 GPU found.",
+			wantSuccess:   true,
+			wantDiscovery: true,
+		},
+		{
+			name:          "live driver with multiple GPUs succeeds",
+			initState:     "live\n",
+			dcgmiOutput:   "8 GPUs found (Active).",
+			wantSuccess:   true,
+			wantDiscovery: true,
+		},
+		{
+			name:          "absent driver skips discovery",
+			dcgmiOutput:   "0 GPUs found (Active).",
+			wantSuccess:   true,
+			wantDiscovery: false,
+		},
+		{
+			name:          "WSL2 device checks GPUs without nvidia module",
+			useDXG:        true,
+			dcgmiOutput:   "1 GPU found (Active).",
+			wantSuccess:   true,
+			wantDiscovery: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testDir := t.TempDir()
+			initStatePath := filepath.Join(testDir, "initstate")
+			dxgPath := filepath.Join(testDir, "dxg")
+			markerPath := filepath.Join(testDir, "dcgmi-called")
+			if tc.initState != "" {
+				require.NoError(t, os.WriteFile(initStatePath, []byte(tc.initState), 0600))
+			}
+			if tc.useDXG {
+				require.NoError(t, os.WriteFile(dxgPath, nil, 0600))
+			}
+
+			t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("DCGMI_TEST_OUTPUT", tc.dcgmiOutput)
+			t.Setenv("DCGMI_TEST_MARKER", markerPath)
+			command := strings.ReplaceAll(probeCommand, "/sys/module/nvidia/initstate", initStatePath)
+			command = strings.ReplaceAll(command, "/dev/dxg", dxgPath)
+			runErr := exec.Command("sh", "-c", command).Run()
+			if tc.wantSuccess {
+				require.NoError(t, runErr)
+			} else {
+				require.Error(t, runErr)
+			}
+
+			_, statErr := os.Stat(markerPath)
+			if tc.wantDiscovery {
+				require.NoError(t, statErr, "dcgmi discovery was not called")
+			} else {
+				require.ErrorIs(t, statErr, os.ErrNotExist, "dcgmi discovery should be skipped")
+			}
 		})
 	}
 }
