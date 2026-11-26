@@ -311,6 +311,28 @@ func TestGetDriverSpecPreservesUserStartupProbe(t *testing.T) {
 	assert.Equal(t, userProbe, constructedDriverSpec.Spec.StartupProbe)
 }
 
+func TestGetDriverSpecPartialStartupProbe(t *testing.T) {
+	cases := map[string]struct {
+		probe *nvidiav1alpha1.ContainerProbeSpec
+		want  nvidiav1alpha1.ContainerProbeSpec
+	}{
+		"partial delay":            {&nvidiav1alpha1.ContainerProbeSpec{InitialDelaySeconds: 120}, nvidiav1alpha1.ContainerProbeSpec{InitialDelaySeconds: 120, TimeoutSeconds: 60, PeriodSeconds: 10, SuccessThreshold: 1, FailureThreshold: 120}},
+		"zero delay and overrides": {&nvidiav1alpha1.ContainerProbeSpec{TimeoutSeconds: 3, PeriodSeconds: 4, SuccessThreshold: 1, FailureThreshold: 9}, nvidiav1alpha1.ContainerProbeSpec{InitialDelaySeconds: 0, TimeoutSeconds: 3, PeriodSeconds: 4, SuccessThreshold: 1, FailureThreshold: 9}},
+		"empty probe":              {&nvidiav1alpha1.ContainerProbeSpec{}, nvidiav1alpha1.ContainerProbeSpec{InitialDelaySeconds: 0, TimeoutSeconds: 60, PeriodSeconds: 10, SuccessThreshold: 1, FailureThreshold: 120}},
+		"nil probe":                {nil, nvidiav1alpha1.ContainerProbeSpec{InitialDelaySeconds: 60, TimeoutSeconds: 60, PeriodSeconds: 10, SuccessThreshold: 1, FailureThreshold: 120}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := newDriverCR("driver-a")
+			cr.Spec.StartupProbe = tc.probe
+			got, err := getDriverSpec(cr, nodePool{osTag: "ubuntu22.04"})
+			require.NoError(t, err)
+			assert.Equal(t, &tc.want, got.Spec.StartupProbe)
+			assert.Equal(t, tc.probe, cr.Spec.StartupProbe)
+		})
+	}
+}
+
 func TestGetDriverSpecManagerImageError(t *testing.T) {
 	// An empty Manager spec only errors when the DRIVER_MANAGER_IMAGE fallback is
 	// also unset.

@@ -647,6 +647,22 @@ func getDriverSpec(cr *nvidiav1alpha1.NVIDIADriver, nodePool nodePool) (*driverS
 
 	if spec.StartupProbe == nil {
 		spec.StartupProbe = getDefaultStartupProbe(spec)
+	} else {
+		defaults := getDefaultStartupProbe(spec)
+		probe := spec.StartupProbe
+		// Zero is a valid initial delay and cannot be distinguished from an omitted value.
+		if probe.TimeoutSeconds == 0 {
+			probe.TimeoutSeconds = defaults.TimeoutSeconds
+		}
+		if probe.PeriodSeconds == 0 {
+			probe.PeriodSeconds = defaults.PeriodSeconds
+		}
+		if probe.SuccessThreshold == 0 {
+			probe.SuccessThreshold = defaults.SuccessThreshold
+		}
+		if probe.FailureThreshold == 0 {
+			probe.FailureThreshold = defaults.FailureThreshold
+		}
 	}
 
 	spec.Labels = sanitizeDriverLabels(spec.Labels)
