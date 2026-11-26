@@ -18,12 +18,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/go-nvlib/pkg/nvmdev"
 	"github.com/NVIDIA/go-nvlib/pkg/nvpci"
@@ -492,5 +494,127 @@ func TestCountNvidiaDevices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expected, countNvidiaDevices(tc.output))
 		})
+	}
+}
+
+func Test_waitForDriver(t *testing.T) {
+	// failUntil returns a probe that fails on its first n calls and succeeds afterwards, together
+	// with a pointer to its call count. A negative n never succeeds.
+	failUntil := func(n int) (func() error, *int) {
+		calls := 0
+		return func() error {
+			calls++
+			if n < 0 || calls <= n {
+				return errors.New("probe failed")
+			}
+			return nil
+		}, &calls
+	}
+
+	testCases := []struct {
+		name              string
+		wait              bool
+		containerFailures int
+		hostFailures      int
+		expectedHost      bool
+		expectedErr       bool
+		expectedHostCalls int
+	}{
+		{
+			name:              "driver container ready on the first attempt",
+			wait:              true,
+			containerFailures: 0,
+			hostFailures:      -1,
+			expectedHost:      false,
+			expectedHostCalls: 0,
+		},
+		{
+			name:              "driver container becomes ready while waiting",
+			wait:              true,
+			containerFailures: 3,
+			hostFailures:      -1,
+			expectedHost:      false,
+			expectedHostCalls: 3,
+		},
+		{
+			// Regression: on a node whose driver ships with the OS image there is never going to
+			// be a driver container, so a host driver that only finishes loading after the
+			// validator started must still be detected. The container probe is given a finite
+			// number of failures so that this case fails rather than hangs if the host is no
+			// longer re-probed.
+			name:              "host driver appears after the validator started",
+			wait:              true,
+			containerFailures: 50,
+			hostFailures:      2,
+			expectedHost:      true,
+			expectedHostCalls: 3,
+		},
+		{
+			name:              "container error is returned when not waiting",
+			wait:              false,
+			containerFailures: -1,
+			hostFailures:      0,
+			expectedHost:      false,
+			expectedErr:       true,
+			expectedHostCalls: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			probeContainer, _ := failUntil(tc.containerFailures)
+			probeHost, hostCalls := failUntil(tc.hostFailures)
+
+			hostDriver, err := waitForDriver(tc.wait, 0, probeContainer, probeHost)
+
+			if tc.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.expectedHost, hostDriver)
+			require.Equal(t, tc.expectedHostCalls, *hostCalls)
+		})
+	}
+}
+
+// Regression: with the driver DaemonSet present in the cluster but not running on this node, the
+// driver container readiness file never appears. The readiness check must not block on it, or the
+// host driver is never re-probed.
+func Test_waitForDriver_driverManagedByOperatorWithLateHostDriver(t *testing.T) {
+	_, err := os.Stat(driverContainerStatusFilePath)
+	require.True(t, os.IsNotExist(err), "test requires %s to be absent", driverContainerStatusFilePath)
+
+	origWait, origInterval := withWaitFlag, sleepIntervalSecondsFlag
+	withWaitFlag, sleepIntervalSecondsFlag = true, 0
+	t.Cleanup(func() { withWaitFlag, sleepIntervalSecondsFlag = origWait, origInterval })
+
+	hostCalls := 0
+	probeHost := func() error {
+		hostCalls++
+		if hostCalls <= 2 {
+			return errors.New("host driver not loaded yet")
+		}
+		return nil
+	}
+
+	type result struct {
+		hostDriver bool
+		err        error
+	}
+	done := make(chan result, 1)
+	go func() {
+		hostDriver, err := waitForDriver(withWaitFlag, sleepIntervalSecondsFlag,
+			func() error { return validateDriverContainer(true, true) }, probeHost)
+		done <- result{hostDriver, err}
+	}()
+
+	select {
+	case r := <-done:
+		require.NoError(t, r.err)
+		require.True(t, r.hostDriver)
+		require.Equal(t, 3, hostCalls)
+	case <-time.After(10 * time.Second):
+		t.Fatal("waitForDriver blocked on the driver container readiness check and never re-probed the host")
 	}
 }
