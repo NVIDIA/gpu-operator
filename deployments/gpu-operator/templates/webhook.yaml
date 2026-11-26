@@ -1,0 +1,195 @@
+{{- if .Values.webhook.enabled }}
+{{- $secretName := "gpu-operator-webhook-cert" -}}
+{{- $serviceName := "gpu-operator-webhook" -}}
+{{- /* Reuse the serving certificate on upgrades to keep the webhook CA stable. */ -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secretName -}}
+{{- $data := dict -}}
+{{- if $existing -}}
+  {{- $data = default dict $existing.data -}}
+{{- end -}}
+{{- if not (and (hasKey $data "ca.crt") (hasKey $data "tls.crt") (hasKey $data "tls.key")) -}}
+  {{- $ca := genCA "gpu-operator-webhook-ca" 3650 -}}
+  {{- $dnsNames := list $serviceName (printf "%s.%s" $serviceName .Release.Namespace) (printf "%s.%s.svc" $serviceName .Release.Namespace) (printf "%s.%s.svc.cluster.local" $serviceName .Release.Namespace) -}}
+  {{- $cert := genSignedCert (printf "%s.%s.svc" $serviceName .Release.Namespace) nil $dnsNames 3650 $ca -}}
+  {{- $_ := set $data "ca.crt" (b64enc $ca.Cert) -}}
+  {{- $_ := set $data "tls.crt" (b64enc $cert.Cert) -}}
+  {{- $_ := set $data "tls.key" (b64enc $cert.Key) -}}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  ca.crt: {{ index $data "ca.crt" | quote }}
+  tls.crt: {{ index $data "tls.crt" | quote }}
+  tls.key: {{ index $data "tls.key" | quote }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gpu-operator-webhook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gpu-operator-webhook
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gpu-operator-webhook
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gpu-operator-webhook
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [list]
+  - apiGroups: [nvidia.com]
+    resources: [nvidiadrivers]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gpu-operator-webhook
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gpu-operator-webhook
+subjects:
+  - kind: ServiceAccount
+    name: gpu-operator-webhook
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: gpu-operator-webhook
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-operator-webhook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gpu-operator-webhook
+spec:
+  replicas: {{ .Values.webhook.replicas }}
+  selector:
+    matchLabels:
+      app: gpu-operator-webhook
+  template:
+    metadata:
+      labels:
+        {{- include "gpu-operator.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gpu-operator-webhook
+        app: gpu-operator-webhook
+    spec:
+      serviceAccountName: gpu-operator-webhook
+      {{- if .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.operator.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.operator.priorityClassName }}
+      priorityClassName: {{ .Values.operator.priorityClassName }}
+      {{- end }}
+      {{- with .Values.operator.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: gpu-operator-webhook
+          image: {{ .Values.webhook.image | default (include "gpu-operator.fullimage" .) | quote }}
+          imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+          command: ["gpu-operator-webhook"]
+          ports:
+            - name: webhook
+              containerPort: 9443
+          readinessProbe:
+            tcpSocket:
+              port: webhook
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: webhook
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.webhook.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: webhook-cert
+              mountPath: /etc/gpu-operator/webhook/certs
+              readOnly: true
+      volumes:
+        - name: webhook-cert
+          secret:
+            secretName: {{ $secretName }}
+      {{- with .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: gpu-operator-webhook
+    app.kubernetes.io/component: gpu-operator-webhook
+  ports:
+    - name: webhook
+      port: 443
+      targetPort: webhook
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: gpu-operator-webhook
+  labels:
+    {{- include "gpu-operator.labels" . | nindent 4 }}
+webhooks:
+  - name: nvidiadrivers.nvidia.com
+    admissionReviewVersions:
+      - v1
+    sideEffects: None
+    # Validation is a no-op for now; allow requests while the server starts.
+    failurePolicy: Ignore
+    timeoutSeconds: 10
+    clientConfig:
+      service:
+        name: {{ $serviceName }}
+        namespace: {{ .Release.Namespace }}
+        path: /validate-nvidia-com-v1alpha1-nvidiadriver
+        port: 443
+      caBundle: {{ index $data "ca.crt" | quote }}
+    rules:
+      - apiGroups:
+          - nvidia.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - nvidiadrivers
+        scope: Cluster
+{{- end }}
