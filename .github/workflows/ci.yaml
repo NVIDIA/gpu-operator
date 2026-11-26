@@ -29,6 +29,54 @@ concurrency:
 permissions: {}
 
 jobs:
+  changes:
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/pull-request/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip_e2e: ${{ steps.filter.outcome == 'success' && steps.filter.outputs.changed == 'true' && steps.filter.outputs.src == 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Find the full PR comparison base
+        id: base
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/${GITHUB_REF##*/}")
+          jq -e --arg sha "$GITHUB_SHA" '.state == "open" and .base.ref != null and .base.sha != null and (.head.sha == $sha or .merge_commit_sha == $sha)' <<< "$pr"
+          base=$(jq -r '.base.sha' <<< "$pr")
+          git fetch --no-tags origin "$base"
+          merge_base=$(git merge-base "$base" "$GITHUB_SHA")
+          echo "base=$merge_base" >> "$GITHUB_OUTPUT"
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: ${{ steps.base.outcome == 'success' }}
+        continue-on-error: true
+        with:
+          token: ''
+          base: ${{ steps.base.outputs.base }}
+          ref: ${{ github.sha }}
+          predicate-quantifier: every
+          filters: |
+            changed:
+              - '**'
+            src:
+              - '!docs/**'
+              - '!**/*.md'
+              - '!.github/renovate.json'
+      - name: Summarize E2E decision
+        if: ${{ always() }}
+        env:
+          DECISION: ${{ steps.filter.outcome == 'success' && steps.filter.outputs.changed == 'true' && steps.filter.outputs.src == 'false' && 'Skip E2E for documentation/maintenance-only changes.' || 'Run E2E for runtime changes or an unavailable comparison.' }}
+        run: echo "$DECISION" >> "$GITHUB_STEP_SUMMARY"
+
   variables:
     permissions:
       contents: read
@@ -79,13 +127,15 @@ jobs:
       operator_image_base: ${{ needs.variables.outputs.operator_image_base }}
 
   e2e-tests:
-    needs: [variables, image-builds]
+    needs: [variables, image-builds, changes]
+    if: ${{ !cancelled() && needs.variables.result == 'success' && needs.image-builds.result == 'success' }}
     permissions:
       contents: read
       id-token: write
       packages: write
     uses: ./.github/workflows/e2e-tests.yaml
     with:
+      skip_e2e: ${{ needs.changes.result == 'success' && needs.changes.outputs.skip_e2e == 'true' }}
       operator_image: ${{ needs.variables.outputs.operator_image }}
       operator_version: ${{ needs.variables.outputs.operator_version }}
     secrets:
