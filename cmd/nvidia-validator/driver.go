@@ -17,6 +17,8 @@
 package main
 
 import (
+	"path"
+
 	"github.com/NVIDIA/gpu-operator/internal/driver"
 )
 
@@ -54,6 +56,10 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 		}
 	}
 
+	// Management containers mount the stable parent of the driver installation
+	// at /driver-root so replacement driver mounts propagate into their view.
+	driverRootCtrPath := path.Join("/driver-root", path.Base(driverInstallDir))
+
 	// For drivers not installed directly on the host, devRoot can either be
 	// hostRoot or driverInstallDir
 	var devRoot, devRootCtrPath string
@@ -63,14 +69,14 @@ func getDriverInfo(isHostDriver bool, hostRoot string, driverInstallDir string, 
 		devRootCtrPath = "/host"
 	} else {
 		devRoot = driverInstallDir
-		devRootCtrPath = "/driver-root"
+		devRootCtrPath = driverRootCtrPath
 	}
 
 	return driverInfo{
 		isHostDriver:      false,
 		hostRoot:          hostRoot,
 		driverRoot:        driverInstallDir,
-		driverRootCtrPath: "/driver-root",
+		driverRootCtrPath: driverRootCtrPath,
 		devRoot:           devRoot,
 		devRootCtrPath:    devRootCtrPath,
 	}
