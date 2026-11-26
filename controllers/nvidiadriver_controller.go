@@ -95,11 +95,7 @@ func (r *NVIDIADriverReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		wrappedErr := fmt.Errorf("error getting NVIDIADriver object: %w", err)
 		logger.Error(err, "error getting NVIDIADriver object")
-		instance.Status.State = nvidiav1alpha1.NotReady
-		if condErr := r.conditionUpdater.SetConditionsError(ctx, instance, conditions.ReconcileFailed, wrappedErr.Error()); condErr != nil {
-			logger.Error(condErr, "failed to set condition")
-		}
-		// Error reading the object - requeue the request.
+		// A failed Get leaves no fetched object to update. Return the error for requeue.
 		return reconcile.Result{}, wrappedErr
 	}
 	if instance.HasDeletionTimestamp() {

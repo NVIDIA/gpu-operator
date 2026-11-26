@@ -26,16 +26,78 @@ import (
 	promcli "github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	gpuv1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/conditions"
 	gpuconsts "github.com/NVIDIA/gpu-operator/internal/consts"
 )
+
+func TestReconcileCustomResourceGetFailure(t *testing.T) {
+	previousMetrics := clusterPolicyCtrl.operatorMetrics
+	clusterPolicyCtrl.operatorMetrics = newClusterPolicyUpgradeTestMetrics()
+	t.Cleanup(func() { clusterPolicyCtrl.operatorMetrics = previousMetrics })
+
+	tests := map[string]struct {
+		resource   string
+		reconciler func(client.Client) reconcile.Reconciler
+	}{
+		"ClusterPolicy": {
+			resource: "clusterpolicies",
+			reconciler: func(c client.Client) reconcile.Reconciler {
+				return &ClusterPolicyReconciler{Client: c, conditionUpdater: conditions.NewClusterPolicyUpdater(c)}
+			},
+		},
+		"NVIDIADriver": {
+			resource: "nvidiadrivers",
+			reconciler: func(c client.Client) reconcile.Reconciler {
+				return &NVIDIADriverReconciler{Client: c, conditionUpdater: conditions.NewNvDriverUpdater(c)}
+			},
+		},
+	}
+	req := ctrl.Request{NamespacedName: client.ObjectKey{Name: "test-resource"}}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fetchErrors := map[string]error{
+				"transient": context.DeadlineExceeded,
+				"not found": apierrors.NewNotFound(schema.GroupResource{Group: "nvidia.com", Resource: tc.resource}, req.Name),
+			}
+			for name, fetchErr := range fetchErrors {
+				t.Run(name, func(t *testing.T) {
+					var getKeys []client.ObjectKey
+					c := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
+						Get: func(_ context.Context, _ client.WithWatch, key client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
+							getKeys = append(getKeys, key)
+							if key.Name == "" {
+								return apierrors.NewBadRequest("resource name may not be empty")
+							}
+							return fetchErr
+						},
+					}).Build()
+					logger, logs := newTestLogger()
+					result, err := tc.reconciler(c).Reconcile(ctrl.LoggerInto(t.Context(), logger), req)
+
+					require.Equal(t, ctrl.Result{}, result)
+					if apierrors.IsNotFound(fetchErr) {
+						require.NoError(t, err)
+					} else {
+						require.ErrorIs(t, err, fetchErr)
+					}
+					require.Equal(t, []client.ObjectKey{req.NamespacedName}, getKeys, "%s", logs.String())
+				})
+			}
+		})
+	}
+}
 
 func TestIsIncompleteDriverUpgradeState(t *testing.T) {
 	tests := []struct {
