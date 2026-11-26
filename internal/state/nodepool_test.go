@@ -307,6 +307,57 @@ func TestGetNodePoolsPartitionsPrecompiledNodesByKernel(t *testing.T) {
 	require.Equal(t, "5.15.0-70-generic_x86_64", nodePools[0].nodeSelector[nfdKernelLabelKey])
 }
 
+func TestGetNodePoolsKeepsPrecompiledKernelsThatSanitizeTogether(t *testing.T) {
+	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
+
+	// x86_64 and aarch64 sanitize to the same string. See TestGetSanitizedKernelVersion.
+	const (
+		x86Kernel = "5.14.0-427.37.1.el9_4.x86_64"
+		armKernel = "5.14.0-427.37.1.el9_4.aarch64"
+	)
+	node := func(name, kernel string) *corev1.Node {
+		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				consts.GPUPresentLabel:        "true",
+				consts.NVIDIADriverOwnerLabel: "driver-a",
+				nfdOSReleaseIDLabelKey:        "rhel",
+				nfdOSVersionIDLabelKey:        "9.4",
+				nfdOSVersionIDMajorLabelKey:   "9",
+				nfdKernelLabelKey:             kernel,
+			},
+		}}
+	}
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(
+			node("x86-node", x86Kernel),
+			node("arm-node", armKernel),
+			node("second-x86-node", x86Kernel),
+		).
+		Build()
+	driver := &nvidiav1alpha1.NVIDIADriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "driver-a"},
+		Spec: nvidiav1alpha1.NVIDIADriverSpec{
+			UsePrecompiled: new(true),
+		},
+	}
+
+	nodePools, err := getNodePools(context.Background(), k8sClient, driver, false)
+
+	require.NoError(t, err)
+	require.Len(t, nodePools, 2)
+	got := map[string]string{}
+	for _, pool := range nodePools {
+		require.Equal(t, "rhel9-5.14.0-427.37.1.el9.4", pool.name)
+		got[pool.kernel] = pool.nodeSelector[nfdKernelLabelKey]
+	}
+	require.Equal(t, map[string]string{
+		x86Kernel: x86Kernel,
+		armKernel: armKernel,
+	}, got)
+}
+
 func TestGetNodePoolsPartitionsOpenShiftNodesByRHCOSVersion(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme.Scheme))
 
