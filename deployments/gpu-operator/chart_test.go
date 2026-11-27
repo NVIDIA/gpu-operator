@@ -28,6 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
+
+	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
 )
 
 func TestOperatorRejectsInvalidReplicaCount(t *testing.T) {
@@ -179,6 +181,97 @@ operator:
 		t.Run(name, func(t *testing.T) {
 			deployment, pdb := renderChart(t, tc.values)
 			tc.check(t, deployment, pdb)
+		})
+	}
+}
+
+func renderNVIDIADriver(t *testing.T, values string, extraArgs ...string) *nvidiav1alpha1.NVIDIADriver {
+	t.Helper()
+	if _, err := exec.LookPath("helm"); err != nil {
+		t.Skip("helm binary not found in PATH")
+	}
+
+	args := append([]string{"template", "gpu-operator", ".", "--namespace", "gpu-operator", "--show-only", "templates/nvidiadriver.yaml", "--values", "-"}, extraArgs...)
+	cmd := exec.Command("helm", args...)
+	cmd.Stdin = strings.NewReader(values)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	require.NoError(t, err, stderr.String())
+
+	var nvidiaDriver nvidiav1alpha1.NVIDIADriver
+	require.NoError(t, yaml.Unmarshal(out, &nvidiaDriver))
+	require.Equal(t, "NVIDIADriver", nvidiaDriver.Kind)
+	return &nvidiaDriver
+}
+
+func TestNVIDIADriverLicensingConfig(t *testing.T) {
+	sources := map[string]struct {
+		key                string
+		value              string
+		expectedSecretName string
+		expectedName       string
+	}{
+		"secretName": {
+			key:                "secretName",
+			value:              "vgpu-license",
+			expectedSecretName: "vgpu-license",
+		},
+		"configMapName": {
+			key:          "configMapName",
+			value:        "vgpu-license-cm",
+			expectedName: "vgpu-license-cm",
+		},
+	}
+
+	testCases := map[string]struct {
+		nlsLine            string
+		extraArgs          []string
+		expectedNLSEnabled bool
+	}{
+		"explicit false": {
+			nlsLine:            "    nlsEnabled: false\n",
+			expectedNLSEnabled: false,
+		},
+		"explicit true": {
+			nlsLine:            "    nlsEnabled: true\n",
+			expectedNLSEnabled: true,
+		},
+		"unset defaults to true": {
+			expectedNLSEnabled: true,
+		},
+		"null defaults to true": {
+			nlsLine:            "    nlsEnabled: null\n",
+			expectedNLSEnabled: true,
+		},
+		"empty string defaults to true": {
+			nlsLine:            "    nlsEnabled: \"\"\n",
+			expectedNLSEnabled: true,
+		},
+		"set-string empty defaults to true": {
+			extraArgs:          []string{"--set-string", "driver.licensingConfig.nlsEnabled="},
+			expectedNLSEnabled: true,
+		},
+		"set-string false": {
+			extraArgs:          []string{"--set-string", "driver.licensingConfig.nlsEnabled=false"},
+			expectedNLSEnabled: false,
+		},
+	}
+
+	for sourceName, source := range sources {
+		t.Run(sourceName, func(t *testing.T) {
+			for caseName, tc := range testCases {
+				t.Run(caseName, func(t *testing.T) {
+					values := fmt.Sprintf("driver:\n  nvidiaDriverCRD:\n    enabled: true\n  licensingConfig:\n    %s: %s\n%s",
+						source.key, source.value, tc.nlsLine)
+					nvidiaDriver := renderNVIDIADriver(t, values, tc.extraArgs...)
+					require.NotNil(t, nvidiaDriver.Spec.LicensingConfig)
+					require.Equal(t, source.expectedSecretName, nvidiaDriver.Spec.LicensingConfig.SecretName)
+					require.Equal(t, source.expectedName, nvidiaDriver.Spec.LicensingConfig.Name)
+					require.NotNil(t, nvidiaDriver.Spec.LicensingConfig.NLSEnabled)
+					require.Equal(t, tc.expectedNLSEnabled, *nvidiaDriver.Spec.LicensingConfig.NLSEnabled)
+				})
+			}
 		})
 	}
 }
