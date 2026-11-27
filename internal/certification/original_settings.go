@@ -24,17 +24,27 @@ import (
 	"reflect"
 	"time"
 
-	nvidiav1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1"
-	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/NVIDIA/gpu-operator/internal/certification/k8s"
 )
 
-// OriginalSettings holds the initial ClusterPolicy and NVIDIADriver CR specs
-// so they can be restored after each TestSet.
+// crClient is the part of *k8s.Clients that captures and restores the CRs.
+type crClient interface {
+	GetClusterPolicyUnstructured(ctx context.Context) (*unstructured.Unstructured, error)
+	ListNVIDIADriversUnstructured(ctx context.Context) ([]unstructured.Unstructured, error)
+	ModifyClusterPolicy(ctx context.Context, patchJSON []byte) error
+	ModifyNVIDIADriver(ctx context.Context, name string, patchJSON []byte) error
+}
+
+// OriginalSettings holds the initial ClusterPolicy and NVIDIADriver CRs so they
+// can be restored after each TestSet. They are kept as the API server returned
+// them: the typed specs would drop explicit zero values from omitempty fields,
+// such as upgradePolicy.autoUpgrade: false, and the API server would replace
+// those with their CRD defaults on restore.
 type OriginalSettings struct {
-	clusterPolicy *nvidiav1.ClusterPolicy
-	drivers       []nvidiav1alpha1.NVIDIADriver
+	clusterPolicy *unstructured.Unstructured
+	drivers       []unstructured.Unstructured
 }
 
 // CaptureOriginalSettings saves the current ClusterPolicy and NVIDIADriver CR specs.
@@ -43,27 +53,35 @@ type OriginalSettings struct {
 func CaptureOriginalSettings(ctx context.Context, clients *k8s.Clients, timeout time.Duration) (*OriginalSettings, error) {
 	var s *OriginalSettings
 	err := clients.WaitForCondition(ctx, timeout, func(ctx context.Context) (bool, error) {
-		s = &OriginalSettings{}
-
-		cp, cpErr := clients.GetClusterPolicy(ctx)
-		if cpErr != nil {
-			log.Printf("  original settings: capture failed (retrying): %v", cpErr)
+		var captureErr error
+		s, captureErr = captureSettings(ctx, clients)
+		if captureErr != nil {
+			log.Printf("  original settings: capture failed (retrying): %v", captureErr)
 			return false, nil
 		}
-		s.clusterPolicy = cp
-
-		drivers, driversErr := clients.ListNVIDIADrivers(ctx)
-		if driversErr != nil {
-			// NVIDIADriver CRD may not exist — not an error
-			log.Printf("  original settings: no NVIDIADriver CRs to capture: %v", driversErr)
-		} else {
-			s.drivers = drivers
-		}
-
 		return true, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("capturing original settings: %w", err)
+	}
+	return s, nil
+}
+
+func captureSettings(ctx context.Context, c crClient) (*OriginalSettings, error) {
+	s := &OriginalSettings{}
+
+	cp, err := c.GetClusterPolicyUnstructured(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.clusterPolicy = cp
+
+	drivers, err := c.ListNVIDIADriversUnstructured(ctx)
+	if err != nil {
+		// NVIDIADriver CRD may not exist — not an error
+		log.Printf("  original settings: no NVIDIADriver CRs to capture: %v", err)
+	} else {
+		s.drivers = drivers
 	}
 	return s, nil
 }
@@ -110,38 +128,34 @@ func (s *OriginalSettings) Restore(ctx context.Context, clients *k8s.Clients, na
 
 // restoreClusterPolicy patches the ClusterPolicy back to its original spec.
 // Returns whether driver-related fields changed.
-func (s *OriginalSettings) restoreClusterPolicy(ctx context.Context, clients *k8s.Clients) (driverRelated bool) {
+func (s *OriginalSettings) restoreClusterPolicy(ctx context.Context, c crClient) (driverRelated bool) {
 	if s.clusterPolicy == nil {
 		return false
 	}
 
-	current, err := clients.GetClusterPolicy(ctx)
+	current, err := c.GetClusterPolicyUnstructured(ctx)
 	if err != nil {
 		log.Printf("  original settings: failed to get current ClusterPolicy: %v", err)
 		return false
 	}
-	if reflect.DeepEqual(current.Spec, s.clusterPolicy.Spec) {
+	if reflect.DeepEqual(current.Object["spec"], s.clusterPolicy.Object["spec"]) {
 		return false
 	}
 
 	// Detect whether driver-related fields changed. Driver DaemonSets use
 	// OnDelete update strategy, so spec changes only take effect after pods
 	// are explicitly deleted.
-	driverRelated = !reflect.DeepEqual(current.Spec.Driver, s.clusterPolicy.Spec.Driver) ||
-		!reflect.DeepEqual(current.Spec.GDRCopy, s.clusterPolicy.Spec.GDRCopy) ||
-		!reflect.DeepEqual(current.Spec.GPUDirectStorage, s.clusterPolicy.Spec.GPUDirectStorage)
+	driverRelated = specFieldChanged(current, s.clusterPolicy, "driver") ||
+		specFieldChanged(current, s.clusterPolicy, "gdrcopy") ||
+		specFieldChanged(current, s.clusterPolicy, "gds")
 
 	log.Println("  original settings: restoring ClusterPolicy spec")
-	specJSON, err := json.Marshal(s.clusterPolicy.Spec)
+	patch, err := specReplacePatch(s.clusterPolicy)
 	if err != nil {
 		log.Printf("  original settings: failed to marshal ClusterPolicy spec: %v", err)
 		return false
 	}
-
-	patch, _ := json.Marshal([]map[string]any{
-		{"op": "replace", "path": "/spec", "value": json.RawMessage(specJSON)},
-	})
-	if err := clients.ModifyClusterPolicy(ctx, patch); err != nil {
+	if err := c.ModifyClusterPolicy(ctx, patch); err != nil {
 		log.Printf("  original settings: failed to restore ClusterPolicy: %v", err)
 		return false
 	}
@@ -151,43 +165,54 @@ func (s *OriginalSettings) restoreClusterPolicy(ctx context.Context, clients *k8
 // restoreNVIDIADrivers patches NVIDIADriver CRs back to their original specs.
 // Returns whether any CR was patched. The entire NVIDIADriver spec is driver-related,
 // so patched == driverRelated.
-func (s *OriginalSettings) restoreNVIDIADrivers(ctx context.Context, clients *k8s.Clients) (patched bool) {
+func (s *OriginalSettings) restoreNVIDIADrivers(ctx context.Context, c crClient) (patched bool) {
 	if len(s.drivers) == 0 {
 		return false
 	}
 
-	currentDrivers, err := clients.ListNVIDIADrivers(ctx)
+	currentDrivers, err := c.ListNVIDIADriversUnstructured(ctx)
 	if err != nil {
 		log.Printf("  original settings: failed to get current NVIDIADriver CRs: %v", err)
 		return false
 	}
 
-	currentByName := make(map[string]nvidiav1alpha1.NVIDIADriver, len(currentDrivers))
+	currentByName := make(map[string]unstructured.Unstructured, len(currentDrivers))
 	for _, d := range currentDrivers {
-		currentByName[d.Name] = d
+		currentByName[d.GetName()] = d
 	}
 
 	for _, saved := range s.drivers {
-		current, exists := currentByName[saved.Name]
-		if !exists || reflect.DeepEqual(current.Spec, saved.Spec) {
+		current, exists := currentByName[saved.GetName()]
+		if !exists || reflect.DeepEqual(current.Object["spec"], saved.Object["spec"]) {
 			continue
 		}
 
-		log.Printf("  original settings: restoring NVIDIADriver %q spec", saved.Name)
-		specJSON, err := json.Marshal(saved.Spec)
+		log.Printf("  original settings: restoring NVIDIADriver %q spec", saved.GetName())
+		patch, err := specReplacePatch(&saved)
 		if err != nil {
-			log.Printf("  original settings: failed to marshal NVIDIADriver %q spec: %v", saved.Name, err)
+			log.Printf("  original settings: failed to marshal NVIDIADriver %q spec: %v", saved.GetName(), err)
 			continue
 		}
 
-		patch, _ := json.Marshal([]map[string]any{
-			{"op": "replace", "path": "/spec", "value": json.RawMessage(specJSON)},
-		})
-		if err := clients.ModifyNVIDIADriver(ctx, saved.Name, patch); err != nil {
-			log.Printf("  original settings: failed to restore NVIDIADriver %q: %v", saved.Name, err)
+		if err := c.ModifyNVIDIADriver(ctx, saved.GetName(), patch); err != nil {
+			log.Printf("  original settings: failed to restore NVIDIADriver %q: %v", saved.GetName(), err)
 		} else {
 			patched = true
 		}
 	}
 	return patched
+}
+
+// specReplacePatch returns a JSON patch that replaces the spec with the one in obj.
+func specReplacePatch(obj *unstructured.Unstructured) ([]byte, error) {
+	return json.Marshal([]map[string]any{
+		{"op": "replace", "path": "/spec", "value": obj.Object["spec"]},
+	})
+}
+
+// specFieldChanged reports whether the spec field differs between the two objects.
+func specFieldChanged(a, b *unstructured.Unstructured, field string) bool {
+	aValue, _, _ := unstructured.NestedFieldNoCopy(a.Object, "spec", field)
+	bValue, _, _ := unstructured.NestedFieldNoCopy(b.Object, "spec", field)
+	return !reflect.DeepEqual(aValue, bValue)
 }

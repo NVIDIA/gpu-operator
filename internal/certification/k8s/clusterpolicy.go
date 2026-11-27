@@ -22,6 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +39,21 @@ var clusterPolicyGVR = schema.GroupVersionResource{
 // GetClusterPolicy retrieves the ClusterPolicy resource by listing all
 // instances and returning the first one found.
 func (c *Clients) GetClusterPolicy(ctx context.Context) (*nvidiav1.ClusterPolicy, error) {
+	obj, err := c.GetClusterPolicyUnstructured(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var cp nvidiav1.ClusterPolicy
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &cp); err != nil {
+		return nil, fmt.Errorf("converting to ClusterPolicy: %w", err)
+	}
+	return &cp, nil
+}
+
+// GetClusterPolicyUnstructured returns the first ClusterPolicy as the API server
+// returned it. Use it when the object has to be written back unchanged.
+func (c *Clients) GetClusterPolicyUnstructured(ctx context.Context) (*unstructured.Unstructured, error) {
 	list, err := c.dynamic.Resource(clusterPolicyGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("listing ClusterPolicies: %w", err)
@@ -45,12 +61,7 @@ func (c *Clients) GetClusterPolicy(ctx context.Context) (*nvidiav1.ClusterPolicy
 	if len(list.Items) == 0 {
 		return nil, fmt.Errorf("no ClusterPolicy resource found")
 	}
-
-	var cp nvidiav1.ClusterPolicy
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[0].Object, &cp); err != nil {
-		return nil, fmt.Errorf("converting to ClusterPolicy: %w", err)
-	}
-	return &cp, nil
+	return &list.Items[0], nil
 }
 
 // ModifyClusterPolicy applies a JSON patch to the ClusterPolicy resource.

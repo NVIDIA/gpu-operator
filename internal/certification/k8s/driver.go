@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,13 +40,13 @@ var nvidiaDriverGVR = schema.GroupVersionResource{
 
 // ListNVIDIADrivers returns all NVIDIADriver CRs in the cluster.
 func (c *Clients) ListNVIDIADrivers(ctx context.Context) ([]nvidiav1alpha1.NVIDIADriver, error) {
-	unstructuredList, err := c.dynamic.Resource(nvidiaDriverGVR).List(ctx, metav1.ListOptions{})
+	items, err := c.ListNVIDIADriversUnstructured(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	drivers := make([]nvidiav1alpha1.NVIDIADriver, 0, len(unstructuredList.Items))
-	for _, item := range unstructuredList.Items {
+	drivers := make([]nvidiav1alpha1.NVIDIADriver, 0, len(items))
+	for _, item := range items {
 		var driver nvidiav1alpha1.NVIDIADriver
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &driver); err != nil {
 			continue
@@ -53,6 +54,16 @@ func (c *Clients) ListNVIDIADrivers(ctx context.Context) ([]nvidiav1alpha1.NVIDI
 		drivers = append(drivers, driver)
 	}
 	return drivers, nil
+}
+
+// ListNVIDIADriversUnstructured returns all NVIDIADriver CRs as the API server
+// returned them. Use it when the objects have to be written back unchanged.
+func (c *Clients) ListNVIDIADriversUnstructured(ctx context.Context) ([]unstructured.Unstructured, error) {
+	list, err := c.dynamic.Resource(nvidiaDriverGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
 
 // ModifyNVIDIADriver applies a JSON patch to the specified NVIDIADriver CR.
