@@ -21,14 +21,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"maps"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	nvidiav1alpha1 "github.com/NVIDIA/gpu-operator/api/nvidia/v1alpha1"
+	"github.com/NVIDIA/gpu-operator/internal/consts"
 )
 
 var nvidiaDriverGVR = schema.GroupVersionResource{
@@ -104,7 +106,7 @@ func (c *Clients) EnableGDRCopy(ctx context.Context) error {
 }
 
 // GDRCopyEligibleNodes returns the set of node names where GDRCopy can be enabled.
-// In NVIDIADriver mode, returns nodes targeted by non-precompiled CRs (via their NodeSelector).
+// In NVIDIADriver mode, returns the GPU nodes the operator assigned to non-precompiled CRs.
 // In ClusterPolicy mode, returns all GPU nodes if the driver is not precompiled.
 // Returns nil when no nodes are eligible.
 func (c *Clients) GDRCopyEligibleNodes(ctx context.Context) (map[string]bool, error) {
@@ -139,12 +141,7 @@ func (c *Clients) GDRCopyEligibleNodes(ctx context.Context) (map[string]bool, er
 		if driver.Spec.UsePrecompiledDrivers() {
 			continue
 		}
-		// Empty NodeSelector means the CR targets all nodes.
-		parts := make([]string, 0, len(driver.Spec.NodeSelector))
-		for k, v := range driver.Spec.NodeSelector {
-			parts = append(parts, k+"="+v)
-		}
-		nodeList, err := c.ListNodes(ctx, strings.Join(parts, ","))
+		nodeList, err := c.ListNodes(ctx, driverNodeSelector(driver))
 		if err != nil {
 			continue
 		}
@@ -190,4 +187,16 @@ func (c *Clients) UpdateDriverImage(ctx context.Context, repository, imageName, 
 		return errors.Join(errs...)
 	}
 	return c.ModifyClusterPolicy(ctx, patch)
+}
+
+// driverNodeSelector returns the label selector of the nodes whose driver pods
+// the NVIDIADriver manages: its nodeSelector restricted to the GPU nodes the
+// operator assigned to it, as the operator selects them for the CR's driver
+// DaemonSets.
+func driverNodeSelector(driver nvidiav1alpha1.NVIDIADriver) string {
+	selector := labels.Set{}
+	maps.Copy(selector, driver.Spec.NodeSelector)
+	selector[consts.GPUPresentLabel] = "true"
+	selector[consts.NVIDIADriverOwnerLabel] = driver.Name
+	return labels.SelectorFromSet(selector).String()
 }
